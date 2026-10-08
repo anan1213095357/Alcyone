@@ -1,84 +1,186 @@
-# Alcyone
+<div align="center">
 
-Windows / .NET 10 / Blazor Server。通过全局变量和屏幕识别条件决定状态转移，拖线编排 C# 热重载脚本。
+![Alcyone — AI-powered scripting and state machine automation](docs/images/banner.svg)
 
-## 使用
+**Simple actions. Complex automation.**
 
-```powershell
-dotnet run --project StateMachine/Alcyone.csproj
+Write scripts with AI. Organize logic with states. Connect it all to your desktop.
+
+**English** · [简体中文](README.zh-CN.md)
+
+![Windows x64](https://img.shields.io/badge/Windows-x64-0078D4?style=flat-square)
+![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square)
+![C%23](https://img.shields.io/badge/Scripting-C%23-65C7C8?style=flat-square)
+![Blazor + Photino](https://img.shields.io/badge/Desktop-Blazor%20%2B%20Photino-8B87F8?style=flat-square)
+
+[Highlights](#highlights) · [A closer look](#a-closer-look) · [Quick start](#quick-start) · [User guide](docs/guide.md)
+
+</div>
+
+---
+
+Alcyone is a Windows desktop automation workspace that brings **AI-assisted development, visual state machines, and hot-reloadable C# scripts** together. Clicks, keystrokes, and waits become reusable actions. Conditions, branches, loops, and parallel state regions turn those actions into workflows.
+
+Start with “find this button and click it.” Build toward “recognize text, evaluate conditions, execute a script, and wait for the screen to change.” Inspect and edit each state and transition on the canvas.
+
+![Alcyone state machine canvas](docs/images/workflow.png)
+
+## Highlights
+
+| | Capability | What it enables |
+| :-- | :-- | :-- |
+| ✦ | **AI script assistant** | Describe a task, generate a workflow, C# scripts, or both, then preview and apply the changes. |
+| ◈ | **Visual state machines** | Connect states, combine ALL / ANY conditions, and prioritize outgoing transitions. |
+| ⌘ | **C# hot reload** | Edit `.csx` files and expose parameters in the UI. Failed compilation keeps the last working version. |
+| ◎ | **Screen recognition** | Use multi-point colors, dictionary OCR, and fixed-text searches to drive transitions. |
+| ⑂ | **Parallel state regions** | Give each region its own current state and share numeric, boolean, text, and JSON variables. |
+| ▷ | **Execution controls** | Run, step, stop, and reset with current-state highlighting and execution logs. |
+
+## From idea to automation
+
+```text
+Describe → Generate scripts / states → Preview & apply → Connect & configure → Run / step
+                                                               ↑                │
+                                                               └─ Inspect & edit┘
 ```
 
-打开控制台输出的浏览器地址。截图和键鼠操作作用于服务所在的 Windows 桌面会话。
+You can also build workflows and write scripts by hand. AI assistance is optional.
 
-1. 在状态机左侧打开“识别库 → 管理 / 导入”。在左侧新建或选中字典、多点色库，再点击统一的“编辑 / 训练当前库”；界面自动根据当前库的类型提供完整截图、标定、训练和测试功能，不需要另外启动 FastColorFinder。训练完成点击“保存到识别库”，当前结果和搜索参数直接保存到当前流程；“另存为新项 / 新字典”会追加记录。选中已有项目后点击“编辑 / 训练当前库”，可继续编辑字典点阵、颜色、权重，或调整多点颜色特征与搜索参数；保存保留项目 ID，已有出口条件仍然引用同一项。
-2. 状态机左侧点击“识别库 → 管理 / 导入”。字典直接点击“导入字典文件”，支持工具导出的 TXT / JSON 或 FTF1，文件上限与原工具一致为 64 MB。多点色库使用粘贴录入：在工具训练完成后点击“复制调用代码”，新建多点色库，将完整代码粘贴到“粘贴工具输出”中，点击“解析并录入”。会解析出权重字符串、查找范围、色偏和相似度；代码只作为数据解析。也支持单独粘贴 FCF2 / FCF3 权重串，此时保留当前查找参数。成功数量和错误原因显示在弹窗顶部。字典可选择找字或 OCR 识别方式。
-3. 管理页使用带列名的列表。字典按“名称、文字矩阵、字符串、查找范围、操作”展示工具字库中的全部模板；多点色库对应展示“名称、颜色坐标描述、字符串、查找范围、操作”。字典字符串为点阵对应的文字，多点色库字符串为工具训练的 FCF2 / FCF3 特征。同一字典的模板共用搜索范围，X/Y/宽/高可在列表中直接修改。字库和色库每行都提供“框选查找范围”，点击后拖动框选桌面区域，自动保存；Esc 取消保留原范围。每行“二次编辑”打开原项目，字库行打开原有字典训练界面并载入整个已有字典，颜色行恢复原训练数据；保存仍更新原项目 ID，不影响出口条件引用。
-4. 选中状态，右侧出口添加条件，在同一个名称选择框中选择全局变量、多点色库名称或字典库名称，三类名称分组显示。选全局变量后显示变量比较，选库中名称后显示识别判断。同一个识别条件中可以同时填写成功／失败、相似度、X、Y 和文字；填写项全部满足才成立，数值和文字留空、结果选“不判断”时跳过该项。相似度、X、Y 各自可设置比较符。多个条件仍可用 ALL / ANY 组合。
-   选择字典后，每条出口条件分别选择“字典用途”：OCR 结果判断识别搜索区全部文字，再比较识别文字等结果；查找固定文字必须填写要找的字符串，并判断找到／未找到及匹配坐标。同一个字典可同时用于 OCR、查找“确定”和查找“取消”，结果独立；库管理页的方式与文字用于测试。
-5. 拖线连接下一状态，配置进入、循环或离开脚本及参数，然后运行或单步。
+1. **Prepare recognition items.** Import or train dictionaries and color patterns, then set search regions.
+2. **Build the workflow.** Add states, configure entry / loop / exit actions, and connect transitions.
+3. **Define conditions.** Combine variables with recognition status, similarity, coordinates, and text.
+4. **Inspect execution.** Step through the logic before running continuously; use logs to diagnose behavior.
 
-左侧识别库只显示名称和类型。管理弹窗的表格同时显示同类库的多条记录，点击简介会定位、高亮对应行，并激活右侧该项的参数。点击表格行只切换参数，不滚动或抢走编辑焦点。多点色库每行拥有独立名称、颜色描述、字符串和查找范围；字符串编辑完成后自动应用，无需保存按钮。右侧“解析并录入新项”连续追加色库记录，每次成功后清空粘贴框，已有表格行通过自动保存来修改。左侧导入字典文件会追加新字典，右侧文件入口用于更新当前选中的字典。格式错误时显示原因并保留上次有效值。每轮只检测当前状态出口引用的识别项目。识别库和条件随流程配置一起保存、导入和导出。旧版颜色变量自动迁移成独立识别项目及成功／失败条件。
+## A closer look
 
-普通全局变量支持数值、布尔、文本和 JSON，由脚本或手动更新。识别结果独立保存，不会写成普通布尔变量。字典格式错误、截图失败等执行错误会中止本轮并记录日志；正常未找到才属于识别失败。
+### Describe what should happen
 
-编译时保留同级 `FastColorFinder` 文件夹。状态机只读链接其截图、框选、训练和识别运行库；工具目录内的源码完全不改。训练界面副本及适配代码位于状态机项目的 `Components/Training`、`Training`、`wwwroot/training`，作为同一进程中的内嵌页面运行；每次打开有独立截图会话，样式与状态机画布隔离。发布后的程序无需旁边放置工具程序。
+The assistant uses the current workflow, recognition library, and action catalog as context. Choose workflow + scripts, scripts only, or workflow only.
 
-取字界面保留多字库切换、TXT 导入导出、逐像素点阵/权重/颜色编辑、实时 OCR、搜索区设置、匹配测试以及调用代码与 C# 类下载。每个字库单独点击“保存到识别库”；下载 TXT 是额外导出。关闭时若存在未保存内容会提示。多点颜色保留实时画布、放大镜、拖动及方向键微调、时间训练、连续测试、搜索范围和调用代码导出。新保存的多点颜色会同时保留训练捕获位置；二次编辑时恢复捕获区及原标点，可拖动调整后重新训练。旧特征串没有捕获位置时，首次重新框选原目标区域即可恢复标点，不必重新逐点标注。查找范围与训练捕获范围独立保存。
+![AI script assistant with an example request](docs/images/ai-assistant.png)
 
-从同时包含 `StateMachine` 和 `FastColorFinder` 的目录执行验证：`dotnet run --project StateMachine/Tests/TrainingChecks/TrainingChecks.csproj -c Release`（直接保存、更新 ID、另存、错误回滚、参数与会话隔离），`dotnet run --project StateMachine/Tests/RecognitionImportChecks/RecognitionImportChecks.csproj -c Release`（原有导入和运行服务）。发布程序支持 `--check-host` 检查脚本、主界面和内嵌训练资源，`--browser-host` 用于本地浏览器验证。
+### Turn screen content into conditions
 
-## 热重载脚本
+Manage dictionaries, multi-point colors, search regions, and matching parameters in one place. Training and testing are embedded in the app.
 
-编辑 `StateMachine/HotScripts/*.csx` 后自动编译和替换动作，编译失败保留上次有效版本。脚本类继承 `StateScript`，公开方法使用 `[StateAction]` 标记，参数使用 `[StateParameter]` 标记。
+![Recognition library and dictionary management](docs/images/recognition.png)
+
+<sub>Actual application screenshots; the current UI is primarily Chinese. The AI screenshot shows prompt composition, without a model call or generated result.</sub>
+
+## Quick start
+
+### Prerequisites
+
+- Windows x64, the .NET 10 SDK, and WebView2 Runtime.
+- **The `FastColorFinder` source dependency.** The project links its source files using relative paths. Supply the complete directory beside this repository; it is not bundled in this repository yet.
+
+```text
+workspace/
+├── Alcyone/                  # This repository; folder name may vary
+│   ├── Alcyone.slnx
+│   └── Alcyone/Alcyone.csproj
+└── FastColorFinder/          # Required to build
+    ├── FastColorFinder.cs
+    ├── Core/
+    ├── Services/
+    └── Native/
+```
+
+### Launch the desktop app
+
+From the repository root:
+
+```powershell
+dotnet restore Alcyone.slnx
+dotnet run --project Alcyone/Alcyone.csproj -c Release
+```
+
+A standalone desktop window opens. For browser-based development:
+
+```powershell
+dotnet run --project Alcyone/Alcyone.csproj -c Release -- --browser-host
+```
+
+Open the local URL printed in the console. Screen capture and input operate on **the Windows desktop session hosting the service**.
+
+### Configure AI (optional)
+
+The app reads `AI:ApiKey`, `AI:Endpoint`, and `AI:Model`, with `DASHSCOPE_API_KEY` as a key fallback. Set environment variables in the same PowerShell session before launching:
+
+```powershell
+$env:AI__ApiKey = "<your-api-key>"
+$env:AI__Endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+$env:AI__Model = "<model-id-available-to-your-account>"
+dotnet run --project Alcyone/Alcyone.csproj -c Release
+```
+
+The endpoint must accept Chat Completions-compatible requests. AI requests send your instructions and current workflow context to the configured provider; proposed changes are previewed and applied in the UI. Keep credentials in local configuration or environment variables.
+
+## Extend with C#
+
+Save scripts in the application's `HotScripts/*.csx` directory. During source development, edit `Alcyone/HotScripts/` and relaunch to copy the scripts; live hot reload watches `HotScripts/` beside the executable.
 
 ```csharp
-public sealed class MyDesktopActions : StateScript
+public sealed class MyActions : StateScript
 {
-    [StateAction("识别后点击", "我的脚本")]
-    public async Task Execute([StateParameter("识别项目名")] string name)
+    [StateAction("Click recognized target", "My scripts")]
+    public async Task ClickTarget([StateParameter("Recognition item")] string name)
     {
         var hit = await Api.Recognition.FindAsync(name, seconds: 3);
         if (!hit.Found) return;
+
         Api.Input.Click(hit.X, hit.Y);
         await Api.Delay(200);
-        Api.Input.Hotkey("CTRL", "A");
-        Api.Input.TypeText("测试文字");
-        Api.Input.Press("ENTER");
         Vars.Set("Finished", true);
+        Log("Target clicked");
     }
 }
 ```
 
-| API | 用途 |
-| --- | --- |
-| `Vars.Get<T>(name, defaultValue)` / `Vars.Set(name, value)` | 读写全局变量 |
-| `Api.Recognition.Last(name)` | 获取最近一次检测结果；可能为空 |
-| `await Api.Recognition.FindAsync(name, seconds: 3)` | 按识别库项目的参数查找 |
-| `hit.Found` / `X` / `Y` / `Similarity` / `Text` | 成功状态、坐标、相似度及文字 |
-| `Api.Input.MoveTo(x, y)` / `Click(x, y, "left")` | 移动和点击 |
-| `await Api.Input.DoubleClickAsync(x, y)` | 双击 |
-| `Api.Input.Press("ENTER")` / `Hotkey("CTRL", "A")` | 按键及组合键 |
-| `Api.Input.TypeText(text)` | Unicode 文字输入 |
-| `Api.Input.KeyDown(key)` / `KeyUp(key)` | 按住和释放键 |
-| `Api.Input.MouseDown()` / `MouseUp()` / `Scroll(120)` | 鼠标按住、释放及滚轮 |
-| `await Api.Input.DragAsync(x1, y1, x2, y2)` | 拖动 |
-| `await Api.Delay(milliseconds)` / `Api.CancellationToken` | 可取消的等待及长循环取消 |
-| `Log(message)` | 写日志 |
+Bind actions to state entry, loop, or exit stages. Scripts can access desktop input, recognition, shared variables, logging, and cancellable waits. See the [scripting guide and API reference](docs/guide.md#scripting-api).
 
-`Api.Color` 保留为 `Api.Recognition` 的兼容别名。使用检测结果点击前检查 `Found`。坐标为虚拟桌面的物理像素，副屏可使用负坐标。
-
-停止和重置会取消内置等待及查找，释放脚本按住的键鼠。自定义长循环需要响应 `Api.CancellationToken`。默认示例使用 `TargetVisible` 识别项；先录入真实特征，然后在执行状态中选择记录或点击动作。
-
-## 编译
+## Build & distribute
 
 ```powershell
-dotnet build StateMachine/Alcyone.csproj -c Release
+# Build
+dotnet build Alcyone.slnx -c Release
+
+# Publish a framework-dependent desktop distribution
+dotnet publish Alcyone/Alcyone.csproj -c Release --self-contained false -o Desktop
+
+# Verify scripts, pages, and UI assets
+dotnet Desktop/Alcyone.dll --check-host
 ```
 
+Launch `Desktop/Alcyone.exe` and distribute the entire folder. The target machine needs the .NET 10 ASP.NET Core Runtime and WebView2. Published builds do not need the `FastColorFinder` source directory.
 
-运行由 `Execution/MachineRuntimeService` 按配置管理。`MachineSession` 拥有状态、识别循环、热重载脚本宿主和独立调度线程；Razor 页面只提交操作并订阅运行快照。刷新、断开页面或切换配置不会销毁已有运行实例；停止由明确的停止操作控制，删除配置会释放对应实例。应用进程退出时服务停止，进程重启后不自动恢复运行中的脚本。
-编辑事件和拖动操作沿用当前配置的统一保存入口；运行快照刷新不触发配置序列化与保存。
+<details>
+<summary><strong>Publish a self-contained single-file EXE</strong></summary>
 
+```powershell
+dotnet publish Alcyone/Alcyone.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -o release-exe
+```
 
-Photino 桌面版：Windows x64，启动发布目录 `Desktop/Alcyone.exe`，保留整个目录。窗口通过随机的本机回环端口加载现有 Blazor 界面，启动时不打开浏览器；关闭窗口后释放后台识别、状态机和热重载宿主。配置与脚本分别在可执行文件旁的 `StateMachineConfigs` 和 `HotScripts`。
-发布命令：`dotnet publish StateMachine/Alcyone.csproj -c Release --self-contained false -o Desktop`。框架依赖版需要 .NET 10 ASP.NET Core Runtime 和 WebView2（与原工具相同的窗口运行组件）。
+This includes the .NET runtime; WebView2 is still required. Embedded resources may be extracted on first launch. Editable scripts and configurations live beside the executable.
+
+</details>
+
+## Explore further
+
+| Resource | Contents |
+| :-- | :-- |
+| [User guide](docs/guide.md) | Recognition imports, training, conditions, scripting API, and runtime behavior |
+| [中文使用指南](docs/guide.zh-CN.md) | Detailed Chinese documentation |
+| [HotScripts](Alcyone/HotScripts) | Built-in C# action examples |
+| [Execution](Alcyone/Execution) | Background state machine runtime |
+| [Training](Alcyone/Training) | Embedded recognition training integration |
+
+Refreshing the page or switching configurations keeps existing runtime instances alive. Use **Stop** to end execution. Closing the app releases the instances; restarting does not resume them automatically.
+
+## Contributing
+
+Ideas, bug reports, and pull requests are welcome. Open an [issue](https://github.com/anan1213095357/Alcyone/issues) with your Windows / .NET versions, reproduction steps, and sanitized logs or a minimal workflow.
+
+If Alcyone fits the way you think about automation, give it a Star to help others discover it.
+
+<sub>This repository does not currently include a LICENSE file; usage and distribution terms have yet to be specified by the maintainer.</sub>
