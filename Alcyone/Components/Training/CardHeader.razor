@@ -1,0 +1,13 @@
+<div class="card-heading">
+    <span class="badge">@Index</span>
+    <div>
+        <div class="card-title">@Title</div>
+        <div class="card-sub">@Subtitle</div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Index { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Subtitle { get; set; } = "";
+}

@@ -1,0 +1,24 @@
+/* Shared by the state machine and its embedded trainers. */
+input[type="number"] {
+    appearance:textfield !important;
+    -moz-appearance:textfield;
+    box-sizing:border-box;
+    min-height:32px;
+    padding:6px 10px !important;
+    border:1px solid #34445d !important;
+    border-radius:8px !important;
+    background:linear-gradient(180deg,#172235,#101927) !important;
+    color:#e7effc !important;
+    font-variant-numeric:tabular-nums;
+    font-size:12px;
+    line-height:1.4;
+    box-shadow:inset 0 1px 0 #ffffff06;
+    transition:border-color .15s,box-shadow .15s;
+    outline:none;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+input[type="number"]:hover:not(:disabled) { border-color:#58749a !important; }
+input[type="number"]:focus { border-color:#6da4ff !important; box-shadow:0 0 0 3px #4c8dff25 !important; }
+input[type="number"]:disabled { opacity:.5; cursor:not-allowed; }
+input[type="number"]:invalid { border-color:#ef8c83 !important; }

@@ -1,0 +1,10 @@
+<div class="metric-box">
+    <span>@Label</span>
+    <div><strong>@Value</strong>@if (!string.IsNullOrEmpty(Suffix)) { <b>@Suffix</b> }</div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string Suffix { get; set; } = "";
+}

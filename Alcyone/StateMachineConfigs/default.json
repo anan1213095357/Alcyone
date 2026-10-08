@@ -1,0 +1,194 @@
+﻿{
+  "regions": [
+    {
+      "id": "region_e19029b22b4044bfa58eeba3ea9e830d",
+      "name": "\u4E3B\u6D41\u7A0B"
+    }
+  ],
+  "variables": [],
+  "recognitions": [
+    {
+      "isFolder": false,
+      "parentId": null,
+      "id": "dbc7f096d918493bbdf118f76d5e2ed0",
+      "name": "\u9ED8\u8BA4\u5B57\u5E93",
+      "settings": {
+        "mode": "dictionary",
+        "weightString": "FTF1:H4sIAAAAAAACCu2au27CMBSG38Wzh1xJwlZubYd2aCsxFAZDDEQNBEFStUK8e0/TpepSQeLYhH/5LMCxzaf4\u002BHpgj2ItWZdNimg4CCdF2LvxJoXf8wPiMHIZZ7fp53a1Z93XA7uPKWsczubzTrjwHMvz7MCPpOj4dmDHjhsEwlvQI8ONmKWSMue7QnL2Ij/yso6O446oJn/kUaZxEucr1vV9zu5kslxRFifk7Fmst6nsZ8WGvohczvpZmu1\u002B6n\u002BiLJ5FTaLUpbRHqU3pQL4nIk\u002ByDX22jlPOHsT\u002BjZ5YiHQvOWgay9eiROO1tk1gg39KS6XXZvLPT5VxUkPUoaKhX2VAUMOB9ExfRnVcjaEL\u002BrS1U1dv/TdzzbXCkTJH5nSrE4TVOX6Y6K32wtukrlZ/l2VOZ1RDzL9URYZO0OCsnUGr2Y57Nb6aW4Wf2iU12VI636r2RhgaytRGsVYoUxHjNAnTO04rXQEpMWfCbni1xU8NRRjqrfIJQz2zEO3Wzm\u002BosvFcxV6/\u002Bvilck/BgPM\u002BnJG2i3TjY1xeIfm\u002BJmJblsUBAAAAAAAAAAAAAAAAAAAAAAAAAACANmJ6nB6/AOD2KBTrQAAA",
+        "x": 139,
+        "y": 51,
+        "width": 105,
+        "height": 48,
+        "colorDeviation": 0,
+        "similarity": 90,
+        "query": "",
+        "dictionaryMode": "ocr",
+        "fileName": "\u5B57\u5E93.txt",
+        "scanStep": 1
+      }
+    },
+    {
+      "isFolder": true,
+      "parentId": null,
+      "id": "8271c916fdb7429f83fbd2b4333ea927",
+      "name": "\u591A\u70B9\u8272\u5E931",
+      "settings": {
+        "mode": "feature",
+        "weightString": "",
+        "x": 0,
+        "y": 0,
+        "width": 800,
+        "height": 600,
+        "colorDeviation": 0,
+        "similarity": 90,
+        "query": "",
+        "dictionaryMode": "ocr",
+        "fileName": "",
+        "scanStep": 1
+      }
+    },
+    {
+      "isFolder": false,
+      "parentId": "8271c916fdb7429f83fbd2b4333ea927",
+      "id": "a7f8193a07b64d78b0a9c25995f35fb5",
+      "name": "\u989C\u8272\u7279\u5F811",
+      "settings": {
+        "mode": "feature",
+        "weightString": "FCF3|70,41|13,10|96|94,96,149,16,12,12,42|-1,24,10,-4,2,19,15,16,21,959;22,15,-12,65,-79,64,26,46,326,468;49,6,-87,37,-26,16,14,14,0,1000",
+        "x": 0,
+        "y": 19,
+        "width": 171,
+        "height": 98,
+        "colorDeviation": 0,
+        "similarity": 90,
+        "query": "",
+        "dictionaryMode": "ocr",
+        "fileName": "",
+        "scanStep": 1
+      }
+    }
+  ],
+  "states": [
+    {
+      "id": "state_76bddf1289a740d0b3e9a2a4d8ccbcaf",
+      "regionId": "region_e19029b22b4044bfa58eeba3ea9e830d",
+      "name": "\u7B49\u5F85\u76EE\u6807",
+      "x": 555.7523129882812,
+      "y": 575.3393740234375,
+      "isStart": true,
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "inputs": [
+        {
+          "id": "input_87fd3398d47f4f2481dc4117f6463f07",
+          "name": "\u76EE\u6807\u6D88\u5931"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output_ee638ef714274272849f6bbcfa6d5b2b",
+          "name": "\u8BC6\u522B\u6210\u529F",
+          "matchMode": "all",
+          "conditions": [
+            {
+              "recognition": {
+                "dictionaryMode": "ocr",
+                "searchText": "",
+                "success": true,
+                "similarity": null,
+                "similarityOperator": "\u003E=",
+                "x": null,
+                "xOperator": "==",
+                "y": null,
+                "yOperator": "==",
+                "text": null,
+                "textOperator": "contains"
+              },
+              "kind": "recognition",
+              "recognitionId": "a7f8193a07b64d78b0a9c25995f35fb5",
+              "recognitionField": "status",
+              "expectedSuccess": true,
+              "id": "condition_6f3a26baee954b92928fbf0890779131",
+              "left": "",
+              "operator": "==",
+              "rightMode": "literal",
+              "rightType": "boolean",
+              "rightValue": false
+            }
+          ],
+          "actionMethod": "",
+          "actionArguments": [],
+          "actionPath": "",
+          "actionArgs": "[]"
+        }
+      ]
+    },
+    {
+      "id": "state_6b2c70b72d31453f93d15d97bf597ee8",
+      "regionId": "region_e19029b22b4044bfa58eeba3ea9e830d",
+      "name": "\u65B0\u72B6\u6001",
+      "x": 923.876,
+      "y": 322.488,
+      "isStart": false,
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "inputs": [
+        {
+          "id": "input_df2342735e754b6c8cda91921e983a96",
+          "name": "\u8FDB\u5165"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output_399c10adc9114808af7dbdda9c86b4e9",
+          "name": "\u5207\u6362",
+          "matchMode": "always",
+          "conditions": [],
+          "actionMethod": "",
+          "actionArguments": [],
+          "actionPath": "",
+          "actionArgs": "[]"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_37d95f30a0264168957f9e85f7dfc1c1",
+      "fromStateId": "state_76bddf1289a740d0b3e9a2a4d8ccbcaf",
+      "fromPortId": "output_ee638ef714274272849f6bbcfa6d5b2b",
+      "toStateId": "state_6b2c70b72d31453f93d15d97bf597ee8",
+      "toPortId": "input_df2342735e754b6c8cda91921e983a96"
+    },
+    {
+      "id": "edge_f3210d4995f04dc287f25146f8efaca8",
+      "fromStateId": "state_6b2c70b72d31453f93d15d97bf597ee8",
+      "fromPortId": "output_399c10adc9114808af7dbdda9c86b4e9",
+      "toStateId": "state_76bddf1289a740d0b3e9a2a4d8ccbcaf",
+      "toPortId": "input_87fd3398d47f4f2481dc4117f6463f07"
+    }
+  ],
+  "settings": {
+    "cycleDelay": 50
+  }
+}

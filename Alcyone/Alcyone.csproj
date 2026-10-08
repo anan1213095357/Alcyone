@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+	<ItemGroup>
+        <Using Include="System.Drawing" />
+        <Compile Include="..\..\FastColorFinder\Core\*.cs" Exclude="..\..\FastColorFinder\Core\FastTextSearch.cs;..\..\FastColorFinder\Core\Models.cs;..\..\FastColorFinder\Core\ColorModelCodec.cs" Link="Training\Core\%(Filename)%(Extension)" />
+        <Compile Include="..\..\FastColorFinder\Services\*.cs" Exclude="..\..\FastColorFinder\Services\FinderWorkspace.cs;..\..\FastColorFinder\Services\TextFinderWorkspace.cs" Link="Training\Services\%(Filename)%(Extension)" />
+        <Compile Include="..\..\FastColorFinder\Native\*.cs" Link="Training\Native\%(Filename)%(Extension)" />
+        <Content Include="..\..\FastColorFinder\Core\FastTextSearch.cs" Link="Core\FastTextSearch.cs" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Compile Include="..\..\FastColorFinder\FastColorFinder.cs" Link="Automation\FastColorSearch.cs" />
+	  <Compile Include="..\..\FastColorFinder\Core\FastTextSearch.cs" Link="Automation\FastTextSearch.cs" />
+	  <Compile Include="..\..\FastColorFinder\Core\Models.cs" Link="Automation\ColorModels.cs" />
+	  <Compile Include="..\..\FastColorFinder\Core\ColorModelCodec.cs" Link="Automation\ColorModelCodec.cs" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Photino.NET" Version="4.0.16" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+		<PackageReference Include="System.Drawing.Common" Version="8.0.12" />
+	</ItemGroup>
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>StateMachine</RootNamespace>
+        <AssemblyName>Alcyone</AssemblyName>
+        <Product>Alcyone</Product>
+        <OutputType>WinExe</OutputType>
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <!-- Roslyn needs physical assembly files when compiling hot-reload scripts. -->
+        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+        <PublishTrimmed>false</PublishTrimmed>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<NoWarn>$(NoWarn);CA1416</NoWarn>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+	</PropertyGroup>
+
+    <ItemGroup>
+        <Content Include="HotScripts\**\*.csx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+        <Content Update="StateMachineConfigs\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+        <Content Update="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+    <!-- The .NET 10 framework-assets target only includes these for Exe, not WinExe. -->
+    <Target Name="IncludeDesktopBlazorAssets" BeforeTargets="AssignTargetPaths">
+        <ItemGroup>
+            <Content Include="$(BlazorFrameworkStaticWebAssetRoot)\blazor.web.js" Link="wwwroot\_framework\blazor.web.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+        </ItemGroup>
+    </Target>
+    <Target Name="BundleDesktopContent" AfterTargets="PrepareForBundle" DependsOnTargets="CopyStaticWebAssetsToPublishDirectory;CopyStaticWebAssetsEndpointsManifest" Condition="'$(PublishSingleFile)' == 'true'">
+        <ItemGroup>
+            <_BundleWebContent Include="$(PublishDir)wwwroot\**\*" /><FilesToBundle Include="@(_BundleWebContent)" RelativePath="wwwroot\%(_BundleWebContent.RecursiveDir)%(_BundleWebContent.Filename)%(_BundleWebContent.Extension)" /><FilesToBundle Include="$(PublishDir)$(AssemblyName).staticwebassets.endpoints.json" RelativePath="$(AssemblyName).staticwebassets.endpoints.json" /><FilesToBundle Include="@(ResolvedFileToPublish)" /><ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" />
+        </ItemGroup>
+    </Target>
+</Project>

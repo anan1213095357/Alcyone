@@ -1,0 +1,72 @@
+@page "/recognition-training"
+@layout TrainingLayout
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject TrainingSession Session
+
+<div class="integrated-workbench">
+    <header class="integration-bar">
+        <strong>@(_initial?.Settings.Mode == "dictionary" ? "取字 · 字典训练" : "取色 · 多点颜色训练")</strong>
+        <span>截图、标定、训练后直接保存到当前流程的识别库</span>
+        <button class="action ghost" @onclick="CloseAsync">返回识别库</button>
+    </header>
+    @if (_error is not null) { <div class="integration-error" role="alert">@_error</div> }
+    @if (_initial is not null)
+    {
+        @if (_initial.Settings.Mode == "dictionary")
+        {
+            <TextTrainer @ref="_text" Initial="_initial" SaveResult="SaveAsync" />
+        }
+        else
+        {
+            <ColorTrainer @ref="_color" Initial="_initial" SaveResult="SaveAsync" />
+        }
+    }
+    else { <p class="integration-loading">正在连接识别库…</p> }
+</div>
+
+@code {
+    private TrainingResult? _initial;
+    private TextTrainer? _text;
+    private ColorTrainer? _color;
+    private string? _error;
+    private IJSObjectReference? _bridge;
+    private DotNetObjectReference<TrainingPage>? _reference;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _reference = DotNetObjectReference.Create(this);
+        _bridge = await JS.InvokeAsync<IJSObjectReference>("import", "/training/bridge.js");
+        await _bridge.InvokeVoidAsync("connectEditor", _reference);
+    }
+    [JSInvokable] public Task InitializeEditor(TrainingResult initial)
+    {
+        if (_initial is null) _initial = initial;
+        return InvokeAsync(StateHasChanged);
+    }
+    private async Task<string> SaveAsync(TrainingResult result)
+        => await _bridge!.InvokeAsync<string>("save", result);
+    private async Task CloseAsync()
+    {
+        if (_text?.IntegrationBusy == true || _color?.IntegrationBusy == true)
+        { _error = "请等待当前操作结束，或先取消训练。"; return; }
+        if ((_text?.HasUnsavedChanges == true || _color?.HasUnsavedChanges == true) &&
+            !await JS.InvokeAsync<bool>("confirm", "还有未保存到识别库的内容。确定放弃并返回？")) return;
+        if (_text is not null) await _text.DisposeAsync();
+        if (_color is not null) await _color.DisposeAsync();
+        _initial = null;
+        await InvokeAsync(StateHasChanged);
+        Session.Dispose();
+        await _bridge!.InvokeVoidAsync("closeEditor");
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (_bridge is not null)
+        {
+            try { await _bridge.InvokeVoidAsync("disconnectEditor"); await _bridge.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+        _reference?.Dispose();
+    }
+}

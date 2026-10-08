@@ -1,0 +1,438 @@
+
+@inject TrainingSession Session
+@code { private FinderWorkspace Workspace => Session.Color; }
+@inject NativeRegionSelector RegionSelector
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+
+
+
+<div class="app-shell">
+    <header class="topbar">
+        <div style="display:flex">
+            <div class="brand-mark"></div>
+            <div class="brand-title">多点颜色训练</div>
+        </div>
+    </header>
+
+    <div class="integration-save">
+        <label for="feature-name">识别项名称</label><input id="feature-name" @bind="_entryName" />
+        <button class="action primary" disabled="@IntegrationBusy" @onclick="() => SaveToLibraryAsync(false)">保存到识别库</button>
+        <button class="action ghost" disabled="@IntegrationBusy" @onclick="() => SaveToLibraryAsync(true)">另存为新项</button>
+        <small>保存特征、搜索范围、相似度和色偏</small>
+    </div>
+    <main class="workspace">
+        <section class="canvas-card">
+            <div class="canvas-head">
+                <div>
+                    <div class="section-title">实时标注画布</div>
+                    <div class="section-sub">左键添加 · 拖动移动 · 右键删除 · 方向键像素级微调 · A 为锚点</div>
+                </div>
+                <div class="capture-meta">@CaptureMeta</div>
+            </div>
+
+            <div class="canvas-stage">
+                @if (Workspace.CaptureRegion.Width <= 0)
+                {
+                    <div class="empty-canvas">
+                        <div class="empty-icon">⌗</div>
+                        <div class="empty-title">还没有捕获区域</div>
+                        <div class="empty-sub">先在右侧框选屏幕区域，再直接在实时画面上标点。</div>
+                    </div>
+                }
+                <div id="annotationViewport"
+                     class="annotation-viewport"
+                     tabindex="0">
+
+                    <img id="annotationImage"
+                         class="annotation-image"
+                         draggable="false" />
+
+                    <div id="annotationOverlay"
+                         class="annotation-overlay">
+                    </div>
+
+                    <div id="pixelMagnifier"
+                         class="pixel-magnifier hidden">
+
+                        <div class="magnifier-preview">
+                            <img id="magnifierImage"
+                                 class="magnifier-image"
+                                 draggable="false" />
+
+                            <div class="magnifier-center"></div>
+                        </div>
+
+                        <div id="magnifierText"
+                             class="magnifier-text">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="side-stack">
+            <section class="panel-card">
+                <CardHeader Index="01" Title="捕获区域" Subtitle="实时预览和训练使用这个区域" />
+                <button class="action primary" @onclick="SelectCaptureRegionAsync" disabled="@_busy">框选捕获区</button>
+                <div class="region-editor">
+                    <input aria-label="捕获范围 X,Y,宽,高" title="X,Y,宽,高" value="@RegionValue(Workspace.CaptureRegion)" placeholder="0,0,0,0" spellcheck="false" disabled="@_busy" @onchange="e => ApplyRegionAsync(e.Value?.ToString(), true)" />
+                    <button class="action ghost" title="复制捕获范围" disabled="@_busy" @onclick="() => CopyRegionAsync(true)">复制</button>
+                    <button class="action ghost" title="粘贴捕获范围" disabled="@_busy" @onclick="() => PasteRegionAsync(true)">粘贴</button>
+                </div>
+                <div class="micro-status">X,Y,宽,高</div>
+            </section>
+
+            <section class="panel-card">
+                <CardHeader Index="02" Title="多点标注" Subtitle="第一个点自动作为锚点，建议 6～20 个点" />
+                <div class="metric-grid two">
+                    <MetricBox Label="标注点" Value="@Workspace.Points.Count.ToString()" Suffix="个" />
+                    <MetricBox Label="锚点" Value="@AnchorText" Suffix="" />
+                </div>
+                <button class="action ghost" @onclick="ClearPointsAsync" disabled="@_busy">清空全部标点</button>
+            </section>
+
+            <section class="panel-card">
+                <CardHeader Index="03" Title="时间训练" Subtitle="持续采样颜色波动，压缩成权重字符串" />
+                <div class="metric-grid one">
+                    <label class="field-box">
+                        <span>训练时间</span>
+                        <div><input type="number" min="2" max="120" @bind="_trainSeconds" /><b>秒</b></div>
+                    </label>
+                </div>
+                <button class="action primary" @onclick="TrainAsync" disabled="@_busy">@(_training ? "训练中..." : "开始训练")</button>
+                <div class="progress-track"><div class="progress-fill" style="@($"width:{_progress}%")"></div></div>
+                <div class="micro-status">@_trainStatus</div>
+            </section>
+
+            <section class="panel-card test-card">
+                <CardHeader Index="04" Title="匹配测试" Subtitle="搜索区域和训练捕获区域可以完全不同" />
+                <div class="metric-grid two">
+                    <label class="field-box">
+                        <span>匹配阈值</span>
+                        <div><input type="number" min="20" max="100" @bind="_threshold" /><b>%</b></div>
+                    </label>
+                    <label class="field-box">
+                        <span>扫描步长</span>
+                        <div><input type="number" min="1" max="8" @bind="_step" /><b>px</b></div>
+                    </label>
+                </div>
+                <div class="action-row">
+                    <button class="action ghost" @onclick="SelectSearchRegionAsync" disabled="@_busy">框选搜索区</button>
+                    <button class="action primary" @onclick="TestOnceAsync" disabled="@_busy">测试一次</button>
+                </div>
+                <div class="region-editor">
+                    <input aria-label="搜索范围 X,Y,宽,高" title="X,Y,宽,高" value="@RegionValue(Workspace.SearchRegion)" placeholder="0,0,0,0" spellcheck="false" disabled="@_busy" @onchange="e => ApplyRegionAsync(e.Value?.ToString(), false)" />
+                    <button class="action ghost" title="复制搜索范围" disabled="@_busy" @onclick="() => CopyRegionAsync(false)">复制</button>
+                    <button class="action ghost" title="粘贴搜索范围" disabled="@_busy" @onclick="() => PasteRegionAsync(false)">粘贴</button>
+                </div>
+                <div class="micro-status">X,Y,宽,高</div>
+                <label class="switch-line">
+                    <input type="checkbox" @bind="_continuous" @bind:after="ContinuousChangedAsync" />
+                    <span class="switch-ui"></span>
+                    <span>连续测试</span>
+                </label>
+                <div class="result-box @(_lastResult.Found ? "match" : _hasTested ? "miss" : "idle")">
+                    <div class="result-state">@ResultState</div>
+                    <div class="result-main">@ResultText</div>
+                </div>
+            </section>
+
+            <section class="panel-card weight-card">
+                <CardHeader Index="05" Title="权重字符串 / 调用" Subtitle="复制时自动生成可直接使用的调用代码" />
+                <textarea class="weight-editor" spellcheck="false" @bind="_weightText" @bind:event="oninput"></textarea>
+
+                <div class="call-param-grid">
+                    <label class="call-param">
+                        <span>色偏</span>
+                        <input type="number" min="0" max="255" @bind="_colorDeviation" />
+                    </label>
+                    <label class="call-param">
+                        <span>循环</span>
+                        <div><input type="number" min="0" max="600" step="0.5" @bind="_loopSeconds" /><b>s</b></div>
+                    </label>
+                    <label class="call-param">
+                        <span>间隔</span>
+                        <div><input type="number" min="0" max="60000" @bind="_intervalMilliseconds" /><b>ms</b></div>
+                    </label>
+                </div>
+
+                <div class="action-row three">
+                    @* <button class="action ghost" @onclick="" disabled="@_busy">应用字符串</button> *@
+                    <button class="action ghost" @onclick="CopyCallCodeAsync">复制调用代码</button>
+
+                </div>
+            </section>
+        </aside>
+    </main>
+
+    <footer class="statusbar">
+        <span class="status-dot @(_statusError ? "error" : "")"></span>
+        <span>@_status</span>
+    </footer>
+</div>
+
+@code {
+    private DotNetObjectReference<ColorTrainer>? _selfRef;
+    private int _trainSeconds = 5;
+    private int _threshold = 78;
+    private int _step = 1;
+    private int _colorDeviation = 0;
+    private double _loopSeconds = 3;
+    private int _intervalMilliseconds = 80;
+    private int _progress;
+    private bool _busy;
+    private bool _training;
+    private bool _continuous;
+    private bool _hasTested;
+    private bool _statusError;
+    private string _status = "就绪";
+    private string _trainStatus = "等待训练";
+    private string _weightText = string.Empty;
+    private MatchResult _lastResult = MatchResult.Empty();
+    private CancellationTokenSource? _continuousCts;
+    private Task? _continuousTask;
+
+    private string AnchorText => Workspace.Points.Count > 0 ? "A" : "—";
+
+    private string CaptureMeta => Workspace.CaptureRegion.Width > 0
+        ? $"{Workspace.CaptureRegion.Width} × {Workspace.CaptureRegion.Height} · {Workspace.Points.Count} points"
+        : "NO REGION";
+
+    private string ResultState => !_hasTested ? "READY" : _lastResult.Found ? "MATCH" : "MISS";
+
+    private string ResultText
+    {
+        get
+        {
+            if (!_hasTested) return "等待测试";
+            if (!_lastResult.Found) return $"未找到 · {_lastResult.Score:F1}%";
+            var p = Workspace.ToAbsolute(_lastResult);
+            return $"X {p.X}   Y {p.Y}   ·   {_lastResult.Score:F1}%   ·   {TicksToMs(_lastResult.ElapsedTicks):F2} ms";
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _selfRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("fcfCanvas.init", "annotationViewport", _selfRef, $"/api/training/{Session.Id}/color");
+        await PushCanvasStateAsync();
+    }
+
+    private async Task SelectCaptureRegionAsync()
+    {
+        await StopContinuousAsync();
+        SetBusy(true, "拖动鼠标框选捕获区域...");
+        try
+        {
+            var region = await RegionSelector.SelectAsync();
+            if (region is null) { SetStatus("已取消框选。", false); return; }
+            SetCaptureForEditing(region.Value);
+            await PushCanvasStateAsync();
+            SetStatus($"捕获区域：{region.Value.Width} × {region.Value.Height}", false);
+        }
+        catch (Exception ex) { SetStatus(ex.Message, true); }
+        finally { SetBusy(false); }
+    }
+
+    private async Task SelectSearchRegionAsync()
+    {
+        await StopContinuousAsync();
+        SetBusy(true, "拖动鼠标框选搜索区域...");
+        try
+        {
+            var region = await RegionSelector.SelectAsync();
+            if (region is null) { SetStatus("已取消框选。", false); return; }
+            Workspace.SetSearchRegion(region.Value);
+            SetStatus($"搜索区域：{region.Value.Width} × {region.Value.Height}", false);
+        }
+        catch (Exception ex) { SetStatus(ex.Message, true); }
+        finally { SetBusy(false); }
+    }
+
+    private async Task ClearPointsAsync()
+    {
+        Workspace.ClearPoints();
+        _weightText = string.Empty;
+        _progress = 0;
+        _trainStatus = "等待训练";
+        await PushCanvasStateAsync();
+        SetStatus("标注点已清空。", false);
+    }
+
+    private async Task TrainAsync()
+    {
+        await StopContinuousAsync();
+        _training = true;
+        SetBusy(true, "正在训练...");
+        _progress = 0;
+        try
+        {
+            var model = await Workspace.TrainAsync(_trainSeconds, (percent, samples) =>
+            {
+                _progress = percent;
+                _trainStatus = $"{percent}% · {samples} 帧";
+                _ = InvokeAsync(StateHasChanged);
+            }, _lifetime.Token);
+
+            _weightText = ColorModelCodec.Encode(model);
+            _trainStatus = $"完成 · {model.SampleCount} 帧 · {model.Points.Count} 点";
+            SetStatus("训练完成，权重字符串已生成。", false);
+            await TestOnceAsync(false);
+        }
+        catch (Exception ex)
+        {
+            SetStatus(ex.Message, true);
+            _trainStatus = "训练失败";
+        }
+        finally
+        {
+            _training = false;
+            SetBusy(false);
+        }
+    }
+
+    private Task TestOnceAsync() => TestOnceAsync(true);
+
+    private async Task TestOnceAsync(bool showBusy)
+    {
+        if (showBusy) SetBusy(true, "正在匹配...");
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_weightText) && _weightText != Workspace.WeightString)
+                Workspace.SetWeightString(_weightText);
+
+            _lastResult = await Task.Run(() => Workspace.TestOnce(_weightText, _threshold, _step));
+            _hasTested = true;
+            SetStatus(_lastResult.Found ? "找到目标。" : "当前搜索区域未找到。", !_lastResult.Found);
+        }
+        catch (Exception ex)
+        {
+            _lastResult = MatchResult.Empty();
+            _hasTested = true;
+            SetStatus(ex.Message, true);
+        }
+        finally
+        {
+            if (showBusy) SetBusy(false);
+        }
+    }
+
+    private async Task ContinuousChangedAsync()
+    {
+        if (_continuous)
+        {
+            await StopContinuousAsync();
+            _continuous = true;
+            _continuousCts = new CancellationTokenSource();
+            _continuousTask = ContinuousLoopAsync(_continuousCts.Token);
+        }
+        else
+        {
+            await StopContinuousAsync();
+        }
+    }
+
+    private async Task ContinuousLoopAsync(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested && _continuous)
+        {
+            await TestOnceAsync(false);
+            await InvokeAsync(StateHasChanged);
+            try { await Task.Delay(90, token); }
+            catch (OperationCanceledException) { break; }
+        }
+    }
+
+    private async Task StopContinuousAsync()
+    {
+        _continuous = false;
+        _continuousCts?.Cancel();
+        if (_continuousTask is not null) await _continuousTask;
+        _continuousTask = null;
+        _continuousCts?.Dispose();
+        _continuousCts = null;
+    }
+
+    private void ApplyWeightString()
+    {
+        try
+        {
+            Workspace.SetWeightString(_weightText);
+            SetStatus("权重字符串已应用。", false);
+        }
+        catch (Exception ex) { SetStatus(ex.Message, true); }
+    }
+
+    private async Task CopyCallCodeAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_weightText))
+        {
+            SetStatus("当前没有权重字符串，先训练或粘贴权重字符串。", true);
+            return;
+        }
+
+        string code = BuildCallCode();
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", code);
+        SetStatus("完整调用代码已复制。", false);
+    }
+
+   
+
+    [JSInvokable]
+    public async Task OnPointsChanged(List<CanvasPointDto> points)
+    {
+        Workspace.SetPoints(points.Select(p => new Point(p.X, p.Y)));
+        _weightText = string.Empty;
+        _progress = 0;
+        _trainStatus = "标点已变化，需要重新训练";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task PushCanvasStateAsync()
+    {
+        var region = Workspace.CaptureRegion;
+        var points = Workspace.Points.Select(p => new CanvasPointDto { X = p.X, Y = p.Y }).ToArray();
+        await JS.InvokeVoidAsync("fcfCanvas.setState", region.Width, region.Height, points);
+    }
+
+    private void SetBusy(bool busy, string? text = null)
+    {
+        if (_disposed) return;
+        _busy = busy;
+        if (!string.IsNullOrWhiteSpace(text)) SetStatus(text, false);
+        StateHasChanged();
+    }
+
+    private void SetStatus(string text, bool error)
+    {
+        if (_disposed) return;
+        _status = text;
+        _statusError = error;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private static string RegionText(Rectangle r, string label) => r.Width <= 0
+        ? $"{label} · 尚未设置"
+        : $"{label} · X {r.X}   Y {r.Y}   ·   {r.Width} × {r.Height}";
+
+    private static double TicksToMs(long ticks) => ticks * 1000.0 / Stopwatch.Frequency;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _lifetime.Cancel();
+        await StopContinuousAsync();
+        if (_selfRef is not null) _selfRef.Dispose();
+        try { await JS.InvokeVoidAsync("fcfCanvas.dispose"); } catch { }
+    }
+
+    public sealed class CanvasPointDto
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+    }
+}

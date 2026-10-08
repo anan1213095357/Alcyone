@@ -1,0 +1,41 @@
+/* Shared across the main window and the embedded training window. */
+select {
+    color-scheme:dark;
+    box-sizing:border-box;
+    min-width:0;
+    min-height:32px;
+    border:1px solid #34445d !important;
+    border-radius:8px !important;
+    padding:6px 32px 6px 10px !important;
+    color:#e7effc !important;
+    background-color:#141f30 !important;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239eb7d8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E") !important;
+    background-repeat:no-repeat !important;
+    background-position:right 9px center !important;
+    background-size:16px !important;
+    appearance:none;
+    font-family:inherit;
+    font-size:12px;
+    line-height:1.5;
+    box-shadow:inset 0 1px 0 #ffffff06;
+    outline:none;
+    cursor:pointer;
+    transition:border-color .15s,box-shadow .15s,background-color .15s;
+}
+select:hover:not(:disabled) { border-color:#58749a !important; background-color:#1a2940 !important; }
+select:focus-visible { border-color:#6da4ff !important; box-shadow:0 0 0 3px #4c8dff25 !important; }
+select:disabled { opacity:.5; cursor:not-allowed; }
+select option,select optgroup { background:#141f30; color:#e7effc; }
+select option:checked { background:#26456b; color:#fff; }
+select[multiple],select[size]:not([size="1"]) { background-image:none !important; padding:6px !important; }
+/* Use a fully styled popup where the embedded browser supports it. */
+@supports (appearance:base-select) {
+    select:not([multiple]):not([size]), select:not([multiple])[size="1"],
+    select:not([multiple]):not([size])::picker(select), select:not([multiple])[size="1"]::picker(select) { appearance:base-select; }
+    select::picker-icon { display:none; }
+    select::picker(select) { margin-top:5px; padding:5px; border:1px solid #3b506e; border-radius:10px; background:#111c2c; color:#e7effc; box-shadow:0 12px 32px #0007; max-height:320px; overflow:auto; }
+    select option { min-height:32px; padding:7px 10px; gap:8px; border-radius:6px; cursor:pointer; }
+    select option:hover,select option:focus { background:#243955; outline:none; }
+    select option:checked { background:#244971; color:#fff; }
+    select option::checkmark { color:#8ebeff; }
+}

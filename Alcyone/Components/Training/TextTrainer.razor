@@ -1,0 +1,115 @@
+@using FastTextFinderRuntime
+@using Microsoft.AspNetCore.Components.Forms
+@inject TrainingSession Session
+@code { private TextFinderWorkspace TextWorkspace => Session.Text; }
+@inject TextDictionaryDownloads Downloads
+@inject NativeRegionSelector RegionSelector
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="app-shell text-finder">
+    <header class="topbar">
+        <div class="brand-title">字典与点阵训练</div>
+        <div class="text-library-switch"><span>当前字库</span>
+            <select aria-label="切换字库" value="@_activeLibrary" @onchange="SwitchLibrary" disabled="@_busy">
+                @for (int i = 0; i < _libraries.Count; i++) { <option value="@i">@_libraries[i].Dictionary.Name @(_libraries[i].Dirty ? "*" : "")</option> }
+            </select>
+            <button class="action ghost" disabled="@_busy" @onclick="NewLibrary">新建字库</button>
+        </div>
+    </header>
+    <div class="integration-save">
+        <button class="action primary" disabled="@IntegrationBusy" @onclick="() => SaveToLibraryAsync(false)">保存到识别库</button>
+        <button class="action ghost" disabled="@IntegrationBusy" @onclick="() => SaveToLibraryAsync(true)">另存为新字典</button>
+        <select aria-label="保存后的字典用途" @bind="_dictionaryMode"><option value="ocr">OCR 结果判断</option><option value="text">查找固定文字</option></select>
+        <small>当前字库及搜索参数直接保存到当前流程</small>
+    </div>
+
+    <main class="workspace">
+        <section class="text-canvas-column">
+            <div class="canvas-card text-canvas-card">
+                <div class="canvas-head">
+                    <div><div class="section-title">实时截图标定</div><div class="section-sub">截图后先框选文字，再标定笔画颜色 · 放大镜精确取色</div></div>
+                    <div class="text-tools">
+                        <button class="action ghost" disabled="@_busy" @onclick="() => SetToolAsync(true)">@(_selectTool ? "● 框选文字" : "框选文字")</button>
+                        <button class="action ghost" disabled="@_busy" @onclick="() => SetToolAsync(false)">@(!_selectTool ? "● 标定点" : "标定点")</button>
+                        <span class="micro-status">● 实时刷新</span>
+                        <label>放大 <input type="number" min="1" max="8" @bind="_zoom" @bind:after="UpdateCanvasAsync" /></label>
+                    </div>
+                </div>
+                <div class="text-image-stage">
+                    @if (TextWorkspace.CaptureRegion.Width == 0) { <div class="empty-sub">先框选截图区域，随后直接在画面上框选文字。</div> }
+                    <canvas id="textAnnotationCanvas" tabindex="0"></canvas>
+                    <div id="textPixelMagnifier" class="text-pixel-magnifier" hidden><canvas id="textMagnifierCanvas" width="180" height="180"></canvas><div id="textMagnifierInfo"></div></div>
+                </div>
+            </div>
+            <section class="panel-card text-preview-card">
+                <div class="text-preview-layout">
+                    <div class="text-extract-preview">
+                        <div class="section-title">提取点阵预览</div><div class="section-sub">训练使用此处提取的字形；文字应保留在原位置。</div>
+                        @if (_preview is not null) { <div class="text-dot-scroll"><div class="text-dot-matrix" style="grid-template-columns:repeat(@_preview.Bounds.Width, 6px)">@foreach (var pixel in _preview.Mask) { <i class="@(pixel ? "ink" : "")"></i> }</div></div><div class="micro-status">@_preview.Bounds.Width×@_preview.Bounds.Height · @_preview.Mask.Count(p => p) 个笔画像素</div> }
+                        else { <div class="micro-status">框选文字、标定颜色后，点击“提取点阵”。</div> }
+                    </div>
+                    <div class="text-live-ocr">
+                        <div class="text-live-ocr-head"><div class="section-title">实时 OCR · 当前字库</div><div class="text-live-ocr-actions"><button class="action ghost" disabled="@string.IsNullOrEmpty(_liveOcrResult?.Text)" @onclick="CopyLiveOcrAsync">复制文字</button><button class="action ghost" disabled="@_busy" @onclick="CopyOcrCodeAsync">复制 OCR 代码</button></div></div>
+                        <div class="section-sub">按当前字库识别搜索区，自动按行拼接文字。</div>
+                        <textarea aria-label="当前字库实时 OCR 文字" class="text-live-ocr-output" readonly value="@(_liveOcrResult?.Text ?? "")" placeholder="训练或打开字库后自动识别"></textarea>
+                        <div class="micro-status text-live-ocr-status">@_liveOcrStatus</div>
+                    </div>
+                </div>
+            </section>
+
+        </section>
+        <aside class="side-stack text-side-stack"><div class="text-side-panels">
+            <section class="panel-card">
+                <CardHeader Index="01" Title="截图区域" Subtitle="实时刷新当前捕获区；截图后自动进入框选文字" />
+                <div class="action-row"><button class="action primary" disabled="@_busy" @onclick="SelectCaptureAsync">框选并截图</button><button class="action ghost" disabled="@(_busy || TextWorkspace.CaptureRegion.Width == 0)" @onclick="RecaptureAsync">重新截图</button></div><div class="info-line">@RegionText(TextWorkspace.CaptureRegion)</div>
+            </section>
+            <section class="panel-card">
+                <CardHeader Index="02" Title="颜色标定 / 色偏" Subtitle="点击笔画添加；拖动或方向键微调；悬停显示放大镜" />
+                <label class="text-inline-field">新点默认色偏 <input type="number" min="0" max="255" @bind="_defaultDeviation" disabled="@_busy" /></label>
+                <div class="text-seed-list">@for (int i = 0; i < _seeds.Count; i++) { var index = i; var seed = _seeds[i]; <div class="text-seed @(_selectedSeed == i ? "selected" : "")"><button class="text-seed-select" disabled="@_busy" @onclick="() => SelectSeedAsync(index)"><i style="background:rgb(@seed.R,@seed.G,@seed.B)"></i>P@(i+1) (@seed.X,@seed.Y)<small>@seed.R,@seed.G,@seed.B</small></button><input aria-label="点位色偏" type="number" min="0" max="255" value="@seed.Deviation" disabled="@_busy" @onchange="e => ChangeDeviationAsync(index, e)" /><button class="text-delete" disabled="@_busy" @onclick="() => DeleteSeedAsync(index)">×</button></div> }</div>
+            </section>
+            <section class="panel-card">
+                <CardHeader Index="03" Title="提取 / 文字 / 训练" Subtitle="训练结果加入当前选中的字库" />
+                <div class="info-line">文字框：@RegionText(_selection)</div><button class="action ghost" disabled="@_busy" @onclick="ExtractAsync">提取点阵</button>
+                <label class="text-inline-field">点阵代表的文字 <input maxlength="128" @bind="_label" disabled="@_busy" placeholder="例如：确定" /></label><label class="text-inline-field">训练时间（秒） <input type="number" min="2" max="120" @bind="_seconds" disabled="@_busy" /></label>
+                <div class="action-row"><button class="action primary" disabled="@(_busy || _preview is null)" @onclick="TrainAsync">训练并加入字库</button><button class="action ghost" disabled="@(!_training)" @onclick="CancelTraining">取消</button></div><div class="progress-track"><div class="progress-fill" style="width:@(_progress)%"></div></div><div class="micro-status">@_trainStatus</div>
+            </section>
+            <section class="panel-card text-dictionary-card">
+                <div class="text-dictionary-head"><div><div class="section-title">@_dictionary.Name @(_libraries[_activeLibrary].Dirty ? "· 未保存" : "")</div><div class="section-sub">@_dictionary.Glyphs.Count 个模板 · 可改字、启停、编辑点阵及颜色权重</div></div><input aria-label="筛选字库列表" placeholder="筛选文字" @bind="_glyphFilter" @bind:event="oninput" /></div>
+                <div class="text-glyph-table">
+                    @if (_dictionary.Glyphs.Count == 0) { <div class="text-library-empty">字库还是空的。训练文字或打开已有 TXT 字库。</div> }
+                    @for (int i = 0; i < _dictionary.Glyphs.Count; i++) {
+                        var index = i; var glyph = _dictionary.Glyphs[i];
+                        if (!string.IsNullOrEmpty(_glyphFilter) && !glyph.Text.Contains(_glyphFilter, StringComparison.OrdinalIgnoreCase)) continue;
+                        <div class="text-glyph-row" @key="glyph"><div class="text-glyph-thumb">@Thumbnail(glyph)</div><input aria-label="模板文字" value="@glyph.Text" maxlength="128" disabled="@_busy" @oninput="e => RenameGlyph(index, e)" /><span class="text-glyph-meta">@glyph.Width×@glyph.Height<br />@glyph.SampleCount 帧</span><label class="text-enable"><input type="checkbox" checked="@glyph.Enabled" disabled="@_busy" @onchange="e => EnableGlyph(index, e)" />启用</label><div class="text-row-actions"><button disabled="@_busy" @onclick="() => EditGlyph(index)">编辑</button><button disabled="@_busy" @onclick="() => DuplicateGlyph(index)">复制</button><button class="text-delete" disabled="@_busy" @onclick="() => RemoveGlyph(index)">删除</button></div></div>
+                    }
+                </div>
+            </section>
+            <section class="panel-card">
+                <CardHeader Index="04" Title="TXT 字库文件" Subtitle="保存后可再次打开编辑；支持多个字库切换" />
+                <label class="text-inline-field">字库名称 <input value="@_dictionary.Name" maxlength="128" disabled="@_busy" @oninput="RenameLibrary" /></label><div class="action-row"><label class="action ghost text-file-open">打开字库 TXT<InputFile OnChange="OpenLibraryAsync" accept=".txt" disabled="@_busy" /></label><button class="action primary" disabled="@_busy" @onclick="SaveLibraryAsync">下载字库 TXT</button></div>
+                <details class="text-weight-details"><summary>权重字符串 / 兼容导入</summary><textarea class="weight-editor" @bind="_weights" @bind:event="oninput" disabled="@_busy" spellcheck="false"></textarea><div class="action-row"><button class="action ghost" disabled="@_busy" @onclick="ApplyWeights">应用权重</button><button class="action ghost" disabled="@_busy" @onclick="CopyWeightsAsync">复制权重</button></div></details>
+            </section>
+            <section class="panel-card">
+                <CardHeader Index="05" Title="搜索区 / 匹配测试" Subtitle="文字框用于提取，搜索区用于查找，两者分开显示" />
+                <label class="text-inline-field">查找文字 <input @bind="_query" disabled="@_busy" placeholder="留空查找整个字库" /></label><div class="metric-grid two"><label class="field-box"><span>匹配阈值</span><div><input type="number" min="1" max="100" @bind="_threshold" @bind:after="ResetLiveOcr" disabled="@_busy" /><b>%</b></div></label><label class="field-box"><span>附加色偏</span><div><input type="number" min="0" max="255" @bind="_extraDeviation" @bind:after="ResetLiveOcr" disabled="@_busy" /><b>RGB</b></div></label></div><label class="text-inline-field">扫描步长 <input type="number" min="1" max="8" @bind="_step" @bind:after="ResetLiveOcr" disabled="@_busy" /></label>
+                <div class="action-row"><button class="action ghost" disabled="@_busy" @onclick="SelectSearchAsync">框选搜索区</button><button class="action primary" disabled="@_busy" @onclick="TestAsync">测试一次</button></div><div class="info-line">@(TextWorkspace.CustomSearchRegion ? "手动搜索区" : "跟随截图区域") · @RegionText(TextWorkspace.SearchRegion)</div><button class="action ghost" disabled="@(_busy || TextWorkspace.CaptureRegion.Width == 0)" @onclick="UseCaptureForSearchAsync">使用当前截图区搜索</button>
+                @if (_searchImage is not null) { <img class="text-search-preview" src="@_searchImage" alt="当前搜索区截图" /> }
+                <div class="micro-status">@_testStatus</div><div class="text-result-list">@foreach (var hit in _results) { <div>@hit.Text · X @hit.X Y @hit.Y · @hit.Similarity.ToString("F1")% · @hit.MatchMilliseconds.ToString("F2")ms</div> }</div>
+                <label class="text-inline-field">调用循环（秒） <input type="number" min="0" max="600" step="0.5" @bind="_loopSeconds" disabled="@_busy" /></label><label class="text-inline-field">调用间隔（ms） <input type="number" min="0" max="60000" @bind="_interval" disabled="@_busy" /></label>
+            </section>
+        </div><section class="text-copy-dock"><button class="action primary" disabled="@_busy" @onclick="CopyCodeAsync">复制调用代码</button><button class="action ghost" disabled="@_busy" @onclick="ShowCallCode">查看代码</button></section></aside>
+    </main>
+    <footer class="statusbar"><span class="status-dot @(_error ? "error" : "")"></span><span>@_status</span></footer>
+    @if (_editing is not null) {
+        <div class="text-modal-backdrop"><section class="text-edit-modal" role="dialog" aria-label="编辑字库模板">
+            <div class="text-dictionary-head"><div class="section-title">编辑模板</div><button class="text-delete" @onclick="CloseEditor">关闭</button></div><label class="text-inline-field">文字 <input maxlength="128" @bind="_editing.Text" @bind:event="oninput" /></label><label class="text-enable"><input type="checkbox" @bind="_editing.Enabled" />启用模板</label><div class="section-sub">点击选择像素，可切换笔画或背景，并调整该像素权重。</div>
+            <div class="text-edit-matrix-scroll"><div class="text-edit-matrix" style="grid-template-columns:repeat(@_editing.Width, 12px)">@for (int i = 0; i < _editing.Mask.Length; i++) { var pixel = i; <button aria-label="点阵像素 @i" class="@(_editing.Mask[i] ? "ink" : "") @(_editPixel == i ? "selected" : "")" title="权重 @_editing.Weights[i]" @onclick="() => _editPixel = pixel"></button> }</div></div>
+            <div class="text-edit-pixel-controls"><span>选中 X @(_editPixel % _editing.Width) Y @(_editPixel / _editing.Width)</span><button @onclick="ToggleEditPixel">切换笔画 / 背景</button><label>权重 <input type="number" min="1" max="1000" value="@_editing.Weights[_editPixel]" @onchange="ChangeEditWeight" /></label></div><div class="section-title">颜色范围</div>
+            @for (int i = 0; i < _editing.Colors.Count; i++) { var colorIndex = i; var color = _editing.Colors[i]; <div class="text-edit-color"><input aria-label="模板颜色" type="color" value="@ColorHex(color)" @onchange="e => ChangeEditColor(colorIndex, e)" /><span>@ColorHex(color)</span><label>色偏 <input type="number" min="0" max="255" value="@color.Deviation" @onchange="e => ChangeEditDeviation(colorIndex, e)" /></label></div> }
+            <div class="micro-status">@_editError</div><div class="action-row"><button class="action primary" @onclick="SaveEditor">保存修改</button><button class="action ghost" @onclick="CloseEditor">取消</button></div>
+        </section></div>
+    }
+    @if (_showCode) { <div class="text-modal-backdrop"><section class="text-edit-modal text-code-modal" role="dialog" aria-label="找字调用代码"><div class="text-dictionary-head"><div class="section-title">当前字库调用代码</div><button class="text-delete" @onclick="() => _showCode = false">关闭</button></div><textarea aria-label="调用代码预览" readonly value="@BuildCallCode()"></textarea><button class="action primary" @onclick="CopyCodeAsync">复制调用代码</button></section></div> }
+</div>
