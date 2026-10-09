@@ -8,8 +8,19 @@ namespace StateMachine.Execution;
         public List<VariableModel> Variables { get; set; } = new();
         public List<RecognitionItem> Recognitions { get; set; } = new();
         public List<StateModel> States { get; set; } = new();
+        public List<StateGroupModel> StateGroups { get; set; } = new();
         public List<EdgeModel> Edges { get; set; } = new();
         public MachineSettings Settings { get; set; } = new();
+    }
+
+    // Canvas-only organization; execution continues to use the original states and edges.
+    public sealed class StateGroupModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = "Alcyone";
+        public List<string> StateIds { get; set; } = new();
+        public double X { get; set; }
+        public double Y { get; set; }
     }
 
     public sealed class MachineSettings

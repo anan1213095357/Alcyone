@@ -6,8 +6,28 @@ namespace StateMachine.Automation;
 
 internal static class RecognitionSearch
 {
-    public static string DictionaryWeights(string data) =>
-        TextModelCodec.Encode(TextDictionaryFile.Read(data));
+    private static readonly object DictionaryCacheLock = new();
+    private static readonly Dictionary<string, string> DictionaryCache = new(StringComparer.Ordinal);
+    private static readonly Queue<string> DictionaryCacheOrder = new();
+
+    public static string DictionaryWeights(string data)
+    {
+        lock (DictionaryCacheLock)
+        {
+            if (DictionaryCache.TryGetValue(data, out var cached)) return cached;
+        }
+        var weights = TextModelCodec.Encode(TextDictionaryFile.Read(data));
+        lock (DictionaryCacheLock)
+        {
+            if (DictionaryCache.TryGetValue(data, out var cached)) return cached;
+            // Bound retained dictionary data; edits naturally use a different key.
+            while (DictionaryCache.Count >= 8)
+                DictionaryCache.Remove(DictionaryCacheOrder.Dequeue());
+            DictionaryCache.Add(data, weights);
+            DictionaryCacheOrder.Enqueue(data);
+        }
+        return weights;
+    }
 
     public static async Task<ColorProbeResult> FindAsync(ColorProbeSettings settings, CancellationToken token, double seconds)
     {

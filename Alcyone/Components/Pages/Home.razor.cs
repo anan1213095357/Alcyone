@@ -90,6 +90,7 @@ public partial class Home
         if (firstRender)
         {
             _jsBridge = new JsBridge(StateMoved, SelectStateFromJs, SelectEdgeFromJs, ClearSelectionFromJs, EscapeFromJs, DeleteSelectionFromJs);
+            _jsBridge.SaveGroups = SaveGroupsFromJs;
             _dotNetRef = DotNetObjectReference.Create(_jsBridge);
             await JS.InvokeVoidAsync("industrialStateMachineUi.init", _dotNetRef);
             _jsReady = true;
@@ -126,6 +127,9 @@ public partial class Home
         await JS.InvokeVoidAsync("industrialStateMachineUi.sync", new
         {
             edges = Machine.Edges,
+            groups = Machine.StateGroups,
+            configKey = _configKey,
+            currentStateIds = Runtime.Running ? Runtime.CurrentStates.Values.ToArray() : Array.Empty<string>(),
             selectedEdgeId = SelectedEdgeId,
             runningEdgeIds = Runtime.CurrentEdgeIds.ToArray(),
             pending = PendingConnection,
@@ -1546,6 +1550,13 @@ public partial class Home
         Machine.Regions ??= new List<RegionModel>();
         Machine.Variables ??= new List<VariableModel>();
         Machine.States ??= new List<StateModel>();
+        Machine.StateGroups ??= new List<StateGroupModel>();
+        var groupedStates = new HashSet<string>(StringComparer.Ordinal);
+        Machine.StateGroups = Machine.StateGroups.Where(g => g is not null && !string.IsNullOrWhiteSpace(g.Id)
+            && double.IsFinite(g.X) && double.IsFinite(g.Y)).DistinctBy(g => g.Id).ToList();
+        foreach (var group in Machine.StateGroups)
+            group.StateIds = (group.StateIds ?? new()).Where(id => Machine.States.Any(s => s.Id == id) && groupedStates.Add(id)).ToList();
+        Machine.StateGroups.RemoveAll(g => g.StateIds.Count == 0);
         Machine.Edges ??= new List<EdgeModel>();
         Machine.Settings ??= new MachineSettings();
         Machine.Recognitions ??= new();
@@ -1765,6 +1776,8 @@ public partial class Home
 
     public sealed class JsBridge
     {
+        public Func<string, List<StateGroupModel>, Task>? SaveGroups { get; set; }
+        [JSInvokable] public Task SaveGroupsFromJs(string configKey, List<StateGroupModel> groups) => SaveGroups?.Invoke(configKey, groups) ?? Task.CompletedTask;
         private readonly Func<string, double, double, Task> _stateMoved;
         private readonly Func<string, Task> _selectState;
         private readonly Func<string, Task> _selectEdge;

@@ -28,6 +28,8 @@
             <div id="zoomLabel" class="zoom-label">85%</div>
             <button class="btn quiet icon-control" title="@L["放大"]" aria-label="@L["放大"]" @onclick="ZoomInAsync">+</button>
             <button class="btn quiet" @onclick="FitCanvasAsync">@L["适配"]</button>
+            <span class="canvas-gesture-hint">@L["左键框选 · 右键平移"]</span>
+            <button id="collapseSelectionButton" class="btn quiet" type="button" disabled>@L["收纳为 Alcyone"]</button>
         </div>
         <div class="spacer"></div>
         <div class="execution-controls" role="group" aria-label="@L["运行控制"]">
@@ -162,6 +164,7 @@
             <div class="starfield-anchor" aria-hidden="true"><canvas id="workspaceStarfield"></canvas></div>
             <div id="worldScale">
                 <div id="world">
+                    <div id="alcyoneGroupLayer"></div>
                     <svg id="edgeSvg">
                         <g id="edgeLayer"></g>
                         <path id="tempEdge"></path>
@@ -1137,6 +1140,8 @@
         const clampZoom = value => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 
         function getPortPosition(stateId, portId) {
+            const grouped = window.alcyoneGroups?.portPosition(stateId, portId);
+            if (grouped) return grouped;
             const element = document.querySelector(`.port[data-state-id="${CSS.escape(stateId)}"][data-port-id="${CSS.escape(portId)}"]`);
             if (!element || !world) return null;
             const rect = element.getBoundingClientRect();
@@ -1157,10 +1162,12 @@
             let html = "";
             const running = new Set(edgeState.runningEdgeIds || []);
             for (const edge of edgeState.edges || []) {
+                if (window.alcyoneGroups?.internalEdge(edge)) continue;
                 const start = getPortPosition(edge.fromStateId, edge.fromPortId);
                 const end = getPortPosition(edge.toStateId, edge.toPortId);
                 if (!start || !end) continue;
                 const d = bezierPath(start.x, start.y, end.x, end.y);
+                const edgeOpacity = window.alcyoneGroups?.edgeOpacity(edge) ?? 1;
                 let cls = "edge";
                 if (edgeState.selectedEdgeId === edge.id) cls += " selected";
                 if (running.has(edge.id)) cls += " running";
@@ -1186,7 +1193,7 @@
         fill="none"
         stroke="${stroke}"
         stroke-width="${strokeWidth}"
-        style="${filter}">
+        style="${filter}opacity:${edgeOpacity}">
     </path>`;
 
     html += `
@@ -1197,7 +1204,7 @@
         fill="none"
         stroke="transparent"
         stroke-width="16"
-        style="pointer-events:stroke;cursor:pointer;">
+        style="pointer-events:${edgeOpacity < .5 ? 'none' : 'stroke'};cursor:pointer;">
     </path>`;
                 const delay = Math.max(0, Number(edge.delayMilliseconds) || 0);
                 if (delay > 0) {
@@ -1215,7 +1222,7 @@
                     if (points[0].x > points[points.length - 1].x) points.reverse();
                     const sleeve = points.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
                     const pathId = `delay-sleeve-${(edgeState.edges || []).indexOf(edge)}`;
-                    html += `<g data-edge-id="${edge.id}" style="cursor:pointer;pointer-events:all">
+                    html += `<g data-edge-id="${edge.id}" style="opacity:${edgeOpacity};cursor:pointer;pointer-events:${edgeOpacity < .5 ? 'none' : 'all'}">
                         <title>${document.documentElement.lang === "en" ? "Click to set the transition delay" : "点击设置切换前等待"}</title>
                         <path d="${sleeve}" fill="none" stroke="${stroke}" stroke-width="27" stroke-linecap="round" />
                         <path id="${pathId}" d="${sleeve}" fill="none" stroke="#182438" stroke-width="23" stroke-linecap="round" />
@@ -1274,7 +1281,7 @@
 
         function fitCanvas() {
             if (!workspace) return;
-            const cards = [...document.querySelectorAll(".state-card")];
+            const cards = [...document.querySelectorAll(".state-card:not([hidden]), .alcyone-orb")];
             if (cards.length === 0) {
                 setZoom(0.85, false);
                 workspace.scrollLeft = 0;
@@ -1307,6 +1314,7 @@
 
         function onPointerDown(event) {
             if (!workspace) return;
+            if (window.alcyoneGroups?.pointerDown(event)) return;
             const header = event.target.closest?.(".state-header");
             if (header && event.button === 0) {
                 const card = header.closest(".state-card");
@@ -1326,7 +1334,7 @@
                 return;
             }
 
-            if (event.button === 1 || (event.button === 0 && isBackground(event.target))) {
+            if (event.button === 1 || event.button === 2) {
                 pan = {
                     mouseX: event.clientX,
                     mouseY: event.clientY,
@@ -1340,6 +1348,7 @@
         }
 
         function onPointerMove(event) {
+            if (window.alcyoneGroups?.pointerMove(event)) return;
             if (pan && workspace) {
                 const dx = event.clientX - pan.mouseX;
                 const dy = event.clientY - pan.mouseY;
@@ -1362,7 +1371,8 @@
             updateTempEdge(event.clientX, event.clientY);
         }
 
-        function onPointerUp() {
+        function onPointerUp(event) {
+            if (window.alcyoneGroups?.pointerUp(event)) { suppressClickUntil = Date.now() + 180; return; }
             if (pan) {
                 if (pan.moved) suppressClickUntil = Date.now() + 150;
                 pan = null;
@@ -1380,6 +1390,7 @@
 
         function onClick(event) {
             if (Date.now() < suppressClickUntil) return;
+            if (window.alcyoneGroups?.click(event)) return;
             const edge = event.target.closest?.("[data-edge-id]");
             if (edge?.dataset.edgeId) {
                 event.stopPropagation();
@@ -1394,6 +1405,8 @@
             }
             if (isBackground(event.target)) dotnet?.invokeMethodAsync("ClearSelectionFromJs");
         }
+
+        function onCanvasContextMenu(event) { event.preventDefault(); }
 
         function onWheel(event) {
             if (!workspace || (!event.ctrlKey && !event.metaKey)) return;
@@ -1413,6 +1426,7 @@
         function onKeyDown(event) {
             const tag = document.activeElement?.tagName;
             if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+            if (window.alcyoneGroups?.keyDown(event)) return;
             if (event.key === "Delete") dotnet?.invokeMethodAsync("DeleteSelectionFromJs");
             if (event.key === "Escape") dotnet?.invokeMethodAsync("EscapeFromJs");
         }
@@ -1497,8 +1511,10 @@
                 tempEdge = document.getElementById("tempEdge");
                 if (initialized) return;
                 initialized = true;
+                window.alcyoneGroups?.init({ workspace, world, dotnet, drawEdges, zoom: () => canvasZoom });
                 startStarfield();
                 workspace?.addEventListener("pointerdown", onPointerDown);
+                workspace?.addEventListener("contextmenu", onCanvasContextMenu);
                 workspace?.addEventListener("click", onClick);
                 workspace?.addEventListener("wheel", onWheel, { passive: false });
                 workspace?.addEventListener("scroll", drawEdges);
@@ -1509,8 +1525,10 @@
             },
             dispose() {
                 if (!initialized) return;
+                window.alcyoneGroups?.dispose();
                 stopStarfield?.(); stopStarfield = null;
                 workspace?.removeEventListener("pointerdown", onPointerDown);
+                workspace?.removeEventListener("contextmenu", onCanvasContextMenu);
                 workspace?.removeEventListener("click", onClick);
                 workspace?.removeEventListener("wheel", onWheel);
                 workspace?.removeEventListener("scroll", drawEdges);
@@ -1523,6 +1541,7 @@
             },
             sync(state) {
                 edgeState = state || edgeState;
+                window.alcyoneGroups?.sync(state);
                 if (state?.language) window.alcyoneLanguage.set(state.language);
                 updatePendingVisual();
                 requestAnimationFrame(drawEdges);

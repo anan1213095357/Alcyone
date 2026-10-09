@@ -29,6 +29,10 @@ public sealed class MachineSession : IAsyncDisposable
     private int _runToken, _recognitionRevision;
     private Task? _runTask;
     private bool _disposed;
+    private long _lastNotification;
+    private bool _notificationPending;
+    private Task? _notificationTask;
+    private const int NotificationIntervalMilliseconds = 50;
     private MachineModel _publishedMachine = new();
     private MachineSnapshot _snapshot = new(new(), new(), new(), new(), new(), false);
     public event Action? Changed;
@@ -46,6 +50,18 @@ public sealed class MachineSession : IAsyncDisposable
     private Task DispatchAsync(Action action) => _dispatcher.InvokeAsync(action);
     private void Notify()
     {
+        if (_disposed) return;
+        var remaining = NotificationIntervalMilliseconds - (Environment.TickCount64 - _lastNotification);
+        if (Runtime.Running && _executing && remaining > 0)
+        {
+            if (!_notificationPending)
+            {
+                _notificationPending = true;
+                _notificationTask = PublishPendingNotificationAsync((int)remaining);
+            }
+            return;
+        }
+        _lastNotification = Environment.TickCount64;
         var snapshot = new MachineSnapshot(_publishedMachine, Clone(Runtime), Clone(Logs), new(_colorResults), new(_recognitionResults), _executing);
         Volatile.Write(ref _snapshot, snapshot);
         foreach (var subscriber in Changed?.GetInvocationList() ?? Array.Empty<Delegate>())
@@ -53,6 +69,13 @@ public sealed class MachineSession : IAsyncDisposable
             try { ((Action)subscriber)(); }
             catch { /* A disconnected view must not terminate the machine. */ }
         }
+    }
+    private async Task PublishPendingNotificationAsync(int delay)
+    {
+        // Resume on the session dispatcher so snapshot creation stays serialized.
+        await Task.Delay(delay);
+        _notificationPending = false;
+        if (!_disposed) Notify();
     }
     public Task ConfigureAsync(MachineModel machine) => DispatchAsync(() => { if (JsonSerializer.Serialize(Machine, _jsonOptions) == JsonSerializer.Serialize(machine, _jsonOptions)) return; Machine = Clone(machine); _publishedMachine = Clone(Machine); _recognitionRevision++; _recognitionResults.Clear(); DiscoverActionMethods(); if (!Runtime.Running && !_executing) ResetRuntime(); Notify(); });
     public Task StartAsync() => DispatchAsync(() => { if (_executing || Runtime.Running) return; _runTask = RunMachineAsync(); Notify(); });
@@ -78,6 +101,7 @@ public sealed class MachineSession : IAsyncDisposable
         _disposed = true;
         await StopAsync();
         if (_runTask is not null) await _runTask;
+        if (_notificationTask is not null) await _notificationTask;
         await DispatchAsync(() => { _scriptHost?.Dispose(); _executionCancellation.Dispose(); });
         _dispatcher.Dispose();
     }
@@ -907,7 +931,6 @@ public sealed class MachineSession : IAsyncDisposable
                 "good");
 
             Notify();
-            await Task.Delay(100, _executionCancellation.Token);
 
             // =====================================================
             // 目标卡片的进入脚本

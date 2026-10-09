@@ -490,5 +490,8 @@
   "实时截图失败": "Live capture failed",
   "复制失败，请从调用代码预览中手动复制。": "Copy failed. Copy manually from the calling code preview.",
   "保存超时，请检查状态机连接后重试。": "Save timed out. Check the workflow connection and try again.",
-  "编辑器已关闭。": "The editor was closed."
+  "编辑器已关闭。": "The editor was closed.",
+  "左键框选 · 右键平移": "Left drag to select · Right drag to pan",
+  "框选": "Box select",
+  "收纳为 Alcyone": "Fold into Alcyone"
 }
