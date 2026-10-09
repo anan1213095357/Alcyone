@@ -1,0 +1,482 @@
+{
+  "regions": [
+    {
+      "name": "Desktop orchestration",
+      "id": "mission"
+    }
+  ],
+  "variables": [
+    {
+      "value": false,
+      "type": "boolean",
+      "name": "TargetReady",
+      "id": "v1"
+    },
+    {
+      "value": 0,
+      "type": "number",
+      "name": "RetryCount",
+      "id": "v2"
+    },
+    {
+      "value": false,
+      "type": "boolean",
+      "name": "Completed",
+      "id": "v3"
+    }
+  ],
+  "recognitions": [],
+  "states": [
+    {
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "y": 120,
+      "inputs": [
+        {
+          "name": "Enter",
+          "id": "in0"
+        }
+      ],
+      "regionId": "mission",
+      "isStart": true,
+      "x": 120,
+      "name": "Observe the desktop",
+      "outputs": [
+        {
+          "matchMode": "all",
+          "name": "Continue",
+          "conditions": [
+            {
+              "rightValue": true,
+              "operator": "==",
+              "rightMode": "literal",
+              "id": "c0",
+              "left": "TargetReady",
+              "rightType": "boolean",
+              "kind": "variable"
+            }
+          ],
+          "id": "out0"
+        }
+      ],
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "id": "s0",
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      }
+    },
+    {
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "y": 460,
+      "inputs": [
+        {
+          "name": "Enter",
+          "id": "in1"
+        }
+      ],
+      "regionId": "mission",
+      "isStart": false,
+      "x": 120,
+      "name": "Route the next action",
+      "outputs": [
+        {
+          "matchMode": "all",
+          "name": "Continue",
+          "conditions": [
+            {
+              "rightValue": true,
+              "operator": "==",
+              "rightMode": "literal",
+              "id": "c1",
+              "left": "TargetReady",
+              "rightType": "boolean",
+              "kind": "variable"
+            }
+          ],
+          "id": "out1"
+        }
+      ],
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "id": "s1",
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      }
+    },
+    {
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "y": 800,
+      "inputs": [
+        {
+          "name": "Enter",
+          "id": "in2"
+        }
+      ],
+      "regionId": "mission",
+      "isStart": false,
+      "x": 120,
+      "name": "Find target",
+      "outputs": [
+        {
+          "matchMode": "all",
+          "name": "Continue",
+          "conditions": [
+            {
+              "rightValue": true,
+              "operator": "==",
+              "rightMode": "literal",
+              "id": "c2",
+              "left": "TargetReady",
+              "rightType": "boolean",
+              "kind": "variable"
+            }
+          ],
+          "id": "out2"
+        }
+      ],
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "id": "s2",
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      }
+    },
+    {
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "y": 1140,
+      "inputs": [
+        {
+          "name": "Enter",
+          "id": "in3"
+        }
+      ],
+      "regionId": "mission",
+      "isStart": false,
+      "x": 120,
+      "name": "Validate match",
+      "outputs": [
+        {
+          "matchMode": "all",
+          "name": "Continue",
+          "conditions": [
+            {
+              "rightValue": true,
+              "operator": "==",
+              "rightMode": "literal",
+              "id": "c3",
+              "left": "TargetReady",
+              "rightType": "boolean",
+              "kind": "variable"
+            }
+          ],
+          "id": "out3"
+        }
+      ],
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "id": "s3",
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      }
+    },
+    {
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "y": 1480,
+      "inputs": [
+        {
+          "name": "Enter",
+          "id": "in4"
+        }
+      ],
+      "regionId": "mission",
+      "isStart": false,
+      "x": 120,
+      "name": "Click target",
+      "outputs": [
+        {
+          "matchMode": "all",
+          "name": "Continue",
+          "conditions": [
+            {
+              "rightValue": true,
+              "operator": "==",
+              "rightMode": "literal",
+              "id": "c4",
+              "left": "TargetReady",
+              "rightType": "boolean",
+              "kind": "variable"
+            }
+          ],
+          "id": "out4"
+        }
+      ],
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "id": "s4",
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      }
+    },
+    {
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "y": 1820,
+      "inputs": [
+        {
+          "name": "Enter",
+          "id": "in5"
+        }
+      ],
+      "regionId": "mission",
+      "isStart": false,
+      "x": 120,
+      "name": "Confirm result",
+      "outputs": [
+        {
+          "matchMode": "all",
+          "name": "Continue",
+          "conditions": [
+            {
+              "rightValue": true,
+              "operator": "==",
+              "rightMode": "literal",
+              "id": "c5",
+              "left": "TargetReady",
+              "rightType": "boolean",
+              "kind": "variable"
+            }
+          ],
+          "id": "out5"
+        }
+      ],
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "id": "s5",
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      }
+    },
+    {
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "y": 2160,
+      "inputs": [
+        {
+          "name": "Enter",
+          "id": "in6"
+        }
+      ],
+      "regionId": "mission",
+      "isStart": false,
+      "x": 120,
+      "name": "Recover gracefully",
+      "outputs": [
+        {
+          "matchMode": "all",
+          "name": "Continue",
+          "conditions": [
+            {
+              "rightValue": true,
+              "operator": "==",
+              "rightMode": "literal",
+              "id": "c6",
+              "left": "TargetReady",
+              "rightType": "boolean",
+              "kind": "variable"
+            }
+          ],
+          "id": "out6"
+        }
+      ],
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "id": "s6",
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      }
+    },
+    {
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "y": 2500,
+      "inputs": [
+        {
+          "name": "Enter",
+          "id": "in7"
+        }
+      ],
+      "regionId": "mission",
+      "isStart": false,
+      "x": 120,
+      "name": "Resume workflow",
+      "outputs": [
+        {
+          "matchMode": "all",
+          "name": "Continue",
+          "conditions": [
+            {
+              "rightValue": true,
+              "operator": "==",
+              "rightMode": "literal",
+              "id": "c7",
+              "left": "TargetReady",
+              "rightType": "boolean",
+              "kind": "variable"
+            }
+          ],
+          "id": "out7"
+        }
+      ],
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "id": "s7",
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "toStateId": "s1",
+      "fromStateId": "s0",
+      "id": "e1",
+      "toPortId": "in1",
+      "delayMilliseconds": 0,
+      "fromPortId": "out0"
+    },
+    {
+      "toStateId": "s2",
+      "fromStateId": "s1",
+      "id": "e2",
+      "toPortId": "in2",
+      "delayMilliseconds": 0,
+      "fromPortId": "out1"
+    },
+    {
+      "toStateId": "s3",
+      "fromStateId": "s2",
+      "id": "e3",
+      "toPortId": "in3",
+      "delayMilliseconds": 0,
+      "fromPortId": "out2"
+    },
+    {
+      "toStateId": "s4",
+      "fromStateId": "s3",
+      "id": "e4",
+      "toPortId": "in4",
+      "delayMilliseconds": 0,
+      "fromPortId": "out3"
+    },
+    {
+      "toStateId": "s5",
+      "fromStateId": "s4",
+      "id": "e5",
+      "toPortId": "in5",
+      "delayMilliseconds": 0,
+      "fromPortId": "out4"
+    },
+    {
+      "toStateId": "s6",
+      "fromStateId": "s5",
+      "id": "e6",
+      "toPortId": "in6",
+      "delayMilliseconds": 0,
+      "fromPortId": "out5"
+    },
+    {
+      "toStateId": "s7",
+      "fromStateId": "s6",
+      "id": "e7",
+      "toPortId": "in7",
+      "delayMilliseconds": 0,
+      "fromPortId": "out6"
+    }
+  ],
+  "stateGroups": [
+    {
+      "appearance": "ocean",
+      "isCollapsed": true,
+      "id": "recognition",
+      "y": 100,
+      "stateIds": [
+        "s2",
+        "s3"
+      ],
+      "name": "Recognition",
+      "x": 800
+    },
+    {
+      "appearance": "sand",
+      "isCollapsed": true,
+      "id": "interaction",
+      "y": 310,
+      "stateIds": [
+        "s4",
+        "s5"
+      ],
+      "name": "Interaction",
+      "x": 1100
+    },
+    {
+      "appearance": "violet",
+      "isCollapsed": true,
+      "id": "recovery",
+      "y": 530,
+      "stateIds": [
+        "s6",
+        "s7"
+      ],
+      "name": "Recovery",
+      "x": 800
+    }
+  ],
+  "settings": {
+    "cycleDelay": 100
+  }
+}

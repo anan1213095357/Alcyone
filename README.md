@@ -1,75 +1,88 @@
 <div align="center">
 
-![Alcyone — AI-powered scripting and state machine automation](docs/images/banner.svg)
+![Alcyone — Give your workflows a universe](docs/images/banner.svg)
 
-**Simple actions. Complex automation.**
+### Desktop automation, in your orbit.
 
-Write scripts with AI. Organize logic with states. Connect it all to your desktop.
+**Visual state machines · Living planets · Hot-reloadable C# · AI-assisted development**
 
 **English** · [简体中文](README.zh-CN.md)
 
-![Windows x64](https://img.shields.io/badge/Windows-x64-0078D4?style=flat-square)
-![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square)
-![C%23](https://img.shields.io/badge/Scripting-C%23-65C7C8?style=flat-square)
-![Blazor + Photino](https://img.shields.io/badge/Desktop-Blazor%20%2B%20Photino-8B87F8?style=flat-square)
+![Windows x64](https://img.shields.io/badge/Windows-x64-8bbcff?style=flat-square&labelColor=101b2d)
+![.NET 10](https://img.shields.io/badge/.NET-10-b9a0ff?style=flat-square&labelColor=101b2d)
+![C%23 scripting](https://img.shields.io/badge/Scripting-C%23-7fe0c0?style=flat-square&labelColor=101b2d)
+![English + Chinese](https://img.shields.io/badge/UI-English%20%2F%20中文-d9c69e?style=flat-square&labelColor=101b2d)
 
-[Highlights](#highlights) · [A closer look](#a-closer-look) · [Quick start](#quick-start) · [User guide](docs/guide.md)
+[Explore the workspace](#a-workspace-with-depth) · [Get started](#quick-start) · [Write C# actions](#extend-with-c) · [User guide](docs/guide.md)
 
 </div>
 
----
+![The English Alcyone interface: state cards, connected planets, and a layered starfield](docs/images/workspace-en.jpg)
 
-Alcyone is a Windows desktop automation workspace that brings **AI-assisted development, visual state machines, and hot-reloadable C# scripts** together. Clicks, keystrokes, and waits become reusable actions. Conditions, branches, loops, and parallel state regions turn those actions into workflows.
+Alcyone is a Windows desktop automation workspace where **you can see the logic you are building**. Connect state cards, recognize screen content, and run C# actions. When a workflow grows, fold related cards into named planets and keep the larger picture in view.
 
-Start with “find this button and click it.” Build toward “recognize text, evaluate conditions, execute a script, and wait for the screen to change.” Inspect and edit each state and transition on the canvas.
+The canvas has depth. The execution stays explicit.
 
-![Alcyone state machine canvas](docs/images/workflow.png)
+## A workspace with depth
 
-## Highlights
+### Less clutter. The same logic.
 
-| | Capability | What it enables |
-| :-- | :-- | :-- |
-| ✦ | **AI script assistant** | Describe a task, generate a workflow, C# scripts, or both, then preview and apply the changes. |
-| ◈ | **Visual state machines** | Connect states, combine ALL / ANY conditions, and prioritize outgoing transitions. |
-| ⌘ | **C# hot reload** | Edit `.csx` files and expose parameters in the UI. Failed compilation keeps the last working version. |
-| ◎ | **Screen recognition** | Use multi-point colors, dictionary OCR, and fixed-text searches to drive transitions. |
-| ⑂ | **Parallel state regions** | Give each region its own current state and share numeric, boolean, text, and JSON variables. |
-| ▷ | **Execution controls** | Run, step, stop, and reset with current-state highlighting and execution logs. |
+Box-select a set of cards and **Fold** them into a planet. Internal connections disappear into the group; external connections stay attached. Expand it to return to the original cards. Folding organizes the canvas—it does not replace states or change their execution order.
 
-## From idea to automation
+- **Work with a selection.** Fold, copy, delete, and expand from a contextual toolbar.
+- **Move as a group.** Drag any selected card to move the selection together.
+- **Grow an existing planet.** Drop selected cards onto it; the cards and connections animate into place.
+- **Keep your layout.** Names, membership, appearances, positions, and collapsed states are saved with the workflow.
 
-```text
-Describe → Generate scripts / states → Preview & apply → Connect & configure → Run / step
-                                                               ↑                │
-                                                               └─ Inspect & edit┘
-```
+![Box-selected cards and the contextual action toolbar](docs/images/selection-en.jpg)
 
-You can also build workflows and write scripts by hand. AI assistance is optional.
+### Choose the world that fits your workflow.
 
-1. **Prepare recognition items.** Import or train dictionaries and color patterns, then set search regions.
-2. **Build the workflow.** Add states, configure entry / loop / exit actions, and connect transitions.
-3. **Define conditions.** Combine variables with recognition status, similarity, coordinates, and text.
-4. **Inspect execution.** Step through the logic before running continuously; use logs to diagnose behavior.
+Ocean, ice, lava, forest, violet clouds, ringed worlds—**12 selectable planet appearances**, with no random reassignment. Rename a planet and pick its surface from **Appearance**. Reopening a workflow, or unfolding and refolding the same group, keeps its identity.
 
-## A closer look
+Planets turn slowly while idle and accelerate when execution reaches a state inside them. Offscreen rendering pauses. Nebulae, distant star clusters, and foreground stars give the workspace a layered backdrop.
 
-### Describe what should happen
+![Planet settings with twelve appearance presets in the English interface](docs/images/planet-styles-en.jpg)
 
-The assistant uses the current workflow, recognition library, and action catalog as context. Choose workflow + scripts, scripts only, or workflow only.
+### A visual workspace. A programmable core.
 
-![AI script assistant with an example request](docs/images/ai-assistant.png)
+| Capability | What you can build |
+| :-- | :-- |
+| **State machines** | Entry, loop, and exit actions; prioritized transitions with ALL / ANY conditions. |
+| **C# hot reload** | Reusable `.csx` actions with parameters exposed in the UI. Failed compilation keeps the last working version. |
+| **Screen recognition** | Multi-point color matching, dictionary OCR, and fixed-text searches, with embedded training tools. |
+| **Independent state regions** | Separate current states with shared boolean, numeric, text, and JSON variables. |
+| **Execution controls** | Run, step, stop, and reset; inspect state highlights, condition results, and logs. |
+| **English & Chinese** | Switch the interface language without reloading the workflow. |
 
-### Turn screen content into conditions
+### Describe it. Review it. Make it run.
 
-Manage dictionaries, multi-point colors, search regions, and matching parameters in one place. Training and testing are embedded in the app.
+The optional AI assistant uses your current workflow, recognition library, and action catalog as context. Ask for scripts, a workflow, or both; review proposed changes before applying them. You can also build everything by hand.
 
-![Recognition library and dictionary management](docs/images/recognition.png)
+![The English AI assistant with an example request ready to review](docs/images/ai-assistant-en.jpg)
 
-<sub>Actual application screenshots, captured in Chinese. The interface supports Chinese and English. The AI screenshot shows prompt composition, without a model call or generated result.</sub>
+<sub>Actual English-interface screenshots from the application’s local browser host. The workflow is a documentation example, not a live desktop automation run. The AI screenshot shows an unsent prompt; no generated result is implied.</sub>
 
-### Choose your language
+<details>
+<summary><strong>Open the workflow shown above</strong></summary>
 
-Use the language selector in the top toolbar to switch between **简体中文** and **English** instantly. The recognition training window also has a selector. Your choice is saved for the current Windows user and restored on the next launch. Switching languages keeps the current workflow and running session intact; user-defined names, scripts, recognized text, and raw log output stay unchanged.
+Copy [orbital-workflow.json](docs/examples/orbital-workflow.json) into `StateMachineConfigs/` beside the executable, then select **orbital-workflow** from the configuration picker. For source builds, the executable is normally under `Alcyone/bin/Release/net10.0/win-x64/`.
+
+This layout example contains no input actions or trained recognition data. Its transitions wait on the `TargetReady` variable, initially `false`.
+
+</details>
+
+## Canvas controls
+
+| Gesture | Action |
+| :-- | :-- |
+| Left-drag on empty canvas | Box-select cards and planets |
+| Right-drag | Pan the workspace |
+| Ctrl + mouse wheel | Zoom |
+| Drag a selected card | Move selected cards together |
+| Drop selected cards onto a planet | Add them to that planet |
+| Click a planet / double-click it | Select / expand |
+| **Appearance**, or click the planet name | Choose a surface and rename it |
 
 ## Quick start
 
