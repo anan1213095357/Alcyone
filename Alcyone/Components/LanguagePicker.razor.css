@@ -1,0 +1,4 @@
+.language-picker { position: relative; flex-shrink: 0; }
+.language-picker select { color: #dbe7f7; background: #111b29; border: 1px solid #2b3c54; border-radius: 7px; padding: 7px 9px; font: inherit; font-size: 12px; cursor: pointer; max-width: 112px; }
+.language-picker select:focus-visible { outline: 2px solid #71b7ff; outline-offset: 2px; }
+.language-error { position: absolute; z-index: 1000; top: 100%; right: 0; width: 230px; padding: 8px; background: #411e29; color: #ffd5df; border-radius: 6px; font-size: 12px; }

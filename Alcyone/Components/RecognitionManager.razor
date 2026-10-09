@@ -1,32 +1,33 @@
+@inherits LocalizedComponent
 @using StateMachine.Automation
 @using FastTextFinderRuntime
 @using FastColorFinder.Core
 
 <div class="recognition-overlay" inert="@(_trainingInitial is not null)">
-    <section class="recognition-dialog" @ref="_dialogElement" role="dialog" aria-modal="true" aria-label="识别库管理">
+    <section class="recognition-dialog" @ref="_dialogElement" role="dialog" aria-modal="true" aria-label="@L["识别库管理"]">
         <header class="manager-topbar">
-            <div><h2>识别库管理</h2><span>字典 / 点阵 / 多点颜色</span></div>
+            <div><h2>@L["识别库管理"]</h2><span>@L["字典 / 点阵 / 多点颜色"]</span></div>
             <div class="top-actions">
-                <button class="close-manager" disabled="@IsBusy" @onclick="OnClose" aria-label="关闭识别库" title="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+                <button class="close-manager" disabled="@IsBusy" @onclick="OnClose" aria-label="@L["关闭识别库"]" title="@L["关闭"]"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
             </div>
         </header>
         @if (_error is not null)
         {
-            <div class="import-feedback error" role="alert">@_error</div>
+            <div class="import-feedback error" role="alert">@L[_error]</div>
         }
         else if (_importStatus is not null)
         {
-            <div class="import-feedback @(_importing ? "pending" : "success")" role="status" aria-live="polite">@_importStatus</div>
+            <div class="import-feedback @(_importing ? "pending" : "success")" role="status" aria-live="polite">@L[_importStatus]</div>
         }
         <div class="manager-body">
             <aside class="library-column">
                 <div class="create-row">
                     <select @bind="_newMode" disabled="@IsBusy">
-                        <option value="feature">多点色库</option><option value="dictionary">字典</option>
-                    </select><button class="primary" disabled="@IsBusy" @onclick="Add">+ 新建</button>
+                        <option value="feature">@L["多点色库"]</option><option value="dictionary">@L["字典"]</option>
+                    </select><button class="primary" disabled="@IsBusy" @onclick="Add">@L["+ 新建"]</button>
                 </div>
-                <label class="file-button library-import">导入字典文件<InputFile @key="_importInputVersion" OnChange="ImportNewDictionary" accept=".json,.txt,.ftf" disabled="@IsBusy" /></label>
-                <input class="library-filter" placeholder="筛选多点色库 / 字典" @bind="_itemFilter" @bind:event="oninput" />
+                <label class="file-button library-import">@L["导入字典文件"]<InputFile @key="_importInputVersion" OnChange="ImportNewDictionary" accept=".json,.txt,.ftf" disabled="@IsBusy" /></label>
+                <input class="library-filter" placeholder="@L["筛选多点色库 / 字典"]" @bind="_itemFilter" @bind:event="oninput" />
                 <div class="library-list">
                     @foreach (var entry in Roots.Where(i => i.Name.Contains(_itemFilter, StringComparison.OrdinalIgnoreCase)))
                     {
@@ -34,20 +35,20 @@
                             <div class="library-name-row">
                                 @if (_renamingLibraryId == entry.Id)
                                 {
-                                    <input aria-label="修改库名称" @bind="_libraryNameDraft" @bind:event="oninput" maxlength="128" disabled="@IsBusy" @onclick:stopPropagation="true" @onkeydown="e => LibraryRenameKeyAsync(entry, e)" @onblur="() => CommitLibraryRenameAsync(entry)" />
+                                    <input aria-label="@L["修改库名称"]" @bind="_libraryNameDraft" @bind:event="oninput" maxlength="128" disabled="@IsBusy" @onclick:stopPropagation="true" @onkeydown="e => LibraryRenameKeyAsync(entry, e)" @onblur="() => CommitLibraryRenameAsync(entry)" />
                                 }
                                 else
                                 {
                                     <button class="library-name" disabled="@IsBusy" @onclick:stopPropagation="true" @onclick="() => Select(entry.Id, true)" title="@entry.Name">@entry.Name</button>
-                                    <button class="rename-library" disabled="@IsBusy" aria-label="重命名库" title="重命名" @onclick:stopPropagation="true" @onclick="() => BeginLibraryRename(entry)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 3 5 5-12 12-6 1 1-6Z M14 5l5 5" /></svg></button>
+                                    <button class="rename-library" disabled="@IsBusy" aria-label="@L["重命名库"]" title="@L["重命名"]" @onclick:stopPropagation="true" @onclick="() => BeginLibraryRename(entry)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 3 5 5-12 12-6 1 1-6Z M14 5l5 5" /></svg></button>
                                 }
                             </div>
-                            <div class="library-item-actions"><small>@RecognitionItem.KindName(entry.Settings.Mode)</small><button class="danger" disabled="@IsBusy" @onclick:stopPropagation="true" @onclick="() => Delete(entry)">删除</button></div>
+                            <div class="library-item-actions"><small>@L[RecognitionItem.KindName(entry.Settings.Mode)]</small><button class="danger" disabled="@IsBusy" @onclick:stopPropagation="true" @onclick="() => Delete(entry)">@L["删除"]</button></div>
                         </div>
                     }
-                    @if (!Roots.Any()) { <div class="empty">在左侧新建字典或多点色库，再编辑训练；也可导入已有字典。</div> }
+                    @if (!Roots.Any()) { <div class="empty">@L["在左侧新建字典或多点色库，再编辑训练；也可导入已有字典。"]</div> }
                 </div>
-                <div class="list-footer">共 @Roots.Count() 项</div>
+                <div class="list-footer">@L.Format("共 {0} 项", Roots.Count())</div>
             </aside>
             @if (Current is { } item)
             {
@@ -55,16 +56,16 @@
                 <main class="preview-column">
                     <section class="panel-card library-table-card">
                         <div class="card-head">
-                            <div><h3>@CurrentRoot!.Name · @VisibleItems.Count() 项</h3><p>@(settings.Mode == "dictionary" ? "工具字库列表中的文字点阵与对应字符串" : "多点颜色坐标描述与训练特征字符串")</p></div>
+                            <div><h3>@CurrentRoot!.Name · @L.Format("{0} 项", VisibleItems.Count())</h3><p>@(settings.Mode == "dictionary" ? L["工具字库列表中的文字点阵与对应字符串"] : L["多点颜色坐标描述与训练特征字符串"])</p></div>
                             <div class="list-toolbar">
-                                @if (settings.Mode == "dictionary") { <input placeholder="筛选字符串" @bind="_glyphFilter" @bind:event="oninput" /> }
-                                <button class="primary add-entry" disabled="@IsBusy" @onclick="OpenNewTraining"><span aria-hidden="true">＋</span> 新增</button>
+                                @if (settings.Mode == "dictionary") { <input placeholder="@L["筛选字符串"]" @bind="_glyphFilter" @bind:event="oninput" /> }
+                                <button class="primary add-entry" disabled="@IsBusy" @onclick="OpenNewTraining"><span aria-hidden="true">＋</span> @L["新增"]</button>
                             </div>
                         </div>
                         <div class="entry-table-scroll">
                             <table class="entry-table">
                                 <colgroup><col class="name-column" /><col class="description-column" /><col class="string-column" /><col class="range-column" /><col class="actions-column" /></colgroup>
-                                <thead><tr><th scope="col">名称</th><th scope="col">@(settings.Mode == "dictionary" ? "文字矩阵" : "颜色坐标描述")</th><th scope="col">字符串</th><th scope="col">查找范围</th><th scope="col">操作</th></tr></thead>
+                                <thead><tr><th scope="col">@L["名称"]</th><th scope="col">@(settings.Mode == "dictionary" ? L["文字矩阵"] : L["颜色坐标描述"])</th><th scope="col">@L["字符串"]</th><th scope="col">@L["查找范围"]</th><th scope="col">@L["操作"]</th></tr></thead>
                                 <tbody>
                                     @foreach (var entry in VisibleItems)
                                     {
@@ -77,18 +78,18 @@
                                                 @foreach (var glyph in dictionary.Glyphs.Where(g => g.Text.Contains(_glyphFilter, StringComparison.OrdinalIgnoreCase)))
                                                 {
                                                     <tr @key="(entry.Id, glyph.Id)" data-recognition-row="@entry.Id" class="@(Current?.Id == entry.Id ? "is-target" : "")" @onclick="() => Select(entry.Id)" aria-selected="@(Current?.Id == entry.Id ? "true" : "false")">
-                                                        <td><input class="entry-name-input" aria-label="字典名称" value="@entry.Name" disabled="@IsBusy" @onchange="e => Rename(entry, e.Value?.ToString())" />@if (rowSettings.TrainingEditor?.ImagePng is { Length: > 0 } image) { <figure class="library-snapshot"><img src="@($"data:image/png;base64,{Convert.ToBase64String(image)}")" alt="@(entry.Name + "的训练截图")" loading="lazy" /><figcaption>训练截图</figcaption></figure> }</td>
+                                                        <td><input class="entry-name-input" aria-label="@L["字典名称"]" value="@entry.Name" disabled="@IsBusy" @onchange="e => Rename(entry, e.Value?.ToString())" />@if (rowSettings.TrainingEditor?.ImagePng is { Length: > 0 } image) { <figure class="library-snapshot"><img src="@($"data:image/png;base64,{Convert.ToBase64String(image)}")" alt="@(entry.Name + L["的训练截图"])" loading="lazy" /><figcaption>@L["训练截图"]</figcaption></figure> }</td>
                                                         <td><div class="matrix-thumbnail">@Thumbnail(glyph)</div><small class="matrix-size">@glyph.Width × @glyph.Height</small></td>
                                                         <td><span class="entry-string readonly-string">@glyph.Text</span></td>
-                                                        <td><input class="range-value" aria-label="查找范围 X,Y,宽,高" value="@RangeValue(rowSettings)" placeholder="X,Y,宽,高" disabled="@IsBusy" @onchange="e => ChangeRange(entry, e.Value?.ToString())" /><button class="range-select" disabled="@IsBusy" @onclick:stopPropagation="true" @onclick="() => SelectSearchRange(entry)">框选查找范围</button><small class="note">X,Y,宽,高</small></td>
-                                                        <td><div class="entry-actions" @onclick:stopPropagation="true"><button class="edit-entry" disabled="@IsBusy" @onclick="() => EditRecognition(entry)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 3 5 5-12 12-6 1 1-6Z M14 5l5 5" /></svg><span>编辑</span></button><label class="check-label"><input type="checkbox" checked="@glyph.Enabled" disabled="@IsBusy" @onchange="async e => { Select(entry.Id); await EnableGlyph(glyph, e.Value is true); }" />启用</label><button disabled="@IsBusy" @onclick="async () => { Select(entry.Id); await DuplicateGlyph(glyph); }">复制</button><button class="danger" disabled="@IsBusy" @onclick="async () => { Select(entry.Id); await RemoveGlyph(glyph); }">删除</button></div></td>
+                                                        <td><input class="range-value" aria-label="@L["查找范围 X,Y,宽,高"]" value="@RangeValue(rowSettings)" placeholder="@L["X,Y,宽,高"]" disabled="@IsBusy" @onchange="e => ChangeRange(entry, e.Value?.ToString())" /><button class="range-select" disabled="@IsBusy" @onclick:stopPropagation="true" @onclick="() => SelectSearchRange(entry)">@L["框选查找范围"]</button><small class="note">@L["X,Y,宽,高"]</small></td>
+                                                        <td><div class="entry-actions" @onclick:stopPropagation="true"><button class="edit-entry" disabled="@IsBusy" @onclick="() => EditRecognition(entry)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 3 5 5-12 12-6 1 1-6Z M14 5l5 5" /></svg><span>@L["编辑"]</span></button><label class="check-label"><input type="checkbox" checked="@glyph.Enabled" disabled="@IsBusy" @onchange="async e => { Select(entry.Id); await EnableGlyph(glyph, e.Value is true); }" />@L["启用"]</label><button disabled="@IsBusy" @onclick="async () => { Select(entry.Id); await DuplicateGlyph(glyph); }">@L["复制"]</button><button class="danger" disabled="@IsBusy" @onclick="async () => { Select(entry.Id); await RemoveGlyph(glyph); }">@L["删除"]</button></div></td>
                                                     </tr>
                                                 }
                                             }
                                             else
                                             {
                                                 <tr @key="entry.Id" data-recognition-row="@entry.Id" class="@(Current?.Id == entry.Id ? "is-target" : "")" @onclick="() => Select(entry.Id)">
-                                                    <td>@entry.Name@if (rowSettings.TrainingEditor?.ImagePng is { Length: > 0 } image) { <figure class="library-snapshot"><img src="@($"data:image/png;base64,{Convert.ToBase64String(image)}")" alt="@(entry.Name + "的训练截图")" loading="lazy" /><figcaption>训练截图</figcaption></figure> }</td><td colspan="2" class="empty">@(dictionary is null ? "尚未导入有效字典，点击此行后在右侧导入。" : "没有符合筛选条件的文字模板。")</td><td><input class="range-value" aria-label="查找范围 X,Y,宽,高" value="@RangeValue(rowSettings)" disabled="@IsBusy" @onchange="e => ChangeRange(entry, e.Value?.ToString())" /><button class="range-select" disabled="@IsBusy" @onclick:stopPropagation="true" @onclick="() => SelectSearchRange(entry)">框选查找范围</button></td><td><div class="entry-actions" @onclick:stopPropagation="true"><button class="edit-entry" disabled="@IsBusy" @onclick="() => EditRecognition(entry)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 3 5 5-12 12-6 1 1-6Z M14 5l5 5" /></svg><span>编辑</span></button><button class="danger" disabled="@IsBusy" @onclick="() => Delete(entry)">删除字典</button></div></td>
+                                                    <td>@entry.Name@if (rowSettings.TrainingEditor?.ImagePng is { Length: > 0 } image) { <figure class="library-snapshot"><img src="@($"data:image/png;base64,{Convert.ToBase64String(image)}")" alt="@(entry.Name + L["的训练截图"])" loading="lazy" /><figcaption>@L["训练截图"]</figcaption></figure> }</td><td colspan="2" class="empty">@(dictionary is null ? L["尚未导入有效字典，点击此行后在右侧导入。"] : L["没有符合筛选条件的文字模板。"])</td><td><input class="range-value" aria-label="@L["查找范围 X,Y,宽,高"]" value="@RangeValue(rowSettings)" disabled="@IsBusy" @onchange="e => ChangeRange(entry, e.Value?.ToString())" /><button class="range-select" disabled="@IsBusy" @onclick:stopPropagation="true" @onclick="() => SelectSearchRange(entry)">@L["框选查找范围"]</button></td><td><div class="entry-actions" @onclick:stopPropagation="true"><button class="edit-entry" disabled="@IsBusy" @onclick="() => EditRecognition(entry)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 3 5 5-12 12-6 1 1-6Z M14 5l5 5" /></svg><span>@L["编辑"]</span></button><button class="danger" disabled="@IsBusy" @onclick="() => Delete(entry)">@L["删除字典"]</button></div></td>
                                                 </tr>
                                             }
                                         }
@@ -96,32 +97,32 @@
                                         {
                                             var model = ColorForTable(entry);
                                             <tr @key="entry.Id" data-recognition-row="@entry.Id" class="@(Current?.Id == entry.Id ? "is-target" : "")" @onclick="() => Select(entry.Id)" aria-selected="@(Current?.Id == entry.Id ? "true" : "false")">
-                                                <td><input class="entry-name-input" aria-label="多点色库名称" value="@entry.Name" disabled="@IsBusy" @onchange="e => Rename(entry, e.Value?.ToString())" />@if (rowSettings.TrainingEditor?.ImagePng is { Length: > 0 } image) { <figure class="library-snapshot"><img src="@($"data:image/png;base64,{Convert.ToBase64String(image)}")" alt="@(entry.Name + "的训练截图")" loading="lazy" /><figcaption>训练截图</figcaption></figure> }</td>
+                                                <td><input class="entry-name-input" aria-label="@L["多点色库名称"]" value="@entry.Name" disabled="@IsBusy" @onchange="e => Rename(entry, e.Value?.ToString())" />@if (rowSettings.TrainingEditor?.ImagePng is { Length: > 0 } image) { <figure class="library-snapshot"><img src="@($"data:image/png;base64,{Convert.ToBase64String(image)}")" alt="@(entry.Name + L["的训练截图"])" loading="lazy" /><figcaption>@L["训练截图"]</figcaption></figure> }</td>
                                                 <td><div class="color-coordinates">
                                                     @if (model is not null)
                                                     {
                                                         @for (int i = 0; i < model.Points.Count; i++)
                                                         {
                                                             var point = model.Points[i];
-                                                            <div class="coordinate-description"><i class="swatch" style="background:@PointColor(model, point)"></i><div><strong>@(point.IsAnchor ? "A 锚点" : $"P{i}") · (@point.X, @point.Y)</strong>
-                                                                @if (point.IsAnchor) { <small>颜色 Y/Cb/Cr：@model.AnchorMeanY / @model.AnchorMeanCb / @model.AnchorMeanCr</small> }
-                                                                else { <small>相对坐标：(@point.Dx, @point.Dy)</small><small>颜色差 Y/Cb/Cr：@point.MeanDY / @point.MeanDCb / @point.MeanDCr</small> }
+                                                            <div class="coordinate-description"><i class="swatch" style="background:@PointColor(model, point)"></i><div><strong>@(point.IsAnchor ? L["A 锚点"] : $"P{i}") · (@point.X, @point.Y)</strong>
+                                                                @if (point.IsAnchor) { <small>@L["颜色 Y/Cb/Cr："]@model.AnchorMeanY / @model.AnchorMeanCb / @model.AnchorMeanCr</small> }
+                                                                else { <small>@L["相对坐标："] (@point.Dx, @point.Dy)</small><small>@L["颜色差 Y/Cb/Cr："]@point.MeanDY / @point.MeanDCb / @point.MeanDCr</small> }
                                                             </div></div>
                                                         }
                                                     }
-                                                    else { <small class="note">粘贴工具的调用代码或权重字符串。</small> }
+                                                    else { <small class="note">@L["粘贴工具的调用代码或权重字符串。"]</small> }
                                                 </div></td>
-                                                <td><div class="feature-value readonly-feature" aria-label="颜色特征字符串">@entry.Settings.WeightString</div></td>
-                                                <td><input class="range-value" aria-label="查找范围 X,Y,宽,高" value="@RangeValue(rowSettings)" placeholder="X,Y,宽,高" disabled="@IsBusy" @onchange="e => ChangeRange(entry, e.Value?.ToString())" /><button class="range-select" disabled="@IsBusy" @onclick:stopPropagation="true" @onclick="() => SelectSearchRange(entry)">框选查找范围</button><small class="note">X,Y,宽,高</small></td>
-                                                <td><div class="entry-actions" @onclick:stopPropagation="true"><button class="edit-entry" disabled="@IsBusy" @onclick="() => EditRecognition(entry)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 3 5 5-12 12-6 1 1-6Z M14 5l5 5" /></svg><span>编辑</span></button><button class="danger" disabled="@IsBusy" @onclick="() => Delete(entry)">删除</button></div></td>
+                                                <td><div class="feature-value readonly-feature" aria-label="@L["颜色特征字符串"]">@entry.Settings.WeightString</div></td>
+                                                <td><input class="range-value" aria-label="@L["查找范围 X,Y,宽,高"]" value="@RangeValue(rowSettings)" placeholder="@L["X,Y,宽,高"]" disabled="@IsBusy" @onchange="e => ChangeRange(entry, e.Value?.ToString())" /><button class="range-select" disabled="@IsBusy" @onclick:stopPropagation="true" @onclick="() => SelectSearchRange(entry)">@L["框选查找范围"]</button><small class="note">@L["X,Y,宽,高"]</small></td>
+                                                <td><div class="entry-actions" @onclick:stopPropagation="true"><button class="edit-entry" disabled="@IsBusy" @onclick="() => EditRecognition(entry)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 3 5 5-12 12-6 1 1-6Z M14 5l5 5" /></svg><span>@L["编辑"]</span></button><button class="danger" disabled="@IsBusy" @onclick="() => Delete(entry)">@L["删除"]</button></div></td>
                                             </tr>
                                         }
                                     }
-                                    @if (!VisibleItems.Any()) { <tr><td colspan="5" class="empty">当前多点色库尚无记录，点击列表上方“新增”开始训练。</td></tr> }
+                                    @if (!VisibleItems.Any()) { <tr><td colspan="5" class="empty">@L["当前多点色库尚无记录，点击列表上方“新增”开始训练。"]</td></tr> }
                                 </tbody>
                             </table>
                         </div>
-                        @if (settings.Mode == "dictionary") { <div class="note">同一字典内的模板共用当前查找范围。</div> }
+                        @if (settings.Mode == "dictionary") { <div class="note">@L["同一字典内的模板共用当前查找范围。"]</div> }
                     </section>
                 </main>
                 <aside class="parameters-column">
@@ -129,43 +130,43 @@
                         @if (settings.Mode == "dictionary")
                         {
                         <section class="panel-card">
-                            <div class="card-head"><h3><b>01</b> 字典文件</h3></div>
+                            <div class="card-head"><h3><b>01</b> @L["字典文件"]</h3></div>
                             @if (settings.Mode == "dictionary")
                             {
-                                <label class="file-button">打开字库 TXT / JSON<InputFile @key="_importInputVersion" OnChange="ImportDictionary" accept=".json,.txt,.ftf" disabled="@IsBusy" /></label>
-                                @if (_dictionary is not null) { <label>字库名称<input @bind="_dictionary.Name" @bind:after="SaveDictionaryName" maxlength="128" /></label> }
+                                <label class="file-button">@L["打开字库 TXT / JSON"]<InputFile @key="_importInputVersion" OnChange="ImportDictionary" accept=".json,.txt,.ftf" disabled="@IsBusy" /></label>
+                                @if (_dictionary is not null) { <label>@L["字库名称"]<input @bind="_dictionary.Name" @bind:after="SaveDictionaryName" maxlength="128" /></label> }
                             }
                             @if (settings.Mode == "dictionary")
                             {
-                                <details open="@string.IsNullOrWhiteSpace(settings.WeightString)"><summary>特征串 / 兼容导入</summary><textarea @bind="_rawWeights" spellcheck="false" placeholder="@(settings.Mode == "feature" ? "FCF2 / FCF3 特征串" : "FTF1 特征串或字库 JSON")"></textarea><button @onclick="ApplyWeights">应用并展开预览</button></details>
+                                <details open="@string.IsNullOrWhiteSpace(settings.WeightString)"><summary>@L["特征串 / 兼容导入"]</summary><textarea @bind="_rawWeights" spellcheck="false" placeholder="@(settings.Mode == "feature" ? L["FCF2 / FCF3 特征串"] : L["FTF1 特征串或字库 JSON"])"></textarea><button @onclick="ApplyWeights">@L["应用并展开预览"]</button></details>
                             }
-                            @if (settings.Mode == "dictionary" && !string.IsNullOrEmpty(settings.FileName)) { <div class="note">已导入：@settings.FileName</div> }
+                            @if (settings.Mode == "dictionary" && !string.IsNullOrEmpty(settings.FileName)) { <div class="note">@L["已导入："]@settings.FileName</div> }
                         </section>
                         }
-                        <section class="panel-card"><div class="card-head"><h3><b>@(settings.Mode == "dictionary" ? "02" : "01")</b> 匹配参数 / 测试</h3></div>
+                        <section class="panel-card"><div class="card-head"><h3><b>@(settings.Mode == "dictionary" ? "02" : "01")</b> @L["匹配参数 / 测试"]</h3></div>
                             @if (settings.Mode == "dictionary")
                             {
-                                <label>字典测试方式<select @bind="settings.DictionaryMode" @bind:after="Changed"><option value="ocr">OCR 识别结果</option><option value="text">查找固定文字</option></select></label>
-                                @if (settings.DictionaryMode == "text") { <label>查找文字<input @bind="settings.Query" @bind:after="Changed" placeholder="填写要查找的固定文字" /></label> }
-                                <div class="note">出口条件中分别选择字典用途和固定文字；此处用于测试。</div>
+                                <label>@L["字典测试方式"]<select @bind="settings.DictionaryMode" @bind:after="Changed"><option value="ocr">@L["OCR 识别结果"]</option><option value="text">@L["查找固定文字"]</option></select></label>
+                                @if (settings.DictionaryMode == "text") { <label>@L["查找文字"]<input @bind="settings.Query" @bind:after="Changed" placeholder="@L["填写要查找的固定文字"]" /></label> }
+                                <div class="note">@L["出口条件中分别选择字典用途和固定文字；此处用于测试。"]</div>
                             }
                             <div class="fields two">
-                                <label>最低相似度 %<input type="number" min="1" max="100" @bind="settings.Similarity" @bind:after="Changed" /></label>
-                                <label>附加色偏<input type="number" min="0" max="255" @bind="settings.ColorDeviation" @bind:after="Changed" /></label>
-                                @if (settings.Mode == "dictionary") { <label>扫描步长<input type="number" min="1" max="8" @bind="settings.ScanStep" @bind:after="Changed" /></label> }
-                            </div><button class="primary" disabled="@item.IsFolder" @onclick="() => OnTest.InvokeAsync(item)">@(IsBusy ? "处理中…" : "测试一次")</button><div class="result-box">@Status(item)</div>
+                                <label>@L["最低相似度 %"]<input type="number" min="1" max="100" @bind="settings.Similarity" @bind:after="Changed" /></label>
+                                <label>@L["附加色偏"]<input type="number" min="0" max="255" @bind="settings.ColorDeviation" @bind:after="Changed" /></label>
+                                @if (settings.Mode == "dictionary") { <label>@L["扫描步长"]<input type="number" min="1" max="8" @bind="settings.ScanStep" @bind:after="Changed" /></label> }
+                            </div><button class="primary" disabled="@item.IsFolder" @onclick="() => OnTest.InvokeAsync(item)">@(IsBusy ? L["处理中…"] : L["测试一次"])</button><div class="result-box">@L[Status(item)]</div>
                         </section>
                     </fieldset>
                 </aside>
             }
-            else { <main class="empty manager-empty">选择或新建识别项目。</main> }
+            else { <main class="empty manager-empty">@L["选择或新建识别项目。"]</main> }
         </div>
-        <footer><span>●</span> 使用原工具训练数据 · 右侧条件可同时判断结果、相似度、X、Y 和文字，留空不判断</footer>
+        <footer><span>●</span> @L["使用原工具训练数据 · 右侧条件可同时判断结果、相似度、X、Y 和文字，留空不判断"]</footer>
     </section>
 </div>
 @if (_trainingInitial is not null)
 {
-    <div class="training-overlay" role="dialog" aria-modal="true" aria-label="识别训练工具">
-        <iframe @ref="_trainingFrame" src="/recognition-training" title="取色取字训练工具"></iframe>
+    <div class="training-overlay" role="dialog" aria-modal="true" aria-label="@L["识别训练工具"]">
+        <iframe @ref="_trainingFrame" src="/recognition-training" title="@L["取色取字训练工具"]"></iframe>
     </div>
 }

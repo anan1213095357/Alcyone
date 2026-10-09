@@ -65,26 +65,18 @@ Manage dictionaries, multi-point colors, search regions, and matching parameters
 
 ![Recognition library and dictionary management](docs/images/recognition.png)
 
-<sub>Actual application screenshots; the current UI is primarily Chinese. The AI screenshot shows prompt composition, without a model call or generated result.</sub>
+<sub>Actual application screenshots, captured in Chinese. The interface supports Chinese and English. The AI screenshot shows prompt composition, without a model call or generated result.</sub>
+
+### Choose your language
+
+Use the language selector in the top toolbar to switch between **简体中文** and **English** instantly. The recognition training window also has a selector. Your choice is saved for the current Windows user and restored on the next launch. Switching languages keeps the current workflow and running session intact; user-defined names, scripts, recognized text, and raw log output stay unchanged.
 
 ## Quick start
 
 ### Prerequisites
 
 - Windows x64, the .NET 10 SDK, and WebView2 Runtime.
-- **The `FastColorFinder` source dependency.** The project links its source files using relative paths. Supply the complete directory beside this repository; it is not bundled in this repository yet.
-
-```text
-workspace/
-├── Alcyone/                  # This repository; folder name may vary
-│   ├── Alcyone.slnx
-│   └── Alcyone/Alcyone.csproj
-└── FastColorFinder/          # Required to build
-    ├── FastColorFinder.cs
-    ├── Core/
-    ├── Services/
-    └── Native/
-```
+The required `FastColorFinder` sources are included in `Alcyone/Automation`, `Alcyone/Training/Core`, `Alcyone/Training/Services`, and `Alcyone/Training/Native`. This repository builds independently; no sibling source project is required.
 
 ### Launch the desktop app
 

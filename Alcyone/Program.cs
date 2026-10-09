@@ -50,6 +50,10 @@ internal static class Program
         builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
         builder.Services.AddRazorComponents().AddInteractiveServerComponents()
             .AddHubOptions(options => options.MaximumReceiveMessageSize = 96 * 1024 * 1024);
+        builder.Services.AddSingleton(new StateMachine.Localization.LanguagePreferences(
+            builder.Configuration["Alcyone:PreferencesPath"] ??
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Alcyone", "settings.json")));
+        builder.Services.AddSingleton<StateMachine.Localization.UiText>();
         builder.Services.AddSingleton<StateMachine.Training.TrainingSessions>();
         builder.Services.AddScoped<StateMachine.Training.TrainingSession>();
         builder.Services.AddSingleton<FastColorFinder.Native.NativeRegionSelector>();

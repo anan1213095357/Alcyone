@@ -358,8 +358,9 @@ public partial class RecognitionManager : IAsyncDisposable
         int Channel(double value) => Math.Clamp((int)Math.Round(value), 0, 255);
         return $"#{Channel(y + 1.402 * cr):X2}{Channel(y - .344136 * cb - .714136 * cr):X2}{Channel(y + 1.772 * cb):X2}";
     }
-    public async ValueTask DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
+        await base.DisposeAsync();
         await DisconnectTrainingAsync();
         _trainingReference?.Dispose();
         if (_trainingModule is not null)

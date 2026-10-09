@@ -1,3 +1,4 @@
+@inherits LocalizedComponent
 
 @inject TrainingSession Session
 @code { private FinderWorkspace Workspace => Session.Color; }
@@ -12,22 +13,22 @@
     <header class="topbar">
         <div style="display:flex">
             <div class="brand-mark"></div>
-            <div class="brand-title">多点颜色训练</div>
+            <div class="brand-title">@L["多点颜色训练"]</div>
         </div>
     </header>
 
     <div class="integration-save">
-        <label for="feature-name">识别项名称</label><input id="feature-name" @bind="_entryName" />
-        <button class="action primary" disabled="@IntegrationBusy" @onclick="() => SaveToLibraryAsync(false)">保存到识别库</button>
-        <button class="action ghost" disabled="@IntegrationBusy" @onclick="() => SaveToLibraryAsync(true)">另存为新项</button>
-        <small>保存特征、搜索范围、相似度和色偏</small>
+        <label for="feature-name">@L["识别项名称"]</label><input id="feature-name" @bind="_entryName" />
+        <button class="action primary" disabled="@IntegrationBusy" @onclick="() => SaveToLibraryAsync(false)">@L["保存到识别库"]</button>
+        <button class="action ghost" disabled="@IntegrationBusy" @onclick="() => SaveToLibraryAsync(true)">@L["另存为新项"]</button>
+        <small>@L["保存特征、搜索范围、相似度和色偏"]</small>
     </div>
     <main class="workspace">
         <section class="canvas-card">
             <div class="canvas-head">
                 <div>
-                    <div class="section-title">实时标注画布</div>
-                    <div class="section-sub">左键添加 · 拖动移动 · 右键删除 · 方向键像素级微调 · A 为锚点</div>
+                    <div class="section-title">@L["实时标注画布"]</div>
+                    <div class="section-sub">@L["左键添加 · 拖动移动 · 右键删除 · 方向键像素级微调 · A 为锚点"]</div>
                 </div>
                 <div class="capture-meta">@CaptureMeta</div>
             </div>
@@ -37,8 +38,8 @@
                 {
                     <div class="empty-canvas">
                         <div class="empty-icon">⌗</div>
-                        <div class="empty-title">还没有捕获区域</div>
-                        <div class="empty-sub">先在右侧框选屏幕区域，再直接在实时画面上标点。</div>
+                        <div class="empty-title">@L["还没有捕获区域"]</div>
+                        <div class="empty-sub">@L["先在右侧框选屏幕区域，再直接在实时画面上标点。"]</div>
                     </div>
                 }
                 <div id="annotationViewport"
@@ -74,93 +75,93 @@
 
         <aside class="side-stack">
             <section class="panel-card">
-                <CardHeader Index="01" Title="捕获区域" Subtitle="实时预览和训练使用这个区域" />
-                <button class="action primary" @onclick="SelectCaptureRegionAsync" disabled="@_busy">框选捕获区</button>
+                <CardHeader Index="01" Title="@L["捕获区域"]" Subtitle="@L["实时预览和训练使用这个区域"]" />
+                <button class="action primary" @onclick="SelectCaptureRegionAsync" disabled="@_busy">@L["框选捕获区"]</button>
                 <div class="region-editor">
-                    <input aria-label="捕获范围 X,Y,宽,高" title="X,Y,宽,高" value="@RegionValue(Workspace.CaptureRegion)" placeholder="0,0,0,0" spellcheck="false" disabled="@_busy" @onchange="e => ApplyRegionAsync(e.Value?.ToString(), true)" />
-                    <button class="action ghost" title="复制捕获范围" disabled="@_busy" @onclick="() => CopyRegionAsync(true)">复制</button>
-                    <button class="action ghost" title="粘贴捕获范围" disabled="@_busy" @onclick="() => PasteRegionAsync(true)">粘贴</button>
+                    <input aria-label="@L["捕获范围 X,Y,宽,高"]" title="@L["X,Y,宽,高"]" value="@RegionValue(Workspace.CaptureRegion)" placeholder="0,0,0,0" spellcheck="false" disabled="@_busy" @onchange="e => ApplyRegionAsync(e.Value?.ToString(), true)" />
+                    <button class="action ghost" title="@L["复制捕获范围"]" disabled="@_busy" @onclick="() => CopyRegionAsync(true)">@L["复制"]</button>
+                    <button class="action ghost" title="@L["粘贴捕获范围"]" disabled="@_busy" @onclick="() => PasteRegionAsync(true)">@L["粘贴"]</button>
                 </div>
-                <div class="micro-status">X,Y,宽,高</div>
+                <div class="micro-status">@L["X,Y,宽,高"]</div>
             </section>
 
             <section class="panel-card">
-                <CardHeader Index="02" Title="多点标注" Subtitle="第一个点自动作为锚点，建议 6～20 个点" />
+                <CardHeader Index="02" Title="@L["多点标注"]" Subtitle="@L["第一个点自动作为锚点，建议 6～20 个点"]" />
                 <div class="metric-grid two">
-                    <MetricBox Label="标注点" Value="@Workspace.Points.Count.ToString()" Suffix="个" />
-                    <MetricBox Label="锚点" Value="@AnchorText" Suffix="" />
+                    <MetricBox Label="@L["标注点"]" Value="@Workspace.Points.Count.ToString()" Suffix="@L["个"]" />
+                    <MetricBox Label="@L["锚点"]" Value="@AnchorText" Suffix="" />
                 </div>
-                <button class="action ghost" @onclick="ClearPointsAsync" disabled="@_busy">清空全部标点</button>
+                <button class="action ghost" @onclick="ClearPointsAsync" disabled="@_busy">@L["清空全部标点"]</button>
             </section>
 
             <section class="panel-card">
-                <CardHeader Index="03" Title="时间训练" Subtitle="持续采样颜色波动，压缩成权重字符串" />
+                <CardHeader Index="03" Title="@L["时间训练"]" Subtitle="@L["持续采样颜色波动，压缩成权重字符串"]" />
                 <div class="metric-grid one">
                     <label class="field-box">
-                        <span>训练时间</span>
-                        <div><input type="number" min="2" max="120" @bind="_trainSeconds" /><b>秒</b></div>
+                        <span>@L["训练时间"]</span>
+                        <div><input type="number" min="2" max="120" @bind="_trainSeconds" /><b>@L["秒"]</b></div>
                     </label>
                 </div>
-                <button class="action primary" @onclick="TrainAsync" disabled="@_busy">@(_training ? "训练中..." : "开始训练")</button>
+                <button class="action primary" @onclick="TrainAsync" disabled="@_busy">@(_training ? L["训练中..."] : L["开始训练"])</button>
                 <div class="progress-track"><div class="progress-fill" style="@($"width:{_progress}%")"></div></div>
-                <div class="micro-status">@_trainStatus</div>
+                <div class="micro-status">@L[_trainStatus]</div>
             </section>
 
             <section class="panel-card test-card">
-                <CardHeader Index="04" Title="匹配测试" Subtitle="搜索区域和训练捕获区域可以完全不同" />
+                <CardHeader Index="04" Title="@L["匹配测试"]" Subtitle="@L["搜索区域和训练捕获区域可以完全不同"]" />
                 <div class="metric-grid two">
                     <label class="field-box">
-                        <span>匹配阈值</span>
+                        <span>@L["匹配阈值"]</span>
                         <div><input type="number" min="20" max="100" @bind="_threshold" /><b>%</b></div>
                     </label>
                     <label class="field-box">
-                        <span>扫描步长</span>
+                        <span>@L["扫描步长"]</span>
                         <div><input type="number" min="1" max="8" @bind="_step" /><b>px</b></div>
                     </label>
                 </div>
                 <div class="action-row">
-                    <button class="action ghost" @onclick="SelectSearchRegionAsync" disabled="@_busy">框选搜索区</button>
-                    <button class="action primary" @onclick="TestOnceAsync" disabled="@_busy">测试一次</button>
+                    <button class="action ghost" @onclick="SelectSearchRegionAsync" disabled="@_busy">@L["框选搜索区"]</button>
+                    <button class="action primary" @onclick="TestOnceAsync" disabled="@_busy">@L["测试一次"]</button>
                 </div>
                 <div class="region-editor">
-                    <input aria-label="搜索范围 X,Y,宽,高" title="X,Y,宽,高" value="@RegionValue(Workspace.SearchRegion)" placeholder="0,0,0,0" spellcheck="false" disabled="@_busy" @onchange="e => ApplyRegionAsync(e.Value?.ToString(), false)" />
-                    <button class="action ghost" title="复制搜索范围" disabled="@_busy" @onclick="() => CopyRegionAsync(false)">复制</button>
-                    <button class="action ghost" title="粘贴搜索范围" disabled="@_busy" @onclick="() => PasteRegionAsync(false)">粘贴</button>
+                    <input aria-label="@L["搜索范围 X,Y,宽,高"]" title="@L["X,Y,宽,高"]" value="@RegionValue(Workspace.SearchRegion)" placeholder="0,0,0,0" spellcheck="false" disabled="@_busy" @onchange="e => ApplyRegionAsync(e.Value?.ToString(), false)" />
+                    <button class="action ghost" title="@L["复制搜索范围"]" disabled="@_busy" @onclick="() => CopyRegionAsync(false)">@L["复制"]</button>
+                    <button class="action ghost" title="@L["粘贴搜索范围"]" disabled="@_busy" @onclick="() => PasteRegionAsync(false)">@L["粘贴"]</button>
                 </div>
-                <div class="micro-status">X,Y,宽,高</div>
+                <div class="micro-status">@L["X,Y,宽,高"]</div>
                 <label class="switch-line">
                     <input type="checkbox" @bind="_continuous" @bind:after="ContinuousChangedAsync" />
                     <span class="switch-ui"></span>
-                    <span>连续测试</span>
+                    <span>@L["连续测试"]</span>
                 </label>
                 <div class="result-box @(_lastResult.Found ? "match" : _hasTested ? "miss" : "idle")">
                     <div class="result-state">@ResultState</div>
-                    <div class="result-main">@ResultText</div>
+                    <div class="result-main">@L[ResultText]</div>
                 </div>
             </section>
 
             <section class="panel-card weight-card">
-                <CardHeader Index="05" Title="权重字符串 / 调用" Subtitle="复制时自动生成可直接使用的调用代码" />
+                <CardHeader Index="05" Title="@L["权重字符串 / 调用"]" Subtitle="@L["复制时自动生成可直接使用的调用代码"]" />
                 <textarea class="weight-editor" spellcheck="false" @bind="_weightText" @bind:event="oninput"></textarea>
 
                 <div class="call-param-grid">
                     <label class="call-param">
-                        <span>色偏</span>
+                        <span>@L["色偏"]</span>
                         <input type="number" min="0" max="255" @bind="_colorDeviation" />
                     </label>
                     <label class="call-param">
-                        <span>循环</span>
+                        <span>@L["循环"]</span>
                         <div><input type="number" min="0" max="600" step="0.5" @bind="_loopSeconds" /><b>s</b></div>
                     </label>
                     <label class="call-param">
-                        <span>间隔</span>
+                        <span>@L["间隔"]</span>
                         <div><input type="number" min="0" max="60000" @bind="_intervalMilliseconds" /><b>ms</b></div>
                     </label>
                 </div>
 
                 <div class="action-row three">
-                    @* <button class="action ghost" @onclick="" disabled="@_busy">应用字符串</button> *@
-                    <button class="action ghost" @onclick="CopyCallCodeAsync">复制调用代码</button>
+                    @* <button class="action ghost" @onclick="" disabled="@_busy">@L["应用字符串"]</button> *@
+                    <button class="action ghost" @onclick="CopyCallCodeAsync">@L["复制调用代码"]</button>
 
                 </div>
             </section>
@@ -169,7 +170,7 @@
 
     <footer class="statusbar">
         <span class="status-dot @(_statusError ? "error" : "")"></span>
-        <span>@_status</span>
+        <span>@L[_status]</span>
     </footer>
 </div>
 
@@ -420,8 +421,9 @@
 
     private static double TicksToMs(long ticks) => ticks * 1000.0 / Stopwatch.Frequency;
 
-    public async ValueTask DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
+        await base.DisposeAsync();
         if (_disposed) return;
         _disposed = true;
         _lifetime.Cancel();

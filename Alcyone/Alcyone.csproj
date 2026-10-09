@@ -1,16 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+    <ItemGroup>
+        <EmbeddedResource Include="Localization\en.json" LogicalName="Alcyone.Localization.en.json" />
+    </ItemGroup>
 	<ItemGroup>
         <Using Include="System.Drawing" />
-        <Compile Include="..\..\FastColorFinder\Core\*.cs" Exclude="..\..\FastColorFinder\Core\FastTextSearch.cs;..\..\FastColorFinder\Core\Models.cs;..\..\FastColorFinder\Core\ColorModelCodec.cs" Link="Training\Core\%(Filename)%(Extension)" />
-        <Compile Include="..\..\FastColorFinder\Services\*.cs" Exclude="..\..\FastColorFinder\Services\FinderWorkspace.cs;..\..\FastColorFinder\Services\TextFinderWorkspace.cs" Link="Training\Services\%(Filename)%(Extension)" />
-        <Compile Include="..\..\FastColorFinder\Native\*.cs" Link="Training\Native\%(Filename)%(Extension)" />
-        <Content Include="..\..\FastColorFinder\Core\FastTextSearch.cs" Link="Core\FastTextSearch.cs" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-	</ItemGroup>
-	<ItemGroup>
-	  <Compile Include="..\..\FastColorFinder\FastColorFinder.cs" Link="Automation\FastColorSearch.cs" />
-	  <Compile Include="..\..\FastColorFinder\Core\FastTextSearch.cs" Link="Automation\FastTextSearch.cs" />
-	  <Compile Include="..\..\FastColorFinder\Core\Models.cs" Link="Automation\ColorModels.cs" />
-	  <Compile Include="..\..\FastColorFinder\Core\ColorModelCodec.cs" Link="Automation\ColorModelCodec.cs" />
+        <Content Include="Automation\FastTextSearch.cs" Link="Core\FastTextSearch.cs" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
 	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="Photino.NET" Version="4.0.16" />

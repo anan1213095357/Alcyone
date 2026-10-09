@@ -471,8 +471,9 @@ internal static class OcrDpi
 """;
     }
 
-    public async ValueTask DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
+        await base.DisposeAsync();
         if (_disposed) return;
         _disposed = true; _lifetime.Cancel(); _trainingCts?.Cancel(); _liveOcrRound?.Cancel();
         try { await JS.InvokeVoidAsync("ftfCanvas.dispose"); } catch (JSDisconnectedException) { }

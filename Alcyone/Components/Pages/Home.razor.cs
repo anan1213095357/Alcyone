@@ -128,7 +128,8 @@ public partial class Home
             edges = Machine.Edges,
             selectedEdgeId = SelectedEdgeId,
             runningEdgeIds = Runtime.CurrentEdgeIds.ToArray(),
-            pending = PendingConnection
+            pending = PendingConnection,
+            language = L.Language
         });
     }
     private JsonNode? GetRuntimeVariable(string name) =>
@@ -1745,8 +1746,9 @@ public partial class Home
     }
     private Task ClearLogs() => _session?.ClearLogsAsync() ?? Task.CompletedTask;
 
-    public async ValueTask DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
+        await base.DisposeAsync();
         _disposed = true;
         if (_session is not null)
         {
@@ -2197,6 +2199,10 @@ reply 尽量简短。
 状态域、状态、变量、transitions、csx 文件数量不做人工限制。
 必须保证 JSON 完整闭合，不能输出到一半。
 """;
+
+            systemPrompt += L.Language == "en"
+                ? "\nWrite user-facing explanations in English. Preserve existing user-defined names, recognition search text, identifiers and JSON field names."
+                : "\n使用简体中文说明方案。保留已有的用户命名、识别查找文字、标识符和 JSON 字段名。";
 
             var aiConversation = _aiMessages
                 .Select(message => (object)new

@@ -356,7 +356,7 @@ window.fcfCanvas = (() => {
 
             label.textContent =
                 i === 0
-                    ? "A  锚点"
+                    ? (document.documentElement.lang === "en" ? "A  Anchor" : "A  锚点")
                     : `P${i + 1}`;
 
 

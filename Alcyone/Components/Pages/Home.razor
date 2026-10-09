@@ -1,3 +1,4 @@
+@inherits LocalizedComponent
 @page "/"
 @using System.Globalization
 @using System.IO
@@ -19,58 +20,59 @@
             Alcyone
         </div>
         <div class="toolbar-group edit-tools">
-            <button class="btn add-state-control" @onclick="AddStateAsync"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M10 6v8 M6 10h8"/></svg><span>添加状态</span></button>
-            <button class="btn ai-development-control" @onclick="OpenAiDialog"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 2 2.2 5.8L18 10l-5.8 2.2L10 18l-2.2-5.8L2 10l5.8-2.2z"/></svg><span>AI 开发</span></button>
+            <button class="btn add-state-control" @onclick="AddStateAsync"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M10 6v8 M6 10h8"/></svg><span>@L["添加状态"]</span></button>
+            <button class="btn ai-development-control" @onclick="OpenAiDialog"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 2 2.2 5.8L18 10l-5.8 2.2L10 18l-2.2-5.8L2 10l5.8-2.2z"/></svg><span>@L["AI 开发"]</span></button>
         </div>
         <div class="toolbar-group view-tools">
-            <button class="btn quiet icon-control" title="缩小" aria-label="缩小" @onclick="ZoomOutAsync">−</button>
+            <button class="btn quiet icon-control" title="@L["缩小"]" aria-label="@L["缩小"]" @onclick="ZoomOutAsync">−</button>
             <div id="zoomLabel" class="zoom-label">85%</div>
-            <button class="btn quiet icon-control" title="放大" aria-label="放大" @onclick="ZoomInAsync">+</button>
-            <button class="btn quiet" @onclick="FitCanvasAsync">适配</button>
+            <button class="btn quiet icon-control" title="@L["放大"]" aria-label="@L["放大"]" @onclick="ZoomInAsync">+</button>
+            <button class="btn quiet" @onclick="FitCanvasAsync">@L["适配"]</button>
         </div>
         <div class="spacer"></div>
-        <div class="execution-controls" role="group" aria-label="运行控制">
-            <span class="execution-status @RuntimeStatusClass"><i></i>@RuntimeStatusText</span>
+        <div class="execution-controls" role="group" aria-label="@L["运行控制"]">
+            <span class="execution-status @RuntimeStatusClass"><i></i>@L[RuntimeStatusText]</span>
             <div class="execution-buttons">
-                <button class="execution-button run @(Runtime.Running || _startingRuntime ? "is-active" : "")" disabled="@RuntimeControlsBusy" aria-label="运行" title="连续运行" @onclick="RunMachineAsync">
-                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 4 10 6-10 6z" /></svg><span class="control-label">运行</span>
+                <button class="execution-button run @(Runtime.Running || _startingRuntime ? "is-active" : "")" disabled="@RuntimeControlsBusy" aria-label="@L["运行"]" title="@L["连续运行"]" @onclick="RunMachineAsync">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 4 10 6-10 6z" /></svg><span class="control-label">@L["运行"]</span>
                 </button>
-                <button class="execution-button step @(_steppingRuntime ? "is-active" : "")" disabled="@RuntimeControlsBusy" aria-label="单步" title="执行一个周期" @onclick="StepAsync">
-                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 5 8 5-8 5z M15 5v10" /></svg><span class="control-label">单步</span>
+                <button class="execution-button step @(_steppingRuntime ? "is-active" : "")" disabled="@RuntimeControlsBusy" aria-label="@L["单步"]" title="@L["执行一个周期"]" @onclick="StepAsync">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 5 8 5-8 5z M15 5v10" /></svg><span class="control-label">@L["单步"]</span>
                 </button>
-                <button class="execution-button stop @(CanStopRuntime ? "is-available" : "")" disabled="@(!CanStopRuntime)" aria-label="停止" title="停止当前执行" @onclick="StopRuntime">
-                    <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="1.5" /></svg><span class="control-label">停止</span>
+                <button class="execution-button stop @(CanStopRuntime ? "is-available" : "")" disabled="@(!CanStopRuntime)" aria-label="@L["停止"]" title="@L["停止当前执行"]" @onclick="StopRuntime">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="1.5" /></svg><span class="control-label">@L["停止"]</span>
                 </button>
-                <button class="execution-button reset @(_resettingRuntime ? "is-active" : "")" disabled="@RuntimeControlsBusy" aria-label="重置" title="恢复初始状态和变量" @onclick="ResetRuntime">
-                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8a6 6 0 1 1 0 5 M4 3v5h5" /></svg><span class="control-label">重置</span>
+                <button class="execution-button reset @(_resettingRuntime ? "is-active" : "")" disabled="@RuntimeControlsBusy" aria-label="@L["重置"]" title="@L["恢复初始状态和变量"]" @onclick="ResetRuntime">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8a6 6 0 1 1 0 5 M4 3v5h5" /></svg><span class="control-label">@L["重置"]</span>
                 </button>
             </div>
         </div>
+        <LanguagePicker />
         <div class="config-control">
-            <button class="config-trigger @(_configMenuOpen ? "is-open" : "")" aria-label="选择配置" aria-expanded="@_configMenuOpen" @onclick="() => _configMenuOpen = !_configMenuOpen">
+            <button class="config-trigger @(_configMenuOpen ? "is-open" : "")" aria-label="@L["选择配置"]" aria-expanded="@_configMenuOpen" @onclick="() => _configMenuOpen = !_configMenuOpen">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2.5h7l3 3v12H5z M12 2.5v4h3 M8 10h4 M8 13h4" /></svg>
                 <span>@_configKey</span><span class="config-chevron">⌄</span>
             </button>
             @if (_configMenuOpen)
             {
                 <div class="config-dismiss" @onclick="() => _configMenuOpen = false"></div>
-                <section class="config-menu" aria-label="配置管理">
-                    <div class="config-menu-title">切换配置</div>
+                <section class="config-menu" aria-label="@L["配置管理"]">
+                    <div class="config-menu-title">@L["切换配置"]</div>
                     <div class="config-options">
                         @foreach (var key in _configKeys)
                         {
                             <button class="config-option @(key == _configKey ? "active" : "")" @onclick="async () => { await SwitchConfigAsync(key); _configMenuOpen = false; }"><span>@key</span><span>@(key == _configKey ? "✓" : "")</span></button>
                         }
-                        @if (_configKeys.Count == 0) { <div class="config-empty">暂无配置</div> }
+                        @if (_configKeys.Count == 0) { <div class="config-empty">@L["暂无配置"]</div> }
                     </div>
                     <div class="config-create">
-                        <input placeholder="新配置名称" aria-label="新配置名称" @bind="_newConfigKey" @bind:event="oninput" />
-                        <button class="btn primary" disabled="@string.IsNullOrWhiteSpace(_newConfigKey)" @onclick="async () => { await CreateConfigAsync(); _configMenuOpen = false; }">新建</button>
+                        <input placeholder="@L["新配置名称"]" aria-label="@L["新配置名称"]" @bind="_newConfigKey" @bind:event="oninput" />
+                        <button class="btn primary" disabled="@string.IsNullOrWhiteSpace(_newConfigKey)" @onclick="async () => { await CreateConfigAsync(); _configMenuOpen = false; }">@L["新建"]</button>
                     </div>
                     <div class="config-menu-actions">
-                        <label for="importFile" class="config-action">导入配置</label>
-                        <button class="config-action" @onclick="async () => { await ExportConfigAsync(); _configMenuOpen = false; }">导出配置</button>
-                        <button class="config-action danger" @onclick="async () => { await DeleteConfigAsync(); _configMenuOpen = false; }">删除当前配置</button>
+                        <label for="importFile" class="config-action">@L["导入配置"]</label>
+                        <button class="config-action" @onclick="async () => { await ExportConfigAsync(); _configMenuOpen = false; }">@L["导出配置"]</button>
+                        <button class="config-action danger" @onclick="async () => { await DeleteConfigAsync(); _configMenuOpen = false; }">@L["删除当前配置"]</button>
                     </div>
                 </section>
             }
@@ -82,8 +84,8 @@
         <aside class="left-panel">
             <div class="section">
                 <div class="section-head">
-                    <div class="section-title">并行状态域</div>
-                    <button class="btn small" @onclick="AddRegion">+ 状态域</button>
+                    <div class="section-title">@L["并行状态域"]</div>
+                    <button class="btn small" @onclick="AddRegion">@L["+ 状态域"]</button>
                 </div>
                 <div id="regionList">
                     @foreach (var region in Machine.Regions)
@@ -102,13 +104,13 @@
                         </div>
                     }
                 </div>
-                <div class="hint">每个状态域独立拥有自己的 Current State。<br />多个状态域可以同时运行。</div>
+                <div class="hint">@L["每个状态域独立拥有自己的 Current State。"]<br />@L["多个状态域可以同时运行。"]</div>
             </div>
 
             <div class="section">
                 <div class="section-head">
-                    <div class="section-title">全局变量</div>
-                    <button class="btn small" @onclick="AddVariable">+ 变量</button>
+                    <div class="section-title">@L["全局变量"]</div>
+                    <button class="btn small" @onclick="AddVariable">@L["+ 变量"]</button>
                 </div>
                 <div id="variableList">
                     @foreach (var variable in Machine.Variables)
@@ -120,7 +122,7 @@
                             </div>
                             <div class="variable-bottom">
                                 <select class="select" value="@variable.Type" @onchange='e => ChangeVariableType(variable.Id, e.Value?.ToString() ?? "number")'>
-                                    <option value="number">数值</option><option value="boolean">布尔</option><option value="string">文本</option><option value="json">JSON</option>
+                                    <option value="number">@L["数值"]</option><option value="boolean">@L["布尔"]</option><option value="string">@L["文本"]</option><option value="json">JSON</option>
                                 </select>
                                 @if (variable.Type == "boolean")
                                 {
@@ -139,18 +141,18 @@
             </div>
             <div class="section">
                 <div class="section-head">
-                    <div class="section-title">识别库 <span class="hint">@Machine.Recognitions.Count(i => i.ParentId is null)</span></div>
-                    <button class="btn small" @onclick="() => OpenRecognitionManager()">管理 / 导入</button>
+                    <div class="section-title">@L["识别库"] <span class="hint">@Machine.Recognitions.Count(i => i.ParentId is null)</span></div>
+                    <button class="btn small" @onclick="() => OpenRecognitionManager()">@L["管理 / 导入"]</button>
                 </div>
                 @foreach (var item in Machine.Recognitions.Where(i => i.ParentId is null))
                 {
                     <button class="recognition-summary" @key="item.Id" @onclick="() => OpenRecognitionManager(item.Id)">
-                        <span><strong>@item.Name</strong><small>@StateMachine.Automation.RecognitionItem.KindName(item.Settings.Mode)</small></span>
+                        <span><strong>@item.Name</strong><small>@L[StateMachine.Automation.RecognitionItem.KindName(item.Settings.Mode)]</small></span>
                     </button>
                 }
                 @if (Machine.Recognitions.Count == 0)
                 {
-                    <div class="hint">导入字典或多点颜色，在出口条件中选择识别项目。</div>
+                    <div class="hint">@L["导入字典或多点颜色，在出口条件中选择识别项目。"]</div>
                 }
             </div>
 
@@ -207,10 +209,10 @@
                                     </div>
 
                                     <div class="state-center">
-                                        <div class="center-title">出口条件 · 从上往下按优先级判断</div>
+                                        <div class="center-title">@L["出口条件 · 从上往下按优先级判断"]</div>
                                         @if (state.Outputs.Count == 0)
                                         {
-                                            <div class="empty-center">当前没有切换出口</div>
+                                            <div class="empty-center">@L["当前没有切换出口"]</div>
                                         }
                                         else
                                         {
@@ -234,11 +236,11 @@
                                                     <div class="condition-mini-list">
                                                         @if (output.MatchMode == "always")
                                                         {
-                                                            <div class="always-condition"><span>⚡</span><span>无条件切换</span></div>
+                                                            <div class="always-condition"><span>⚡</span><span>@L["无条件切换"]</span></div>
                                                         }
                                                         else if (output.Conditions.Count == 0)
                                                         {
-                                                            <div class="always-condition">没有配置条件</div>
+                                                            <div class="always-condition">@L["没有配置条件"]</div>
                                                         }
                                                         else
                                                         {
@@ -296,9 +298,9 @@
                                 </div>
 
                                 <div class="state-footer">
-                                    输入：@state.Inputs.Count&nbsp;&nbsp; 输出：@state.Outputs.Count
+                                    @L.Format("输入：{0}　输出：{1}", state.Inputs.Count, state.Outputs.Count)
                                     <div class="spacer"></div>
-                                    @(current ? "实时判断中" : "非当前状态")
+                                    @(current ? L["实时判断中"] : L["非当前状态"])
                                 </div>
                             </div>
                         }
@@ -309,7 +311,7 @@
 
         <aside class="right-panel">
             <div class="inspector">
-                <div class="section-title">属性</div>
+                <div class="section-title">@L["属性"]</div>
                 <div id="inspectorContent">
                     @if (!string.IsNullOrWhiteSpace(SelectedEdgeId))
                     {
@@ -321,7 +323,7 @@
                             var output = from?.Outputs.FirstOrDefault(x => x.Id == edge.FromPortId);
                             var input = to?.Inputs.FirstOrDefault(x => x.Id == edge.ToPortId);
                             <div class="group">
-                                <div class="group-title">状态连线</div>
+                                <div class="group-title">@L["状态连线"]</div>
                                 <div style="margin-top:9px;color:#9faabe;font-size:10px;line-height:1.8">
                                     @(from?.Name ?? "")<br />
                                     @(output?.Name ?? "")<br />
@@ -331,35 +333,35 @@
                                 </div>
                             </div>
                             <div class="group">
-                                <div class="group-title">切换前等待</div>
-                                <label>等待时间（毫秒）</label>
+                                <div class="group-title">@L["切换前等待"]</div>
+                                <label>@L["等待时间（毫秒）"]</label>
                                 <input type="number" min="0" max="86400000" step="100" value="@edge.DelayMilliseconds" @onchange="e => ChangeEdgeDelayAsync(edge, e)" />
-                                <div style="margin-top:8px;color:#9faabe;font-size:11px;line-height:1.7">条件满足后，等待结束再切换。0 表示不额外等待。</div>
+                                <div style="margin-top:8px;color:#9faabe;font-size:11px;line-height:1.7">@L["条件满足后，等待结束再切换。0 表示不额外等待。"]</div>
                             </div>
-                            <button class="danger" @onclick="DeleteSelectedEdge">删除连线</button>
+                            <button class="danger" @onclick="DeleteSelectedEdge">@L["删除连线"]</button>
                         }
                     }
                     else if (SelectedState is null)
                     {
                         <div class="empty-inspector">
-                            点击状态卡片编辑。<br /><br />
-                            每个右侧切换插头拥有自己的条件组。<br /><br />
-                            ALL：所有条件全部成立。<br /><br />
-                            ANY：任意一个条件成立。<br /><br />
-                            当前状态卡中，每个小条件都会实时显示 ✓ 或 ×。<br /><br />
-                            多个出口同时满足时，从上往下只执行第一个。<br /><br />
-                            Ctrl + 鼠标滚轮：缩放画布。
+                            @L["点击状态卡片编辑。"]<br /><br />
+                            @L["每个右侧切换插头拥有自己的条件组。"]<br /><br />
+                            @L["ALL：所有条件全部成立。"]<br /><br />
+                            @L["ANY：任意一个条件成立。"]<br /><br />
+                            @L["当前状态卡中，每个小条件都会实时显示 ✓ 或 ×。"]<br /><br />
+                            @L["多个出口同时满足时，从上往下只执行第一个。"]<br /><br />
+                            @L["Ctrl + 鼠标滚轮：缩放画布。"]
                         </div>
                     }
                     else
                     {
                         var state = SelectedState!;
                         <div class="field">
-                            <label class="field-label">状态名称</label>
+                            <label class="field-label">@L["状态名称"]</label>
                             <input class="input" value="@state.Name" @oninput="e => RenameState(state.Id, e.Value?.ToString() ?? string.Empty)" />
                         </div>
                         <div class="field">
-                            <label class="field-label">所属状态域</label>
+                            <label class="field-label">@L["所属状态域"]</label>
                             <select class="select" value="@state.RegionId" @onchange="e => ChangeStateRegion(state.Id, e.Value?.ToString() ?? string.Empty)">
                                 @foreach (var region in Machine.Regions)
                                 {
@@ -370,14 +372,14 @@
                         <div class="field">
                             <label style="display:flex;gap:7px;align-items:center;color:#adb8c9;font-size:10px">
                                 <input type="checkbox" checked="@state.IsStart" @onchange="e => ChangeStateStart(state.Id, e.Value is bool b && b)" />
-                                当前状态域的初始状态
+                                @L["当前状态域的初始状态"]
                             </label>
                         </div>
 
                         <div class="group">
                             <div class="group-header">
-                                <div class="group-title">进入插头</div>
-                                <button class="btn small" @onclick="() => AddInput(state.Id)">+ 插头</button>
+                                <div class="group-title">@L["进入插头"]</div>
+                                <button class="btn small" @onclick="() => AddInput(state.Id)">@L["+ 插头"]</button>
                             </div>
                             @foreach (var input in state.Inputs)
                             {
@@ -391,8 +393,8 @@
                         </div>
 
                         <div class="group">
-                            <div class="group-title">状态生命周期</div>
-                            <div class="hint">进入脚本执行一次；循环脚本每个扫描周期执行；离开脚本在转入目标状态前执行一次。</div>
+                            <div class="group-title">@L["状态生命周期"]</div>
+                            <div class="hint">@L["进入脚本执行一次；循环脚本每个扫描周期执行；离开脚本在转入目标状态前执行一次。"]</div>
 
                             @foreach (var lifecycle in GetLifecycleActions(state))
                             {
@@ -405,18 +407,18 @@
                                 }
 
                                 <div class="action-box">
-                                    <div class="field-label">@lifecycle.Title</div>
+                                    <div class="field-label">@L[lifecycle.Title]</div>
 
                                     <select class="select"
                                             value="@actionCall.ActionMethod"
                                             @onchange="e => ChangeStateActionMethod(state.Id, lifecycle.Key, e.Value?.ToString() ?? string.Empty)">
-                                        <option value="">不调用动作</option>
+                                        <option value="">@L["不调用动作"]</option>
                                         @foreach (var group in ActionMethods.GroupBy(x => x.Group))
                                         {
-                                            <optgroup label="@group.Key">
+                                            <optgroup label="@L[group.Key]">
                                                 @foreach (var action in group)
                                                 {
-                                                    <option value="@action.Key">@action.DisplayName</option>
+                                                    <option value="@action.Key">@L[action.DisplayName]</option>
                                                 }
                                             </optgroup>
                                         }
@@ -440,7 +442,7 @@
 
                                                     <div class="action-parameter">
                                                         <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
-                                                            <div class="field-label" style="margin:0;flex:1">@parameter.DisplayName</div>
+                                                            <div class="field-label" style="margin:0;flex:1">@L[parameter.DisplayName]</div>
                                                         </div>
 
                                                         <div style="display:grid;grid-template-columns:88px 1fr;gap:6px">
@@ -452,11 +454,11 @@
                                                                                     parameter.Name,
                                                                                     e.Value?.ToString() ?? "literal")'>
 
-<option value="literal">固定值</option>
+<option value="literal">@L["固定值"]</option>
 
         @if (CanBindGlobalVariable(actionCall, parameter))
                                                                 {
-                                                                    <option value="variable">全局变量</option>
+                                                                    <option value="variable">@L["全局变量"]</option>
                                                                 }
                                                             </select>
 
@@ -589,10 +591,10 @@
 
                         <div class="group">
                             <div class="group-header">
-                                <div class="group-title">切换出口</div>
-                                <button class="btn small" @onclick="() => AddOutput(state.Id)">+ 插头</button>
+                                <div class="group-title">@L["切换出口"]</div>
+                                <button class="btn small" @onclick="() => AddOutput(state.Id)">@L["+ 插头"]</button>
                             </div>
-                            <div class="hint">从上往下就是切换优先级。</div>
+                            <div class="hint">@L["从上往下就是切换优先级。"]</div>
                             <div style="margin-top:8px">
                                 @for (var outputIndex = 0; outputIndex < state.Outputs.Count; outputIndex++)
                                 {
@@ -605,13 +607,13 @@
                                             <button class="mini-btn" @onclick="() => MoveOutput(state.Id, output.Id, 1)">↓</button>
                                             <button class="remove-btn" @onclick="() => RemoveOutput(state.Id, output.Id)">×</button>
                                         </div>
-                                        <div style="margin-bottom:7px;color:#65738a;font-size:9px">优先级：@(outputIndex + 1) · @(connected ? "已连接" : "未连接")</div>
+                                        <div style="margin-bottom:7px;color:#65738a;font-size:9px">@L.Format("优先级：{0}", outputIndex + 1) · @(connected ? L["已连接"] : L["未连接"])</div>
                                         <div class="transition-grid">
-                                            <div style="display:flex;align-items:center;color:#748298;font-size:9px">条件组合</div>
+                                            <div style="display:flex;align-items:center;color:#748298;font-size:9px">@L["条件组合"]</div>
                                             <select class="select" value="@output.MatchMode" @onchange='e => ChangeOutputMatchMode(state.Id, output.Id, e.Value?.ToString() ?? "all")'>
-                                                <option value="all">ALL 全部成立</option>
-                                                <option value="any">ANY 任意成立</option>
-                                                <option value="always">ALWAYS 无条件</option>
+                                                <option value="all">@L["ALL 全部成立"]</option>
+                                                <option value="any">@L["ANY 任意成立"]</option>
+                                                <option value="always">@L["ALWAYS 无条件"]</option>
                                             </select>
                                         </div>
 
@@ -621,23 +623,23 @@
                                             {
                                                 var condition = output.Conditions[conditionIndex];
                                                 <div class="condition-editor" @key="condition.Id">
-                                                    <div class="condition-index">条件 @(conditionIndex + 1)</div>
+                                                    <div class="condition-index">@L.Format("条件 {0}", conditionIndex + 1)</div>
                                                     <div class="recognition-condition-row">
-                                                        <select class="select" aria-label="选择出口判断项目" value="@ConditionTarget(condition)" @onchange="e => ChangeConditionTarget(condition, e.Value?.ToString() ?? string.Empty)">
-                                                            <option value="" disabled>选择变量或库中的名称</option>
-                                                            <optgroup label="全局变量">
+                                                        <select class="select" aria-label="@L["选择出口判断项目"]" value="@ConditionTarget(condition)" @onchange="e => ChangeConditionTarget(condition, e.Value?.ToString() ?? string.Empty)">
+                                                            <option value="" disabled>@L["选择变量或库中的名称"]</option>
+                                                            <optgroup label="@L["全局变量"]">
                                                                 @foreach (var variable in Machine.Variables)
                                                                 {
                                                                     <option value="@($"variable:{variable.Id}")">@variable.Name</option>
                                                                 }
                                                             </optgroup>
-                                                            <optgroup label="多点色库">
+                                                            <optgroup label="@L["多点色库"]">
                                                                 @foreach (var item in Machine.Recognitions.Where(i => !i.IsFolder && i.Settings.Mode == "feature"))
                                                                 {
                                                                     <option value="@($"recognition:{item.Id}")">@RecognitionPath(item)</option>
                                                                 }
                                                             </optgroup>
-                                                            <optgroup label="字典库">
+                                                            <optgroup label="@L["字典库"]">
                                                                 @foreach (var item in Machine.Recognitions.Where(i => i.Settings.Mode == "dictionary"))
                                                                 {
                                                                     <option value="@($"recognition:{item.Id}")">@RecognitionPath(item)</option>
@@ -652,68 +654,68 @@
                                                         @if (IsDictionaryCondition(condition))
                                                         {
                                                             <div class="recognition-filter-row">
-                                                                <label>字典用途</label>
+                                                                <label>@L["字典用途"]</label>
                                                                 <select class="select" value="@DictionaryModeFor(condition)" @onchange='e => ChangeDictionaryMode(condition, e.Value?.ToString() ?? "ocr")'>
-                                                                    <option value="ocr">OCR 结果判断</option><option value="text">查找固定文字</option>
+                                                                    <option value="ocr">@L["OCR 结果判断"]</option><option value="text">@L["查找固定文字"]</option>
                                                                 </select>
                                                             </div>
                                                             @if (DictionaryModeFor(condition) == "text")
                                                             {
                                                                 <div class="recognition-filter-row">
-                                                                    <label>查找文字</label>
-                                                                    <input class="input" placeholder="必须填写固定文字，例如：确定" value="@(criteria.SearchText ?? Machine.Recognitions.FirstOrDefault(i => i.Id == condition.RecognitionId)?.Settings.Query)" @onchange="e => { criteria.SearchText = e.Value?.ToString() ?? string.Empty; RefreshCurrentConditionResults(); }" />
+                                                                    <label>@L["查找文字"]</label>
+                                                                    <input class="input" placeholder="@L["必须填写固定文字，例如：确定"]" value="@(criteria.SearchText ?? Machine.Recognitions.FirstOrDefault(i => i.Id == condition.RecognitionId)?.Settings.Query)" @onchange="e => { criteria.SearchText = e.Value?.ToString() ?? string.Empty; RefreshCurrentConditionResults(); }" />
                                                                 </div>
-                                                                <div class="hint">在所选字典中匹配这段固定文字，按找到／未找到判断。</div>
+                                                                <div class="hint">@L["在所选字典中匹配这段固定文字，按找到／未找到判断。"]</div>
                                                             }
                                                             else
                                                             {
-                                                                <div class="hint">用所选字典识别搜索区文字，再按下方“识别文字”等结果判断。</div>
+                                                                <div class="hint">@L["用所选字典识别搜索区文字，再按下方“识别文字”等结果判断。"]</div>
                                                             }
                                                         }
                                                         <div class="recognition-filter-row">
-                                                            <label>识别结果</label>
+                                                            <label>@L["识别结果"]</label>
                                                             <select class="select" value="@RecognitionSuccessValue(condition)" @onchange='e => ChangeRecognitionSuccess(condition, e.Value?.ToString() ?? "ignore")'>
-                                                                <option value="ignore">不判断</option><option value="success">成功</option><option value="failure">失败</option>
+                                                                <option value="ignore">@L["不判断"]</option><option value="success">@L["成功"]</option><option value="failure">@L["失败"]</option>
                                                             </select>
                                                         </div>
                                                         <div class="recognition-filter-row numeric">
-                                                            <label>相似度 %</label>
+                                                            <label>@L["相似度 %"]</label>
                                                             <select class="select" @bind="criteria.SimilarityOperator" @bind:after="RefreshCurrentConditionResults">
                                                                 @foreach (var op in NumericRecognitionOperators) { <option value="@op">@op</option> }
                                                             </select>
-                                                            <input class="input" type="number" min="0" max="100" step="any" placeholder="留空不判断" @bind="criteria.Similarity" @bind:after="RefreshCurrentConditionResults" />
+                                                            <input class="input" type="number" min="0" max="100" step="any" placeholder="@L["留空不判断"]" @bind="criteria.Similarity" @bind:after="RefreshCurrentConditionResults" />
                                                         </div>
                                                         <div class="recognition-filter-row numeric">
-                                                            <label>坐标 X</label>
+                                                            <label>@L["坐标 X"]</label>
                                                             <select class="select" @bind="criteria.XOperator" @bind:after="RefreshCurrentConditionResults">
                                                                 @foreach (var op in NumericRecognitionOperators) { <option value="@op">@op</option> }
                                                             </select>
-                                                            <input class="input" type="number" placeholder="留空不判断" @bind="criteria.X" @bind:after="RefreshCurrentConditionResults" />
+                                                            <input class="input" type="number" placeholder="@L["留空不判断"]" @bind="criteria.X" @bind:after="RefreshCurrentConditionResults" />
                                                         </div>
                                                         <div class="recognition-filter-row numeric">
-                                                            <label>坐标 Y</label>
+                                                            <label>@L["坐标 Y"]</label>
                                                             <select class="select" @bind="criteria.YOperator" @bind:after="RefreshCurrentConditionResults">
                                                                 @foreach (var op in NumericRecognitionOperators) { <option value="@op">@op</option> }
                                                             </select>
-                                                            <input class="input" type="number" placeholder="留空不判断" @bind="criteria.Y" @bind:after="RefreshCurrentConditionResults" />
+                                                            <input class="input" type="number" placeholder="@L["留空不判断"]" @bind="criteria.Y" @bind:after="RefreshCurrentConditionResults" />
                                                         </div>
                                                         <div class="recognition-filter-row numeric">
-                                                            <label>识别文字</label>
+                                                            <label>@L["识别文字"]</label>
                                                             <select class="select" @bind="criteria.TextOperator" @bind:after="RefreshCurrentConditionResults">
-                                                                <option value="contains">包含</option><option value="==">等于</option><option value="!=">不等于</option><option value="startsWith">开头</option><option value="endsWith">结尾</option>
+                                                                <option value="contains">@L["包含"]</option><option value="==">@L["等于"]</option><option value="!=">@L["不等于"]</option><option value="startsWith">@L["开头"]</option><option value="endsWith">@L["结尾"]</option>
                                                             </select>
-                                                            <input class="input" placeholder="留空不判断" @bind="criteria.Text" @bind:after="RefreshCurrentConditionResults" />
+                                                            <input class="input" placeholder="@L["留空不判断"]" @bind="criteria.Text" @bind:after="RefreshCurrentConditionResults" />
                                                         </div>
-                                                        <div class="hint">填写的项目同时满足才成立，留空的项目不参与判断。</div>
-                                                        <button class="btn small" @onclick="() => OpenRecognitionManager(condition.RecognitionId)">编辑识别项目</button>
-                                                        <button class="btn small" disabled="@(_executing || Runtime.Running)" @onclick="() => TestRecognitionConditionAsync(condition)">测试当前条件</button>
+                                                        <div class="hint">@L["填写的项目同时满足才成立，留空的项目不参与判断。"]</div>
+                                                        <button class="btn small" @onclick="() => OpenRecognitionManager(condition.RecognitionId)">@L["编辑识别项目"]</button>
+                                                        <button class="btn small" disabled="@(_executing || Runtime.Running)" @onclick="() => TestRecognitionConditionAsync(condition)">@L["测试当前条件"]</button>
                                                         <div class="hint" style="white-space:pre-wrap">@RecognitionConditionResult(condition)</div>
                                                     }
 
                                                     else
                                                     {
                                                     <div class="recognition-filter-row">
-                                                        <label>比较方式</label>
+                                                        <label>@L["比较方式"]</label>
                                                         <select class="select" value="@condition.Operator" @onchange='e => ChangeConditionOperator(state.Id, output.Id, condition.Id, e.Value?.ToString() ?? "==")'>
                                                             @foreach (var op in Operators)
                                                             {
@@ -723,8 +725,8 @@
                                                     </div>
                                                     <div class="condition-row-b">
                                                         <select class="select" value="@condition.RightMode" @onchange='e => ChangeConditionRightMode(state.Id, output.Id, condition.Id, e.Value?.ToString() ?? "literal")'>
-                                                            <option value="literal">固定值</option>
-                                                            <option value="variable">全局变量</option>
+                                                            <option value="literal">@L["固定值"]</option>
+                                                            <option value="variable">@L["全局变量"]</option>
                                                         </select>
                                                         @if (condition.RightMode == "literal")
                                                         {
@@ -736,17 +738,17 @@
                                                         }
                                                         else
                                                         {
-                                                            <div style="display:flex;align-items:center;padding-left:7px;color:#67758d;font-size:9px">与另一个全局变量比较</div>
+                                                            <div style="display:flex;align-items:center;padding-left:7px;color:#67758d;font-size:9px">@L["与另一个全局变量比较"]</div>
                                                         }
                                                     </div>
                                                     <div class="condition-row-c">
-                                                        <div style="display:flex;align-items:center;color:#718097;font-size:9px">右值</div>
+                                                        <div style="display:flex;align-items:center;color:#718097;font-size:9px">@L["右值"]</div>
                                                         @if (condition.RightMode == "variable")
                                                         {
                                                             <select class="select" value="@NodeString(condition.RightValue)" @onchange="e => ChangeConditionRightValue(state.Id, output.Id, condition.Id, e.Value?.ToString() ?? string.Empty)">
                                                                 @if (Machine.Variables.Count == 0)
                                                                 {
-                                                                    <option value="">没有变量</option>
+                                                                    <option value="">@L["没有变量"]</option>
                                                                 }
                                                                 else
                                                                 {
@@ -772,18 +774,18 @@
                                                     }
                                                 </div>
                                             }
-                                            <button class="btn small" style="margin-top:6px" @onclick="() => AddCondition(state.Id, output.Id)">+ 条件</button>
+                                            <button class="btn small" style="margin-top:6px" @onclick="() => AddCondition(state.Id, output.Id)">@L["+ 条件"]</button>
                                         }
                                         else
                                         {
-                                            <div class="hint">无条件出口如果优先级最高，会让后面的出口永远没有机会执行。</div>
+                                            <div class="hint">@L["无条件出口如果优先级最高，会让后面的出口永远没有机会执行。"]</div>
                                         }
 
                                     </div>
                                 }
                             </div>
                         </div>
-                        <button class="danger" @onclick="DeleteSelectedState">删除整个状态</button>
+                        <button class="danger" @onclick="DeleteSelectedState">@L["删除整个状态"]</button>
                     }
                 </div>
             </div>
@@ -796,7 +798,7 @@
                 <div id="runtimeDot" class="status-dot @(Runtime.Running ? "running" : "")"></div>
                 <span id="runtimeStatus">@(Runtime.Running ? "RUNNING" : "STOPPED")</span>
                 <div class="spacer"></div>
-                <button class="btn small" @onclick="ClearLogs">清空</button>
+                <button class="btn small" @onclick="ClearLogs">@L["清空"]</button>
             </div>
             <div id="console">
                 @foreach (var log in Logs)
@@ -811,7 +813,7 @@
         </div>
 
         <div class="runtime-panel">
-            <div class="bottom-header">运行时</div>
+            <div class="bottom-header">@L["运行时"]</div>
             <div class="runtime-content">
                 <div id="runtimeRegions" class="runtime-regions">
                     @foreach (var region in Machine.Regions)
@@ -864,9 +866,9 @@
                     <div class="ai-logo">✦</div>
 
                     <div>
-                        <div class="ai-title">AI 脚本助手</div>
+                        <div class="ai-title">@L["AI 脚本助手"]</div>
                         <div class="ai-subtitle">
-                            围绕当前色库和字典，编排识别条件与键鼠动作
+                            @L["围绕当前色库和字典，编排识别条件与键鼠动作"]
                         </div>
                     </div>
                 </div>
@@ -882,8 +884,8 @@
                     {
                         <button class="ai-toolbar-btn"
                                 @onclick="ClearAiConversation"
-                                title="清空对话">
-                            清空对话
+                                title="@L["清空对话"]">
+                            @L["清空对话"]
                         </button>
                     }
 
@@ -895,10 +897,10 @@
                 </div>
             </div>
 
-            <div class="ai-scope-tabs" role="group" aria-label="修改范围">
-                <button class="@(_aiScope == "both" ? "active" : "")" disabled="@_aiBusy" @onclick='() => _aiScope = "both"'>流程与脚本</button>
-                <button class="@(_aiScope == "script" ? "active" : "")" disabled="@_aiBusy" @onclick='() => _aiScope = "script"'>仅脚本</button>
-                <button class="@(_aiScope == "machine" ? "active" : "")" disabled="@_aiBusy" @onclick='() => _aiScope = "machine"'>仅流程</button>
+            <div class="ai-scope-tabs" role="group" aria-label="@L["修改范围"]">
+                <button class="@(_aiScope == "both" ? "active" : "")" disabled="@_aiBusy" @onclick='() => _aiScope = "both"'>@L["流程与脚本"]</button>
+                <button class="@(_aiScope == "script" ? "active" : "")" disabled="@_aiBusy" @onclick='() => _aiScope = "script"'>@L["仅脚本"]</button>
+                <button class="@(_aiScope == "machine" ? "active" : "")" disabled="@_aiBusy" @onclick='() => _aiScope = "machine"'>@L["仅流程"]</button>
             </div>
             <!-- 对话主体 -->
             <div class="ai-body">
@@ -910,37 +912,37 @@
                         <div class="ai-welcome-icon">✦</div>
 
                         <div class="ai-welcome-title">
-                            描述你要执行的桌面操作
+                            @L["描述你要执行的桌面操作"]
                         </div>
 
                         <div class="ai-welcome-desc">
-                            选择已有识别项目，描述什么时候执行、执行哪些操作，以及执行后去哪个状态。
+                            @L["选择已有识别项目，描述什么时候执行、执行哪些操作，以及执行后去哪个状态。"]
                         </div>
 
                         <div class="ai-example-grid">
 
                             <button class="ai-example"
-                                    @onclick='() => SetAiExample("使用当前多点色库里的真实记录，持续等待识别成功，进入执行状态，调用脚本点击识别坐标，再等待目标消失后返回等待。不要编造训练数据。")'>
-                                <strong>找色执行脚本</strong>
-                                <span>找到特征后执行脚本</span>
+                                    @onclick='() => SetAiExample(L["使用当前多点色库里的真实记录，持续等待识别成功，进入执行状态，调用脚本点击识别坐标，再等待目标消失后返回等待。不要编造训练数据。"])'>
+                                <strong>@L["找色执行脚本"]</strong>
+                                <span>@L["找到特征后执行脚本"]</span>
                             </button>
 
                             <button class="ai-example"
-                                    @onclick='() => SetAiExample("使用当前字典做 OCR，当识别文字包含我指定的内容时切换状态，执行键鼠脚本，然后返回等待；保留现有字典和查找范围。")'>
-                                <strong>OCR 文字判断</strong>
-                                <span>识别文字满足条件后执行</span>
+                                    @onclick='() => SetAiExample(L["使用当前字典做 OCR，当识别文字包含我指定的内容时切换状态，执行键鼠脚本，然后返回等待；保留现有字典和查找范围。"])'>
+                                <strong>@L["OCR 文字判断"]</strong>
+                                <span>@L["识别文字满足条件后执行"]</span>
                             </button>
 
                             <button class="ai-example"
-                                    @onclick='() => SetAiExample("使用当前字典查找固定文字“确定”，成功后在识别坐标点击一次；找不到时保持等待，不重复点击同一次出现。")'>
-                                <strong>查找固定文字</strong>
-                                <span>找到指定文字并点击</span>
+                                    @onclick='() => SetAiExample(L["使用当前字典查找固定文字“确定”，成功后在识别坐标点击一次；找不到时保持等待，不重复点击同一次出现。"])'>
+                                <strong>@L["查找固定文字"]</strong>
+                                <span>@L["找到指定文字并点击"]</span>
                             </button>
 
                             <button class="ai-example"
-                                    @onclick='() => SetAiExample("生成一个继承 StateScript 的键鼠操作脚本：点击指定坐标，输入指定字符串，按 ENTER，再等待指定毫秒。参数可在卡片里配置，等待要响应停止。")'>
-                                <strong>键鼠操作脚本</strong>
-                                <span>点击、输入、按键和等待</span>
+                                    @onclick='() => SetAiExample(L["生成一个继承 StateScript 的键鼠操作脚本：点击指定坐标，输入指定字符串，按 ENTER，再等待指定毫秒。参数可在卡片里配置，等待要响应停止。"])'>
+                                <strong>@L["键鼠操作脚本"]</strong>
+                                <span>@L["点击、输入、按键和等待"]</span>
                             </button>
 
                         </div>
@@ -1015,7 +1017,7 @@
             {
                 <div class="ai-error-bar">
                     <span>!</span>
-                    @_aiError
+                    @L[_aiError]
                 </div>
             }
 
@@ -1029,20 +1031,17 @@
                     </div>
 
                     <div class="ai-plan-info">
-                        <strong>变更已生成</strong>
+                        <strong>@L["变更已生成"]</strong>
 
                         @if (_pendingAiPlan.ApplyMachine)
                         {
                             <span>
-                                流程：@_pendingAiPlan.Regions.Count 个状态域 ·
-                                @_pendingAiPlan.Variables.Count 个变量 ·
-                                @_pendingAiPlan.States.Count 个状态 ·
-                                @_pendingAiPlan.Transitions.Count 条连线
+                                @L.Format("流程：{0} 个状态域 · {1} 个变量 · {2} 个状态 · {3} 条连线", _pendingAiPlan.Regions.Count, _pendingAiPlan.Variables.Count, _pendingAiPlan.States.Count, _pendingAiPlan.Transitions.Count)
                             </span>
                         }
                         else
                         {
-                            <span>流程：保持当前状态机不变</span>
+                            <span>@L["流程：保持当前状态机不变"]</span>
                         }
 
                         @if (_pendingAiPlan.Scripts.Count > 0)
@@ -1051,7 +1050,7 @@
                                 @foreach (var script in _pendingAiPlan.Scripts)
                                 {
                                     <span class="ai-script-chip @(script.Operation == "delete" ? "delete" : "")">
-                                        @(script.Operation == "delete" ? "删除" : "写入") · @script.FileName
+                                        @(script.Operation == "delete" ? L["删除"] : L["写入"]) · @script.FileName
                                     </span>
                                 }
                             </div>
@@ -1061,7 +1060,7 @@
                     <button class="btn green"
                             disabled="@(_aiBusy || Runtime.Running || _executing)"
                             @onclick="ApplyPendingAiPlanAsync">
-                        应用变更
+                        @L["应用变更"]
                     </button>
 
                 </div>
@@ -1076,13 +1075,13 @@
                               @bind="_aiInput"
                               @bind:event="oninput"
                               disabled="@_aiBusy"
-                              placeholder="例如：字典识别到“登录”后，点击识别坐标，输入账号并按回车，再等待“完成”出现。">
+                              placeholder="@L["例如：字典识别到“登录”后，点击识别坐标，输入账号并按回车，再等待“完成”出现。"]">
                     </textarea>
 
                     <div class="ai-composer-footer">
 
                         <div class="ai-composer-hint">
-                            基于当前流程、识别库和已有脚本生成可预览的修改
+                            @L["基于当前流程、识别库和已有脚本生成可预览的修改"]
                         </div>
 
                         <button class="ai-send"
@@ -1091,11 +1090,11 @@
 
                             @if (_aiBusy)
                             {
-                                <span>处理中</span>
+                                <span>@L["处理中"]</span>
                             }
                             else
                             {
-                                <span>开始发明</span>
+                                <span>@L["开始发明"]</span>
                                 <span class="ai-send-arrow">↑</span>
                             }
 
@@ -1202,7 +1201,8 @@
     </path>`;
                 const delay = Math.max(0, Number(edge.delayMilliseconds) || 0);
                 if (delay > 0) {
-                    const label = delay >= 1000 ? `等待 ${+(delay / 1000).toFixed(3)} s` : `等待 ${delay} ms`;
+                    const waitLabel = document.documentElement.lang === "en" ? "Wait" : "等待";
+                    const label = delay >= 1000 ? `${waitLabel} ${+(delay / 1000).toFixed(3)} s` : `${waitLabel} ${delay} ms`;
                     const curve = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     curve.setAttribute("d", d);
                     const length = curve.getTotalLength();
@@ -1216,7 +1216,7 @@
                     const sleeve = points.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
                     const pathId = `delay-sleeve-${(edgeState.edges || []).indexOf(edge)}`;
                     html += `<g data-edge-id="${edge.id}" style="cursor:pointer;pointer-events:all">
-                        <title>点击设置切换前等待</title>
+                        <title>${document.documentElement.lang === "en" ? "Click to set the transition delay" : "点击设置切换前等待"}</title>
                         <path d="${sleeve}" fill="none" stroke="${stroke}" stroke-width="27" stroke-linecap="round" />
                         <path id="${pathId}" d="${sleeve}" fill="none" stroke="#182438" stroke-width="23" stroke-linecap="round" />
                         <text fill="#e4efff" font-size="11" font-weight="600" dy="4" text-anchor="middle" style="pointer-events:all"><textPath href="#${pathId}" startOffset="50%">${label}</textPath></text>
@@ -1523,6 +1523,7 @@
             },
             sync(state) {
                 edgeState = state || edgeState;
+                if (state?.language) window.alcyoneLanguage.set(state.language);
                 updatePendingVisual();
                 requestAnimationFrame(drawEdges);
             },

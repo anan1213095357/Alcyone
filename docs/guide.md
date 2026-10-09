@@ -2,6 +2,18 @@
 
 [Project overview](../README.md) · [简体中文](guide.zh-CN.md)
 
+## Interface language
+
+Select **简体中文** or **English** in the main toolbar or training window. Changes apply immediately to open UI components, including the embedded training editor. The preference is stored in `%LOCALAPPDATA%\Alcyone\settings.json`, independently of workflow files. The default is Simplified Chinese; missing, corrupt, or unsupported saved settings fall back to it. A failed save reports an error and leaves the active language unchanged.
+
+Switching language changes presentation only. Workflow data, user-defined names, scripts, recognition strings and raw log output are preserved. AI requests ask for explanations in the selected language while preserving existing identifiers and search text.
+
+Run the localization regression checks from the repository root:
+
+```powershell
+dotnet run --project Tests/LocalizationChecks/LocalizationChecks.csproj -c Release
+```
+
 ## Recognition libraries
 
 Open **管理 / 导入** (Manage / Import) in the recognition section. Create or select a dictionary or multi-point color library. The embedded editor provides capture, labeling, training, and testing without launching a separate tool.
@@ -90,7 +102,7 @@ Editable configuration and scripts live in `StateMachineConfigs/` and `HotScript
 
 ## Building and verification
 
-See [Build & distribute](../README.md#build--distribute) for commands and runtime requirements. Source builds require the sibling `FastColorFinder` directory. The project links its capture, selection, training, and recognition code; published builds do not need these sources nearby.
+See [Build & distribute](../README.md#build--distribute) for commands and runtime requirements. The required capture, selection, training, and recognition sources are included in this repository under `Alcyone/Automation` and `Alcyone/Training`. Building and publishing do not require a sibling `FastColorFinder` directory.
 
 `--browser-host` prints a loopback URL for browser development. `--check-host` verifies script compilation, the main page, and embedded training resources. This repository does not include standalone TrainingChecks or RecognitionImportChecks test projects.
 

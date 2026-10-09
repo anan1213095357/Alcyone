@@ -67,24 +67,16 @@ AI 助手结合当前流程、识别库和动作目录生成修改，支持“�
 
 <sub>以上均为当前程序的实际截图。AI 截图展示需求输入界面，未调用模型或生成示例结果。</sub>
 
+### 切换界面语言
+
+点击顶部工具栏的语言选择框，即可在 **简体中文** 和 **English** 之间即时切换，识别训练窗口也提供同样的入口。程序会保存当前 Windows 用户的选择，下次启动自动恢复。切换不重载流程、不打断正在运行的实例；自定义名称、脚本、识别文字和原始日志保持不变。
+
 ## 快速开始
 
 ### 环境准备
 
 - Windows x64、.NET 10 SDK、WebView2 Runtime。
-- **源码依赖：`FastColorFinder`**。当前工程通过相对路径链接其源码，需要自行准备完整目录，放在仓库旁边。此依赖尚未包含在本仓库中。
-
-```text
-workspace/
-├── Alcyone/                  # 本仓库，可使用其他文件夹名
-│   ├── Alcyone.slnx
-│   └── Alcyone/Alcyone.csproj
-└── FastColorFinder/          # 编译必需
-    ├── FastColorFinder.cs
-    ├── Core/
-    ├── Services/
-    └── Native/
-```
+所需的 `FastColorFinder` 源码已包含在 `Alcyone/Automation`、`Alcyone/Training/Core`、`Alcyone/Training/Services` 和 `Alcyone/Training/Native` 中。本仓库可独立编译，无需准备同级图色助手项目。
 
 ### 启动桌面程序
 

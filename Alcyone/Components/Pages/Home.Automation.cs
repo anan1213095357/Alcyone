@@ -17,20 +17,22 @@ public partial class Home
         ? $"{Machine.Recognitions.FirstOrDefault(i => i.Id == parent)?.Name}/{item.Name}" : item.Name;
     private string RecognitionStatus(RecognitionItem item)
     {
-        if (!_colorResults.TryGetValue(item.Id, out var result)) return "未检测";
-        if (result.Error is not null) return $"错误：{result.Error}";
-        return result.Found ? $"成功 · {result.Similarity:F1}% · ({result.X}, {result.Y})"
-            + (string.IsNullOrEmpty(result.Text) ? "" : $" · {result.Text}") : $"失败 · {result.Similarity:F1}%";
+        if (!_colorResults.TryGetValue(item.Id, out var result)) return L["未检测"];
+        if (result.Error is not null) return L.Format("错误：{0}", result.Error);
+        return result.Found ? L.Format("成功 · {0}% · ({1}, {2})", result.Similarity.ToString("F1"), result.X, result.Y)
+            + (string.IsNullOrEmpty(result.Text) ? "" : $" · {result.Text}") : L.Format("失败 · {0}%", result.Similarity.ToString("F1"));
     }
     private async Task TestRecognitionAsync(RecognitionItem item)
     { if (_session is not null) { await _session.ConfigureAsync(Machine); await _session.TestAsync(item); ApplyRuntimeSnapshot(); } }
     private string RecognitionConditionResult(ConditionModel condition)
     {
         var item = Machine.Recognitions.FirstOrDefault(i => !i.IsFolder && i.Id == condition.RecognitionId);
-        if (item is null) return "请选择识别项目。";
-        if (!_recognitionResults.TryGetValue(RecognitionScanKey(condition, item), out var result)) return "尚未检测当前条件。";
-        if (result.Error is not null) return $"检测错误：{result.Error}";
-        return $"识别{(result.Found ? "成功" : "失败")} · 相似度 {result.Similarity:F1}% · 坐标 ({result.X},{result.Y}) · 条件{(EvaluateRecognitionCondition(condition) ? "满足" : "不满足")}\n实际文字：{(string.IsNullOrEmpty(result.Text) ? "（空）" : result.Text)}";
+        if (item is null) return L["请选择识别项目。"];
+        if (!_recognitionResults.TryGetValue(RecognitionScanKey(condition, item), out var result)) return L["尚未检测当前条件。"];
+        if (result.Error is not null) return L.Format("检测错误：{0}", result.Error);
+        return L.Format("识别{0} · 相似度 {1}% · 坐标 ({2},{3}) · 条件{4}\n实际文字：{5}",
+            L[result.Found ? "成功" : "失败"], result.Similarity.ToString("F1"), result.X, result.Y,
+            L[EvaluateRecognitionCondition(condition) ? "满足" : "不满足"], string.IsNullOrEmpty(result.Text) ? L["（空）"] : result.Text);
     }
     private async Task TestRecognitionConditionAsync(ConditionModel condition)
     { if (_session is not null) { await _session.ConfigureAsync(Machine); await _session.TestConditionAsync(condition); ApplyRuntimeSnapshot(); } }
@@ -124,20 +126,20 @@ public partial class Home
     private string RecognitionConditionText(ConditionModel condition)
     {
         var item = Machine.Recognitions.FirstOrDefault(i => !i.IsFolder && i.Id == condition.RecognitionId);
-        var name = item?.Name ?? "未选择识别项";
+        var name = item?.Name ?? L["未选择识别项"];
         var criteria = RecognitionCriteriaFor(condition);
         var parts = new List<string>();
         if (item?.Settings.Mode == "dictionary")
         {
             var key = RecognitionScanKey(condition, item);
-            parts.Add(key.Mode == "text" ? $"找固定文字“{key.Query}”" : "OCR 结果");
+            parts.Add(key.Mode == "text" ? L.Format("找固定文字“{0}”", key.Query) : L["OCR 结果"]);
         }
-        if (criteria.Success.HasValue) parts.Add(criteria.Success.Value ? "成功" : "失败");
-        if (criteria.Similarity.HasValue) parts.Add($"相似度 {criteria.SimilarityOperator} {criteria.Similarity}%");
+        if (criteria.Success.HasValue) parts.Add(L[criteria.Success.Value ? "成功" : "失败"]);
+        if (criteria.Similarity.HasValue) parts.Add(L.Format("相似度 {0} {1}%", criteria.SimilarityOperator, criteria.Similarity));
         if (criteria.X.HasValue) parts.Add($"X {criteria.XOperator} {criteria.X}");
         if (criteria.Y.HasValue) parts.Add($"Y {criteria.YOperator} {criteria.Y}");
-        if (!string.IsNullOrWhiteSpace(criteria.Text)) parts.Add($"文字 {criteria.TextOperator} {criteria.Text}");
-        return $"{name} · {(parts.Count == 0 ? "无筛选" : string.Join(" 且 ", parts))}";
+        if (!string.IsNullOrWhiteSpace(criteria.Text)) parts.Add(L.Format("文字 {0} {1}", criteria.TextOperator, criteria.Text));
+        return $"{name} · {(parts.Count == 0 ? L["无筛选"] : string.Join(L[" 且 "], parts))}";
     }
     private void MigrateLegacyRecognitionVariables()
     {
