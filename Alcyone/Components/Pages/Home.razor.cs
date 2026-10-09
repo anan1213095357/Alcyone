@@ -91,6 +91,7 @@ public partial class Home
         {
             _jsBridge = new JsBridge(StateMoved, SelectStateFromJs, SelectEdgeFromJs, ClearSelectionFromJs, EscapeFromJs, DeleteSelectionFromJs);
             _jsBridge.SaveGroups = SaveGroupsFromJs;
+            _jsBridge.EditSelection = EditSelectionFromJs;
             _dotNetRef = DotNetObjectReference.Create(_jsBridge);
             await JS.InvokeVoidAsync("industrialStateMachineUi.init", _dotNetRef);
             _jsReady = true;
@@ -1776,8 +1777,10 @@ public partial class Home
 
     public sealed class JsBridge
     {
-        public Func<string, List<StateGroupModel>, Task>? SaveGroups { get; set; }
-        [JSInvokable] public Task SaveGroupsFromJs(string configKey, List<StateGroupModel> groups) => SaveGroups?.Invoke(configKey, groups) ?? Task.CompletedTask;
+        public Func<string, List<StateGroupModel>, List<CanvasStatePosition>, Task>? SaveGroups { get; set; }
+        public Func<string, string, List<string>, List<CanvasStatePosition>, Task<CanvasEditResult>>? EditSelection { get; set; }
+        [JSInvokable] public Task SaveGroupsFromJs(string configKey, List<StateGroupModel> groups, List<CanvasStatePosition> positions) => SaveGroups?.Invoke(configKey, groups, positions) ?? Task.CompletedTask;
+        [JSInvokable] public Task<CanvasEditResult> EditSelectionFromJs(string configKey, string command, List<string> ids, List<CanvasStatePosition> positions) => EditSelection!(configKey, command, ids, positions);
         private readonly Func<string, double, double, Task> _stateMoved;
         private readonly Func<string, Task> _selectState;
         private readonly Func<string, Task> _selectEdge;

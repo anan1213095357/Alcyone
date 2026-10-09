@@ -4,6 +4,7 @@
     const records = new Map(), cache = new Map(), projection = [];
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     let frame = 0, observer = null;
+    const appearanceKeys = ['ocean', 'rust', 'ice', 'violet', 'sand', 'jade', 'rock', 'lava', 'blue', 'rose', 'forest', 'silver'];
     const palettes = [
         [[8, 41, 84], [48, 108, 83], [207, 223, 226]], // ocean
         [[105, 40, 22], [212, 126, 67], [241, 192, 137]], // rust
@@ -26,10 +27,11 @@
         return seed >>> 0;
     }
     function surface(id) {
+        if (!appearanceKeys.includes(id)) id = 'ocean';
         if (cache.has(id)) {
             const found = cache.get(id); cache.delete(id); cache.set(id, found); return found;
         }
-        const seed = seedOf(id), kind = seed % palettes.length, colors = palettes[kind];
+        const seed = seedOf(id), kind = appearanceKeys.indexOf(id), colors = palettes[kind];
         const hash = (x, y, z) => {
             let h = seed ^ Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 1274126177);
             h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -126,14 +128,24 @@
             }, { root });
             document.addEventListener('visibilitychange', resume); reduced.addEventListener('change', resume);
         },
-        attach(canvas, id) {
+        attach(canvas, appearance = 'ocean') {
             canvas.width = canvas.height = size;
-            const ctx = canvas.getContext('2d'), texture = surface(id);
-            const record = { canvas, ctx, texture, pixels: ctx.createImageData(size, size), phase: texture.phase, active: false, speed: .005, visible: true, time: 0, drawn: 0 };
+            const ctx = canvas.getContext('2d'), texture = surface(appearance);
+            const record = { canvas, ctx, texture, appearance, pixels: ctx.createImageData(size, size), phase: texture.phase, active: false, speed: .005, visible: true, time: 0, drawn: 0 };
             records.set(canvas, record); observer?.observe(canvas); draw(record);
             if (!frame) resume();
         },
         setActive(canvas, active) { const record = records.get(canvas); if (record) record.active = active; },
+        setAppearance(canvas, appearance = 'ocean') {
+            const record = records.get(canvas);
+            if (!record || record.appearance === appearance) return;
+            record.appearance = appearance; record.texture = surface(appearance); draw(record);
+        },
+        preview(canvas, appearance) {
+            canvas.width = canvas.height = size;
+            const ctx = canvas.getContext('2d'), texture = surface(appearance);
+            draw({ ctx, texture, pixels: ctx.createImageData(size, size), phase: texture.phase });
+        },
         detach(canvas) { observer?.unobserve(canvas); records.delete(canvas); if (!records.size) { cancelAnimationFrame(frame); frame = 0; } },
         clear() { observer?.disconnect(); records.clear(); cancelAnimationFrame(frame); frame = 0; },
         dispose() { this.clear(); document.removeEventListener('visibilitychange', resume); reduced.removeEventListener('change', resume); }

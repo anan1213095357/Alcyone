@@ -18,6 +18,8 @@ namespace StateMachine.Execution;
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = "Alcyone";
+        public string Appearance { get; set; } = "ocean";
+        public bool IsCollapsed { get; set; } = true;
         public List<string> StateIds { get; set; } = new();
         public double X { get; set; }
         public double Y { get; set; }
