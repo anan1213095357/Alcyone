@@ -61,6 +61,7 @@ internal static class Program
         builder.Services.AddSingleton<FastColorFinder.Services.TextDictionaryDownloads>();
         builder.Services.AddSingleton<IColorProbeScanner, DesktopColorProbeScanner>();
         builder.Services.AddSingleton<MachineRuntimeService>();
+        builder.Services.AddSingleton<DesktopWallpaperService>();
         var app = builder.Build();
         app.UseExceptionHandler("/Error", createScopeForErrors: true);
         app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
@@ -104,7 +105,7 @@ internal static class Program
                 app.WaitForShutdownAsync().GetAwaiter().GetResult();
                 return;
             }
-            new PhotinoWindow()
+            var window = new PhotinoWindow()
                 .SetTitle("Alcyone")
                 .SetUseOsDefaultSize(false)
                 .SetMaximized(true)
@@ -116,8 +117,11 @@ internal static class Program
 #else
                 .SetDevToolsEnabled(false)
 #endif
-                .Load(url)
-                .WaitForClose();
+                ;
+            var desktop = app.Services.GetRequiredService<DesktopWallpaperService>();
+            desktop.Attach(window, url);
+            try { window.Load(url).WaitForClose(); }
+            finally { desktop.Dispose(); }
         }
         finally
         {

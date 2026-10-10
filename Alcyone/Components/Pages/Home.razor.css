@@ -13,6 +13,17 @@
     z-index: 100;
 }
 
+.desktop-control { border-color:#3b668e; }
+.desktop-error { position:fixed; top:68px; left:50%; transform:translateX(-50%); z-index:2000; max-width:80vw; padding:12px 18px; border:1px solid #b36767; border-radius:8px; background:#341c27; color:#ffe1e1; }
+.desktop-error button { margin-left:14px; border:0; background:transparent; color:inherit; }
+#app.desktop-mode { display:block; width:100vw; height:100vh; overflow:hidden; background:#030610; }
+.desktop-mode > :not(.main), .desktop-mode .left-panel, .desktop-mode .right-panel { display:none !important; }
+.desktop-mode .main { display:block; width:100%; height:100%; }
+.desktop-mode .workspace { width:100%; height:100%; overflow:hidden; pointer-events:none; }
+.desktop-mode #worldScale { position:absolute; }
+.desktop-mode #world { background:transparent; }
+.desktop-mode .starfield-anchor { position:absolute; inset:0; }
+
 .feature-string { min-height: 78px; width: 100%; resize: vertical; overflow-wrap: anywhere; }
 .probe-binding { display: flex; flex-direction: column; gap: 7px; }
 .probe-field { min-width: 0; font-size: 11px; color: #8c9bb2; }

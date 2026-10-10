@@ -7,7 +7,8 @@
 @keyframes star-route-transit { from { offset-distance:0%; opacity:1; } to { offset-distance:100%; opacity:1; } }
 .star-route-craft { filter:drop-shadow(0 2px 2px #0009); }
 .star-route-exhaust { filter:drop-shadow(0 0 3px #59dfff); }
-.star-route-plumes { transform-box:fill-box; transform-origin:right center; animation:star-route-burn .24s ease-in-out infinite alternate; filter:drop-shadow(0 0 4px #49bfff); }
+.star-route-plumes { filter:drop-shadow(0 0 2px #49bfff); }
+.star-route-plume { transform-box:fill-box; transform-origin:right center; animation:star-route-burn .24s ease-in-out infinite alternate; }
 @keyframes star-route-burn { from { transform:scaleX(.82) scaleY(.9); opacity:.75; } to { transform:scaleX(1.08) scaleY(1.05); opacity:1; } }
 .star-route-signal { offset-distance:0%; offset-rotate:auto; offset-anchor:0px 0px; animation:star-route-flight 1.8s linear infinite; filter:drop-shadow(0 0 4px #2bd59a); }
 @keyframes star-route-flight {
@@ -17,7 +18,7 @@
 }
 @media (prefers-reduced-motion:reduce) {
     .star-route-ship, .star-route-signal { display:none; animation:none; }
-    .star-route-plumes { animation:none; }
+    .star-route-plume { animation:none; }
 }
 .state-card.box-selected { outline:2px solid #9fcaff; outline-offset:5px; box-shadow:0 0 0 8px #6aaaff15,0 15px 50px #0008 !important; }
 .canvas-gesture-hint { font-size:11px; color:#91a8c7; white-space:nowrap; padding:0 6px; }

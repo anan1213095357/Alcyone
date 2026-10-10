@@ -84,11 +84,27 @@ public partial class Home
 
     private StateModel? SelectedState => string.IsNullOrWhiteSpace(SelectedStateId) ? null : GetState(SelectedStateId!);
 
-    protected override void OnInitialized() => CreateDemo();
+    protected override void OnInitialized()
+    {
+        if (IsWallpaperView) AttachWallpaperSession();
+        else CreateDemo();
+        _desktopLayoutPending = _desktopMode;
+        Desktop.Changed += OnDesktopChanged;
+    }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            if (IsWallpaperView)
+            {
+                // Read-only subscribers never load/save files, discover actions or
+                // create another runtime. Every display observes the applied session.
+                await JS.InvokeVoidAsync("industrialStateMachineUi.init", null, true);
+                _jsReady = true;
+                _desktopLayoutPending = true;
+                StateHasChanged();
+                return;
+            }
             _jsBridge = new JsBridge(StateMoved, SelectStateFromJs, SelectEdgeFromJs, ClearSelectionFromJs, EscapeFromJs, DeleteSelectionFromJs);
             _jsBridge.SaveGroups = SaveGroupsFromJs;
             _jsBridge.EditSelection = EditSelectionFromJs;
@@ -115,6 +131,11 @@ public partial class Home
         if (_jsReady)
         {
             await SyncJsAsync();
+            if (_desktopLayoutPending)
+            {
+                _desktopLayoutPending = false;
+                await JS.InvokeVoidAsync("industrialStateMachineUi.setDesktopView", _desktopMode);
+            }
             if (_scrollLog)
             {
                 _scrollLog = false;
@@ -166,6 +187,7 @@ public partial class Home
     {
         if (_session is null) return;
         var snapshot = _session.Snapshot;
+        if (IsWallpaperView) Machine = snapshot.Machine;
         Runtime = snapshot.Runtime; Logs = snapshot.Logs;
         if (!snapshot.Executing && !snapshot.Runtime.Running) _stoppingRuntime = false;
         _colorResults.Clear(); foreach (var pair in snapshot.ColorResults) _colorResults[pair.Key] = pair.Value;
@@ -174,7 +196,7 @@ public partial class Home
     private void OnRuntimeChanged()
     {
         if (_disposed) return;
-        _ = InvokeAsync(() => { if (_disposed) return; ApplyRuntimeSnapshot(); _scrollLog = true; StateHasChanged(); });
+        _ = InvokeAsync(() => { if (_disposed) return; ApplyRuntimeSnapshot(); _scrollLog = !IsWallpaperView; StateHasChanged(); });
     }
 
     private void OnScriptsReloaded(ScriptReloadResult result)
@@ -1498,6 +1520,7 @@ public partial class Home
                 _session.ScriptHost.Reloaded -= OnScriptsReloaded;
                 _session = null;
             }
+            if (Desktop.Presentation?.ConfigKey == key) await Desktop.SetDesktopAsync(false);
             await RuntimeService.RemoveAsync(key);
             File.Delete(path);
 
@@ -1764,6 +1787,7 @@ public partial class Home
     {
         await base.DisposeAsync();
         _disposed = true;
+        Desktop.Changed -= OnDesktopChanged;
         if (_session is not null)
         {
             _session.Changed -= OnRuntimeChanged;
