@@ -24,7 +24,11 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     private uint _taskbarCreated;
     private NotifyIconData _tray;
     private bool _trayAdded, _hotkey, _disposed;
-
+    [DllImport("user32.dll", EntryPoint = "LoadImageW",
+    CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern nint LoadImageW(
+    nint instance, string name, uint type,
+    int width, int height, uint flags);
     public bool Available => OperatingSystem.IsWindows() && _window is not null && !_disposed;
     public bool IsDesktop { get; private set; }
     public IReadOnlyList<DesktopDisplay> Displays => Volatile.Read(ref _displays);
@@ -99,7 +103,10 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         {
             Size = (uint)Marshal.SizeOf<NotifyIconData>(), Window = _helper, Id = 1,
             Flags = 1 | 2 | 4, CallbackMessage = TrayMessage,
-            Icon = LoadIconW(0, (nint)32512),
+            Icon = LoadImageW(
+    0,
+    Path.Combine(AppContext.BaseDirectory, "wwwroot", "favicon.ico"),
+    1, 0, 0, 0x50),
             Tip = text["Alcyone · 双击返回设置"], Info = "", InfoTitle = ""
         };
         _trayAdded = Shell_NotifyIconW(0, ref _tray);

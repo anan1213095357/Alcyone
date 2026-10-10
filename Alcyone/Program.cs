@@ -114,6 +114,7 @@ internal static class Program
                 .SetMaximized(true)
                 .SetResizable(true)
                 .SetMinSize(1366,768)
+                .SetIconFile(Path.Combine(AppContext.BaseDirectory, "wwwroot", "favicon.ico"))
                 .SetContextMenuEnabled(false)
 #if DEBUG
                 .SetDevToolsEnabled(true)

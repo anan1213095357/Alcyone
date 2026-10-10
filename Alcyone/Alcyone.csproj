@@ -16,6 +16,7 @@
         <RootNamespace>StateMachine</RootNamespace>
         <AssemblyName>Alcyone</AssemblyName>
         <Product>Alcyone</Product>
+		<ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
         <OutputType>WinExe</OutputType>
         <RuntimeIdentifier>win-x64</RuntimeIdentifier>
         <!-- Roslyn needs physical assembly files when compiling hot-reload scripts. -->
