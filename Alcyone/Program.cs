@@ -8,6 +8,7 @@ using StateMachine.Automation;
 
 namespace StateMachine;
 
+
 internal static class Program
 {
     [STAThread]
