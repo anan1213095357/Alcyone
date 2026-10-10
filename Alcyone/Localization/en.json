@@ -509,5 +509,13 @@
   "编辑器已关闭。": "The editor was closed.",
   "左键框选 · 右键平移": "Left drag to select · Right drag to pan",
   "框选": "Box select",
-  "收纳为 Alcyone": "Fold into Alcyone"
+  "收纳为 Alcyone": "Fold into Alcyone",
+  "是否整数": "Is integer",
+  "是": "Yes",
+  "否": "No",
+  "整数比较": "Integer comparison",
+  "脚本编译器": "Script compiler",
+  "文档": "Documentation",
+  "保存并编译": "Save and compile",
+  "重新读取（放弃修改）": "Reload (discard edits)"
 }

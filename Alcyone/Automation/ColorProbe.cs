@@ -68,6 +68,27 @@ public sealed class RecognitionCriteria
     public string YOperator { get; set; } = "==";
     public string? Text { get; set; }
     public string TextOperator { get; set; } = "contains";
+    public bool? IsInteger { get; set; }
+    public string? IntegerValue { get; set; }
+    public string IntegerOperator { get; set; } = ">=";
+
+    public bool MatchesOcr(string text)
+    {
+        var valid = System.Numerics.BigInteger.TryParse(text.Trim(),
+            System.Globalization.NumberStyles.AllowLeadingSign,
+            System.Globalization.CultureInfo.InvariantCulture, out var actual);
+        if (IsInteger.HasValue && valid != IsInteger.Value) return false;
+        if (string.IsNullOrWhiteSpace(IntegerValue)) return true;
+        if (!valid || !System.Numerics.BigInteger.TryParse(IntegerValue.Trim(),
+            System.Globalization.NumberStyles.AllowLeadingSign,
+            System.Globalization.CultureInfo.InvariantCulture, out var expected)) return false;
+        return IntegerOperator switch
+        {
+            "==" => actual == expected, "!=" => actual != expected,
+            ">" => actual > expected, ">=" => actual >= expected,
+            "<" => actual < expected, "<=" => actual <= expected, _ => false
+        };
+    }
 }
 
 public interface IColorProbeScanner

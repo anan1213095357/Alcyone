@@ -23,6 +23,7 @@
             Alcyone
         </div>
         <div class="toolbar-group edit-tools">
+            <button class="btn" @onclick="OpenScriptEditorAsync">@L["脚本编译器"]</button>
             <button class="btn add-state-control" @onclick="AddStateAsync"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M10 6v8 M6 10h8"/></svg><span>@L["添加状态"]</span></button>
             <button class="btn ai-development-control" @onclick="OpenAiDialog"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 2 2.2 5.8L18 10l-5.8 2.2L10 18l-2.2-5.8L2 10l5.8-2.2z"/></svg><span>@L["AI 开发"]</span></button>
         </div>
@@ -721,13 +722,27 @@
                                                             </select>
                                                             <input class="input" type="number" placeholder="@L["留空不判断"]" @bind="criteria.Y" @bind:after="RefreshCurrentConditionResults" />
                                                         </div>
-                                                        <div class="recognition-filter-row numeric">
+                                                        @if (IsDictionaryCondition(condition) && DictionaryModeFor(condition) == "ocr")
+                                                        {
+                                                        <div class="recognition-filter-row text-filter">
                                                             <label>@L["识别文字"]</label>
                                                             <select class="select" @bind="criteria.TextOperator" @bind:after="RefreshCurrentConditionResults">
                                                                 <option value="contains">@L["包含"]</option><option value="==">@L["等于"]</option><option value="!=">@L["不等于"]</option><option value="startsWith">@L["开头"]</option><option value="endsWith">@L["结尾"]</option>
                                                             </select>
                                                             <input class="input" placeholder="@L["留空不判断"]" @bind="criteria.Text" @bind:after="RefreshCurrentConditionResults" />
                                                         </div>
+                                                        <div class="recognition-filter-row">
+                                                            <label>@L["是否整数"]</label>
+                                                            <select class="select" @bind="criteria.IsInteger" @bind:after="RefreshCurrentConditionResults"><option value="">@L["不判断"]</option><option value="true">@L["是"]</option><option value="false">@L["否"]</option></select>
+                                                        </div>
+                                                        <div class="recognition-filter-row text-filter">
+                                                            <label>@L["整数比较"]</label>
+                                                            <select class="select" @bind="criteria.IntegerOperator" @bind:after="RefreshCurrentConditionResults">
+                                                                @foreach (var op in new[] { "==", "!=", ">", ">=", "<", "<=" }) { <option value="@op">@op</option> }
+                                                            </select>
+                                                            <input class="input" placeholder="@L["留空不判断"]" @bind="criteria.IntegerValue" @bind:after="RefreshCurrentConditionResults" />
+                                                        </div>
+                                                        }
                                                         <div class="hint">@L["填写的项目同时满足才成立，留空的项目不参与判断。"]</div>
                                                         <button class="btn small" @onclick="() => OpenRecognitionManager(condition.RecognitionId)">@L["编辑识别项目"]</button>
                                                         <button class="btn small" disabled="@(_executing || Runtime.Running)" @onclick="() => TestRecognitionConditionAsync(condition)">@L["测试当前条件"]</button>
@@ -1180,7 +1195,7 @@
             if (desktopView) fitDesktop();
             else {
                 scaleBox.style.left = scaleBox.style.top = "";
-                requestAnimationFrame(drawEdges);
+                scheduleDrawEdges();
             }
         }
 
@@ -1200,6 +1215,13 @@
         function bezierPath(x1, y1, x2, y2) {
             const distance = Math.max(90, Math.abs(x2 - x1) * 0.45);
             return `M ${x1} ${y1} C ${x1 + distance} ${y1}, ${x2 - distance} ${y2}, ${x2} ${y2}`;
+        }
+
+        let edgeFrame = 0;
+        function scheduleDrawEdges() {
+            // A minimized WebView pauses animation frames. Keep only the latest repaint.
+            if (edgeFrame) return;
+            edgeFrame = requestAnimationFrame(() => { edgeFrame = 0; drawEdges(); });
         }
 
         function drawEdges() {
@@ -1395,7 +1417,7 @@
                 workspace.scrollLeft = centerWorldX * canvasZoom - workspace.clientWidth / 2;
                 workspace.scrollTop = centerWorldY * canvasZoom - workspace.clientHeight / 2;
             }
-            requestAnimationFrame(drawEdges);
+            scheduleDrawEdges();
         }
 
         function fitCanvas() {
@@ -1691,6 +1713,7 @@
                 workspace?.removeEventListener("contextmenu", onCanvasContextMenu);
                 workspace?.removeEventListener("click", onClick);
                 workspace?.removeEventListener("wheel", onWheel);
+                cancelAnimationFrame(edgeFrame); edgeFrame = 0;
                 workspace?.removeEventListener("scroll", drawEdges);
                 window.removeEventListener("pointermove", onPointerMove);
                 window.removeEventListener("pointerup", onPointerUp);
@@ -1720,7 +1743,7 @@
                 window.alcyoneGroups?.sync(state);
                 if (state?.language) window.alcyoneLanguage.set(state.language);
                 updatePendingVisual();
-                requestAnimationFrame(drawEdges);
+                scheduleDrawEdges();
             },
             setZoom(value, keepCenter) { setZoom(value, !!keepCenter); },
             adjustZoom(delta, keepCenter) { setZoom(canvasZoom + Number(delta), !!keepCenter); },
@@ -1769,4 +1792,9 @@
 </script>@if (_recognitionManagerOpen)
 {
     <RecognitionManager Items="Machine.Recognitions" SelectedId="_recognitionSelection" OnClose="() => _recognitionManagerOpen = false" OnChanged="RecognitionLibraryChanged" OnTest="TestRecognitionAsync" Status="RecognitionStatus" Busy="_executing" />
+}
+
+@if (_scriptEditorOpen && _scriptHost is not null)
+{
+    <ScriptWorkbench Host="_scriptHost" OnClose="() => _scriptEditorOpen = false" OnAi="OpenScriptAi" />
 }

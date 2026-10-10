@@ -138,7 +138,12 @@ public partial class Home
         if (criteria.Similarity.HasValue) parts.Add(L.Format("相似度 {0} {1}%", criteria.SimilarityOperator, criteria.Similarity));
         if (criteria.X.HasValue) parts.Add($"X {criteria.XOperator} {criteria.X}");
         if (criteria.Y.HasValue) parts.Add($"Y {criteria.YOperator} {criteria.Y}");
+        if (item?.Settings.Mode == "dictionary" && RecognitionScanKey(condition, item).Mode == "ocr")
+        {
+        if (criteria.IsInteger.HasValue) parts.Add(L["是否整数"] + ": " + L[criteria.IsInteger.Value ? "是" : "否"]);
+        if (!string.IsNullOrWhiteSpace(criteria.IntegerValue)) parts.Add(L["整数比较"] + $" {criteria.IntegerOperator} {criteria.IntegerValue}");
         if (!string.IsNullOrWhiteSpace(criteria.Text)) parts.Add(L.Format("文字 {0} {1}", criteria.TextOperator, criteria.Text));
+        }
         return $"{name} · {(parts.Count == 0 ? L["无筛选"] : string.Join(L[" 且 "], parts))}";
     }
     private void MigrateLegacyRecognitionVariables()

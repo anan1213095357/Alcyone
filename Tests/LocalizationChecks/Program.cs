@@ -68,3 +68,25 @@ static void Check(bool condition, string description)
 {
     if (!condition) throw new Exception("FAILED: " + description);
 }
+
+// OCR values must compare numerically without floating point precision loss.
+var integerCriteria = new StateMachine.Automation.RecognitionCriteria { IsInteger = true };
+Check(integerCriteria.MatchesOcr(" -42 "), "Signed OCR integer");
+foreach (var invalid in new[] { "", "1.5", "1e3", "1,000", "12abc", "12\n34" })
+    Check(!integerCriteria.MatchesOcr(invalid), "Reject invalid OCR integer: " + invalid);
+integerCriteria.IntegerValue = "9007199254740993";
+integerCriteria.IntegerOperator = ">";
+Check(integerCriteria.MatchesOcr("9007199254740994"), "Exact comparison above double precision");
+Check(!integerCriteria.MatchesOcr("9007199254740993"), "Strict numeric comparison");
+foreach (var op in new[] { "==", "!=", ">", ">=", "<", "<=" })
+{
+    integerCriteria.IntegerValue = "10";
+    integerCriteria.IntegerOperator = op;
+    Check(integerCriteria.MatchesOcr("2") == (op is "!=" or "<" or "<="), "Numeric ordering: " + op);
+}
+integerCriteria.IntegerValue = "bad";
+Check(!integerCriteria.MatchesOcr("10"), "Invalid comparison input cannot match");
+integerCriteria.IntegerValue = null;
+integerCriteria.IsInteger = false;
+Check(integerCriteria.MatchesOcr("abc") && !integerCriteria.MatchesOcr("12"), "Noninteger condition");
+Console.WriteLine("OCR integer checks passed.");

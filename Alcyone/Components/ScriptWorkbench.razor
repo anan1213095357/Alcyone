@@ -1,0 +1,93 @@
+@using StateMachine.Scripting
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="studio-overlay" @onkeydown:stopPropagation="true">
+    <section class="studio" role="dialog" aria-modal="true" aria-label="Alcyone 脚本工作台">
+        <header class="studio-titlebar">
+            <span class="studio-mark">A</span><strong>Alcyone <span>Script Studio</span></strong>
+            <span class="studio-title-divider"></span><span class="studio-project">HotScripts 工作区</span>
+            <span class="studio-title-spacer"></span><span class="studio-local"><i></i>本地编辑 · 实时热重载</span>
+            <button class="studio-icon close" title="关闭工作台" aria-label="关闭工作台" disabled="@_busy" @onclick="RequestCloseAsync">×</button>
+        </header>
+        <nav class="studio-toolbar" aria-label="编辑器工具栏">
+            <button class="studio-build" disabled="@(_busy || !_ready)" @onclick="CompileAsync"><span>▷</span>@(_busy ? "正在编译…" : "保存并编译")<kbd>F8</kbd></button>
+            <span class="studio-toolbar-divider"></span>
+            <button disabled="@(!_ready)" @onclick='() => EditorActionAsync("actions.find")'><span>⌕</span>查找<kbd>Ctrl F</kbd></button>
+            <button disabled="@(!_ready)" @onclick='() => EditorActionAsync("editor.action.startFindReplaceAction")'>替换</button>
+            <button disabled="@(_busy || !_ready)" @onclick="RequestReload">↻ 重新读取</button>
+            <span class="studio-title-spacer"></span>
+            <button class="@(_docsOpen ? "toolbar-active" : "")" @onclick="() => _docsOpen = !_docsOpen">▤ API 文档</button>
+            <button class="studio-ai" @onclick="OnAi">✧ AI 开发</button>
+        </nav>
+        <div class="studio-body @(_docsOpen ? "with-docs" : "")">
+            <aside class="studio-explorer">
+                <div class="studio-section-title">资源管理器 <span>@_files.Length</span></div>
+                <div class="studio-workspace-label">⌄ <span>HOT SCRIPTS</span></div>
+                <label class="studio-search"><span>⌕</span><input aria-label="筛选脚本" placeholder="筛选脚本…" @bind="_fileQuery" @bind:event="oninput" /></label>
+                <div class="studio-file-list">
+                    @foreach (var file in _files.Where(f => f.Contains(_fileQuery, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        <button class="studio-file @(file == _active ? "selected" : "")" title="@file" disabled="@_busy" @onclick="() => OpenFileAsync(file)"><span class="csharp-icon">C#</span><span>@file</span>@if (_dirty.Contains(file)) { <i class="dirty-dot"></i> }</button>
+                    }
+                    @if (_files.Length == 0) { <p class="studio-empty-explorer">还没有脚本。通过 AI 开发创建第一个动作。</p> }
+                </div>
+                <div class="studio-explorer-footer"><span class="studio-folder-icon">⌘</span><div>脚本工作区<small>保存后自动编译，下一次动作使用新代码</small></div></div>
+            </aside>
+            <main class="studio-main">
+                <div class="studio-tabs" role="tablist" aria-label="已打开脚本">
+                    @foreach (var file in _tabs)
+                    {
+                        <button role="tab" aria-selected="@(file == _active)" class="studio-tab @(file == _active ? "active" : "")" @onclick="() => OpenFileAsync(file)"><span class="csharp-icon">C#</span>@System.IO.Path.GetFileName(file)@if (_dirty.Contains(file)) { <i class="dirty-dot"></i> }</button>
+                    }
+                </div>
+                <div class="studio-breadcrumb"><span>HotScripts</span><b>›</b>@(_active ?? "选择脚本")<span class="studio-title-spacer"></span><span>C# Script</span></div>
+                <div class="studio-editor-area">
+                    <div class="studio-monaco" @ref="_editorElement"></div>
+                    @if (!_ready || _active is null)
+                    {
+                        <div class="studio-editor-empty"><span class="studio-empty-glyph">{ }</span><h2>@(_ready ? "从一个动作开始" : "正在准备编辑器")</h2><p>@(_ready ? "打开左侧脚本，或让 AI 帮你编写新的自动化动作。" : "加载本地 C# 编辑环境…")</p>@if (_ready) { <button class="studio-build" @onclick="OnAi">✧ AI 开发</button> }</div>
+                    }
+                </div>
+                <section class="studio-output" aria-label="编译结果">
+                    <div class="studio-output-header"><strong>输出</strong><span class="studio-problems">问题 <b>@_errors.Count</b></span><span class="studio-title-spacer"></span><span>Roslyn · C#</span></div>
+                    <div class="studio-output-content" role="status">
+                        <div class="studio-output-line @(_errors.Count > 0 ? "output-error" : "")"><span class="studio-output-time">@_outputTime</span><span>@_status</span></div>
+                        @foreach (var error in _errors)
+                        {
+                            <button class="studio-error-row" @onclick="() => GoToErrorAsync(error)"><span>⊗</span><code>@error.Message</code><small>@error.File:@error.Line</small></button>
+                        }
+                    </div>
+                </section>
+            </main>
+            @if (_docsOpen)
+            {
+                <aside class="studio-docs">
+                    <div class="studio-section-title">API 参考 <button class="studio-icon" aria-label="关闭 API 文档" @onclick="() => _docsOpen = false">×</button></div>
+                    <div class="studio-docs-intro"><span class="studio-eyebrow">ALCYONE SCRIPTING</span><h2>让代码连接桌面。</h2><p>内置接口、调用示例与动作约定，随写随查。</p></div>
+                    <label class="studio-search"><span>⌕</span><input aria-label="搜索 API" placeholder="搜索 API 或功能…" @bind="_docQuery" @bind:event="oninput" /></label>
+                    <div class="studio-doc-categories">
+                        @foreach (var category in new[] { "全部", "基础", "键鼠", "识别", "变量" })
+                        { <button class="@(_docCategory == category ? "active" : "")" @onclick="() => _docCategory = category">@category</button> }
+                    </div>
+                    <div class="studio-doc-list">
+                        @foreach (var doc in FilteredDocs)
+                        {
+                            <details class="studio-doc" open="@(doc.Title == "StateScript")">
+                                <summary><span><b>@doc.Title</b><small>@doc.Description</small></span><span>⌄</span></summary>
+                                <div class="studio-doc-detail"><code class="studio-signature">@doc.Signature</code><p>@doc.Notes</p><pre>@doc.Example</pre><button disabled="@(!_ready || _active is null || _busy)" @onclick="() => InsertExampleAsync(doc)">插入示例 ↗</button></div>
+                            </details>
+                        }
+                        @if (!FilteredDocs.Any()) { <p class="studio-doc-no-results">没有找到匹配的 API。</p> }
+                    </div>
+                    <div class="studio-docs-footer">示例中的坐标、名称可按当前流程修改。</div>
+                </aside>
+            }
+        </div>
+        <footer class="studio-statusbar"><span>⌁</span><span>@(_dirty.Count == 0 ? "所有更改已保存" : $"{_dirty.Count} 个文件未保存")</span><span class="studio-title-spacer"></span><span @ref="_cursorElement">行 1，列 1</span><span>空格: 4</span><span>UTF-8</span><span>C#</span></footer>
+        @if (_confirm is not null)
+        {
+            <div class="studio-confirm-overlay"><section class="studio-confirm" role="alertdialog" aria-label="未保存的修改"><h3>@(_confirm == "reload" ? "重新读取文件？" : "还有未保存的修改")</h3><p>@(_confirm == "reload" ? "这会用磁盘文件替换当前编辑内容。" : "保存并编译后关闭，或放弃这次编辑。")</p><div><button @onclick="() => _confirm = null">继续编辑</button><button @onclick="DiscardAsync">放弃修改</button>@if (_confirm == "close") { <button class="studio-build" @onclick="SaveAndCloseAsync">保存并关闭</button> }</div></section></div>
+        }
+    </section>
+</div>

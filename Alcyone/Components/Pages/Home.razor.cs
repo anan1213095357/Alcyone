@@ -130,6 +130,8 @@ public partial class Home
 
         if (_jsReady)
         {
+            try
+            {
             await SyncJsAsync();
             if (_desktopLayoutPending)
             {
@@ -141,6 +143,9 @@ public partial class Home
                 _scrollLog = false;
                 await JS.InvokeVoidAsync("industrialStateMachineUi.scrollConsoleToBottom");
             }
+            }
+            catch (JSDisconnectedException) { }
+            catch (TaskCanceledException) { /* A suspended desktop webview may time out; keep its circuit usable. */ }
         }
     }
 
@@ -193,10 +198,29 @@ public partial class Home
         _colorResults.Clear(); foreach (var pair in snapshot.ColorResults) _colorResults[pair.Key] = pair.Value;
         _recognitionResults.Clear(); foreach (var pair in snapshot.RecognitionResults) _recognitionResults[pair.Key] = pair.Value;
     }
+    private int _runtimeRefreshPending;
     private void OnRuntimeChanged()
     {
-        if (_disposed) return;
-        _ = InvokeAsync(() => { if (_disposed) return; ApplyRuntimeSnapshot(); _scrollLog = !IsWallpaperView; StateHasChanged(); });
+        if (_disposed || Interlocked.Exchange(ref _runtimeRefreshPending, 1) != 0) return;
+        _ = RefreshRuntimeViewAsync();
+    }
+
+    private async Task RefreshRuntimeViewAsync()
+    {
+        try
+        {
+            // Coalesce notifications while a minimized webview or circuit is catching up.
+            await Task.Delay(IsWallpaperView ? 200 : 150);
+            await InvokeAsync(() =>
+            {
+                if (_disposed) return;
+                ApplyRuntimeSnapshot();
+                _scrollLog = !IsWallpaperView;
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException) { }
+        finally { Interlocked.Exchange(ref _runtimeRefreshPending, 0); }
     }
 
     private void OnScriptsReloaded(ScriptReloadResult result)

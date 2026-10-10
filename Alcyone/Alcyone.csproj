@@ -39,6 +39,16 @@
             <Content Include="$(BlazorFrameworkStaticWebAssetRoot)\blazor.web.js" Link="wwwroot\_framework\blazor.web.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
         </ItemGroup>
     </Target>
+    <Target Name="CopyDesktopScopedStyles" AfterTargets="Build">
+        <ItemGroup>
+            <_DesktopComponentScripts Include="Components/**/*.razor.js" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_DesktopComponentScripts)"
+              DestinationFiles="@(_DesktopComponentScripts->'$(OutDir)wwwroot/%(Identity)')" />
+        <Copy SourceFiles="$(IntermediateOutputPath)scopedcss/bundle/$(AssemblyName).styles.css"
+              DestinationFolder="$(OutDir)wwwroot"
+              Condition="Exists('$(IntermediateOutputPath)scopedcss/bundle/$(AssemblyName).styles.css')" />
+    </Target>
     <Target Name="BundleDesktopContent" AfterTargets="PrepareForBundle" DependsOnTargets="CopyStaticWebAssetsToPublishDirectory;CopyStaticWebAssetsEndpointsManifest" Condition="'$(PublishSingleFile)' == 'true'">
         <ItemGroup>
             <_BundleWebContent Include="$(PublishDir)wwwroot\**\*" /><FilesToBundle Include="@(_BundleWebContent)" RelativePath="wwwroot\%(_BundleWebContent.RecursiveDir)%(_BundleWebContent.Filename)%(_BundleWebContent.Extension)" /><FilesToBundle Include="$(PublishDir)$(AssemblyName).staticwebassets.endpoints.json" RelativePath="$(AssemblyName).staticwebassets.endpoints.json" /><FilesToBundle Include="@(ResolvedFileToPublish)" /><ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" />

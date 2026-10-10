@@ -1302,11 +1302,12 @@ public sealed class MachineSession : IAsyncDisposable
         if (!_recognitionResults.TryGetValue(key, out var result) || result.Error is not null) return false;
         var criteria = RecognitionCriteriaFor(condition);
         if (criteria.Success.HasValue && result.Found != criteria.Success.Value) return false;
-        if ((criteria.X.HasValue || criteria.Y.HasValue || !string.IsNullOrWhiteSpace(criteria.Text)) && !result.Found) return false;
+        var ocr = key.Mode == "ocr";
+        if ((criteria.X.HasValue || criteria.Y.HasValue || (ocr && (criteria.IsInteger.HasValue || !string.IsNullOrWhiteSpace(criteria.IntegerValue) || !string.IsNullOrWhiteSpace(criteria.Text)))) && !result.Found) return false;
         return OptionalNumberMatches(result.Similarity, criteria.Similarity, criteria.SimilarityOperator)
             && OptionalNumberMatches(result.X, criteria.X, criteria.XOperator)
             && OptionalNumberMatches(result.Y, criteria.Y, criteria.YOperator)
-            && (string.IsNullOrWhiteSpace(criteria.Text) || RecognitionTextMatches(result.Text, criteria.Text, criteria.TextOperator));
+            && (!ocr || (criteria.MatchesOcr(result.Text) && (string.IsNullOrWhiteSpace(criteria.Text) || RecognitionTextMatches(result.Text, criteria.Text, criteria.TextOperator))));
     }
 
     private (string Id, string Mode, string Query) RecognitionScanKey(ConditionModel condition, RecognitionItem item)

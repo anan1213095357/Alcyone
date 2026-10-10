@@ -39,3 +39,5 @@ select[multiple],select[size]:not([size="1"]) { background-image:none !important
     select option:checked { background:#244971; color:#fff; }
     select option::checkmark { color:#8ebeff; }
 }
+
+select, select option { white-space:nowrap; }

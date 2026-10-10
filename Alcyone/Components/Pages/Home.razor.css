@@ -2053,3 +2053,8 @@
     .state-card,.state-card::after,.state-card .current-badge::before { animation:none; }
     .state-card,.state-card::after,.state-card .transition-summary,.state-card .port { transition:none; }
 }
+
+.recognition-filter-row label { white-space:nowrap; }
+.recognition-filter-row.text-filter { grid-template-columns:64px minmax(92px,auto) minmax(0,1fr); }
+.recognition-filter-row .select { min-width:0; white-space:nowrap; }
+.recognition-filter-row .select { padding:6px 24px 6px 6px !important;background-position:right 4px center !important; }

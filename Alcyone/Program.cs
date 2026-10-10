@@ -43,6 +43,9 @@ internal static class Program
             ContentRootPath = desktopDirectory,
             WebRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot")
         });
+        // Desktop builds run from bin rather than publish; load the asset manifest so
+        // negotiated compressed CSS/JS resolve correctly as well as plain assets.
+        builder.WebHost.UseStaticWebAssets();
         builder.Logging.ClearProviders();
         if (verifyHost || browserHost) builder.Logging.AddSimpleConsole();
         // The local webview session ends with this process; no persisted browser cookies are needed.
