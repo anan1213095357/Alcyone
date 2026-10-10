@@ -941,6 +941,7 @@ public sealed class MachineSession : IAsyncDisposable
 
             // 正式进入目标卡片
             Runtime.CurrentStates[region.Id] = targetState.Id;
+            Runtime.TransitionCounts[edge.Id] = Runtime.TransitionCounts.GetValueOrDefault(edge.Id) + 1;
             _recognitionRevision++;
             _recognitionResults.Clear();
             Runtime.CurrentEdgeIds.Remove(edge.Id);

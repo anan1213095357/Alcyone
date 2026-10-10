@@ -132,6 +132,8 @@ public partial class Home
             configKey = _configKey,
             currentStateIds = Runtime.Running ? Runtime.CurrentStates.Values.ToArray() : Array.Empty<string>(),
             selectedEdgeId = SelectedEdgeId,
+            runtimeRunning = Runtime.Running,
+            transitionCounts = Runtime.TransitionCounts.ToDictionary(pair => pair.Key, pair => pair.Value),
             runningEdgeIds = Runtime.CurrentEdgeIds.ToArray(),
             pending = PendingConnection,
             language = L.Language

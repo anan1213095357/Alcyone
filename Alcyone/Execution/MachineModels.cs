@@ -137,6 +137,7 @@ namespace StateMachine.Execution;
         public Dictionary<string, string> CurrentStates { get; } = new();
         public Dictionary<string, string> EnteredStates { get; } = new();
         public HashSet<string> CurrentEdgeIds { get; } = new();
+        public Dictionary<string, long> TransitionCounts { get; } = new();
         public Dictionary<string, Dictionary<string, OutputEvaluation>> ConditionResults { get; } = new();
     }
 

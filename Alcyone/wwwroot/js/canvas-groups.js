@@ -414,11 +414,17 @@
             active = new Set(state.currentStateIds || []);
             for (const group of groups) {
                 const orb = [...layer.children].find(node => node.dataset.groupId === group.id);
-                if (orb) window.alcyonePlanets.setActive(orb.querySelector('canvas'), group.stateIds.some(id => active.has(id)));
+                if (orb) {
+                    const running = group.stateIds.some(id => active.has(id));
+                    orb.classList.toggle('is-running', running);
+                    window.alcyonePlanets.setActive(orb.querySelector('canvas'), running);
+                }
             }
             if (!busy && !gesture) groups = structuredClone(state.groups || []);
             if (!applyPendingSelection()) return;
-            if (!busy) render();
+            // render() rebuilds group objects and resets orb coordinates. During a
+            // drag the gesture owns those objects; runtime ticks must only update activity.
+            if (!busy && !gesture) render();
         },
         pointerDown(event) {
             if (event.target.closest?.('.alcyone-fold-popover,.orb-name,.canvas-selection-toolbar')) return true;
@@ -531,6 +537,12 @@
             if (!group) return null;
             const input = api.world.querySelector(`.port[data-port-id="${CSS.escape(portId)}"][data-state-id="${CSS.escape(stateId)}"]`)?.dataset.direction === 'input';
             return { x: group.x + (input ? 24 : 156), y: group.y + 86 };
+        },
+        interplanetEdge(edge) {
+            // Wait until folding finishes so ships never appear on internal wires.
+            if (transition) return false;
+            const from = groupFor(edge.fromStateId), to = groupFor(edge.toStateId);
+            return !!from && !!to && from.id !== to.id;
         },
         internalEdge(edge) {
             if (transition && (transition.members.has(edge.fromStateId) || transition.members.has(edge.toStateId))

@@ -1131,6 +1131,8 @@
         let tempEdge = null;
         let canvasZoom = 0.85;
         let edgeState = { edges: [], selectedEdgeId: null, runningEdgeIds: [], pending: null };
+        const shipFlights = new Map();
+        let flightCleanup = 0;
         let drag = null;
         let pan = null;
         let suppressClickUntil = 0;
@@ -1158,7 +1160,15 @@
 
         function drawEdges() {
             if (!edgeLayer) return;
-            let html = "";
+            clearTimeout(flightCleanup);
+            let nextArrival = Infinity;
+            let html = `<defs>
+                <linearGradient id="ship-thrust"><stop stop-color="#43a9ff" stop-opacity="0"/>
+                    <stop offset=".65" stop-color="#39cfff" stop-opacity=".65"/><stop offset="1" stop-color="#efffff"/>
+                </linearGradient>
+                <linearGradient id="signal-tail"><stop stop-color="#51ffc6" stop-opacity="0"/>
+                    <stop offset="1" stop-color="#c5fff0"/></linearGradient>
+            </defs>`;
             const running = new Set(edgeState.runningEdgeIds || []);
             for (const edge of edgeState.edges || []) {
                 if (window.alcyoneGroups?.internalEdge(edge)) continue;
@@ -1167,10 +1177,20 @@
                 if (!start || !end) continue;
                 const d = bezierPath(start.x, start.y, end.x, end.y);
                 const edgeOpacity = window.alcyoneGroups?.edgeOpacity(edge) ?? 1;
+                const interplanet = window.alcyoneGroups?.interplanetEdge(edge);
+                const flightDuration = interplanet ? (() => {
+                    const route = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    route.setAttribute("d", d);
+                    return Math.max(.01, route.getTotalLength() / 1500);
+                })() : 0;
+                const now = performance.now() / 1000;
+                const flights = interplanet ? (shipFlights.get(edge.id) || []).filter(started => now < started + flightDuration) : [];
+                if (interplanet && !flights.length) shipFlights.delete(edge.id);
+                const highlighted = interplanet ? flights.length > 0 : running.has(edge.id);
                 let cls = "edge";
                 if (edgeState.selectedEdgeId === edge.id) cls += " selected";
-                if (running.has(edge.id)) cls += " running";
-                    let stroke = "#64738a";
+                if (highlighted) cls += " running";
+                    let stroke = interplanet ? "#679dc9" : "#64738a";
     let strokeWidth = 2;
     let filter = "";
 
@@ -1179,12 +1199,16 @@
         strokeWidth = 3;
     }
 
-    if (running.has(edge.id)) {
+    if (highlighted) {
         stroke = "#2bd59a";
         strokeWidth = 3;
         filter = "filter:drop-shadow(0 0 5px rgba(43,213,154,.8));";
     }
 
+    if (interplanet) {
+        html += `<path class="star-route-halo" d="${d}" fill="none" stroke="${stroke}" stroke-width="12" opacity="${edgeOpacity * .12}" />
+            <path class="star-route-guide" d="${d}" fill="none" stroke="#91caff" stroke-width="1" stroke-dasharray="2 12" opacity="${edgeOpacity * .65}" />`;
+    }
     html += `
     <path
         class="${cls}"
@@ -1194,6 +1218,41 @@
         stroke-width="${strokeWidth}"
         style="${filter}opacity:${edgeOpacity}">
     </path>`;
+
+    if (interplanet && flights.length) {
+        // Keep the phase tied to the clock across drag, zoom and runtime redraws.
+        // The line and vessel share this lifetime; speed is independent of route length.
+        const duration = flightDuration;
+        for (const started of flights) {
+            const elapsed = now - started;
+            if (elapsed >= duration) continue;
+            nextArrival = Math.min(nextArrival, duration - elapsed);
+            const delay = -elapsed;
+            html += `<g class="star-route-ship" style="offset-path:path('${d}');animation-duration:${duration}s;animation-delay:${delay}s;animation-iteration-count:1;animation-fill-mode:both;opacity:${edgeOpacity}" aria-hidden="true">
+                <g class="star-route-craft" transform="scale(.6)">
+                    <g class="star-route-plumes">
+                        <path d="M -49 -20 Q -80 -17 -104 -17 Q -80 -15 -49 -14 Z M -51 -4 Q -91 0 -119 0 Q -91 3 -51 3 Z M -49 10 Q -81 14 -104 15 Q -81 17 -49 17 Z" fill="url(#ship-thrust)"/>
+                        <path d="M -49 -18 L -82 -17 L -49 -16 Z M -51 -2 L -91 0 L -51 1 Z M -49 12 L -82 15 L -49 15 Z" fill="#e2fcff" opacity=".85"/>
+                    </g>
+                    <image href="images/star-cruiser-realistic.png" x="-55" y="-36.667" width="110" height="73.334" />
+                </g>
+            </g>`;
+        }
+    } else if (!interplanet && edgeState.runtimeRunning) {
+        // Transitions may last only one render: keep visible traffic while the machine runs.
+        const route = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        route.setAttribute("d", d);
+        const duration = Math.max(.01, route.getTotalLength() / 160);
+        for (let signal = 0; signal < 2; signal++) {
+            const delay = -(performance.now() / 1000 % duration + signal * duration / 2);
+            html += `<g opacity="${edgeOpacity * (running.has(edge.id) ? 1 : .65)}" aria-hidden="true">
+                <g class="star-route-signal" style="offset-path:path('${d}');animation-duration:${duration}s;animation-delay:${delay}s">
+                    <path d="M -32 0 L 0 0" stroke="url(#signal-tail)" stroke-width="4" stroke-linecap="round"/>
+                    <circle r="7" fill="#51ffc6" opacity=".15"/><circle r="3.5" fill="#d7fff4"/>
+                </g>
+            </g>`;
+        }
+    }
 
     html += `
     <path
@@ -1230,6 +1289,7 @@
                 }
             }
             edgeLayer.innerHTML = html;
+            if (Number.isFinite(nextArrival)) flightCleanup = setTimeout(drawEdges, nextArrival * 1000 + 20);
         }
 
         function updatePendingVisual() {
@@ -1556,6 +1616,7 @@
                 window.addEventListener("resize", drawEdges);
             },
             dispose() {
+                clearTimeout(flightCleanup); shipFlights.clear();
                 if (!initialized) return;
                 window.alcyoneGroups?.dispose();
                 stopStarfield?.(); stopStarfield = null;
@@ -1572,6 +1633,22 @@
                 dotnet = null;
             },
             sync(state) {
+                if (state && state.configKey === edgeState.configKey) {
+                    for (const [id, count] of Object.entries(state.transitionCounts || {})) {
+                        if (count > (edgeState.transitionCounts?.[id] || 0)) {
+                            // Only committed switches launch ships, never the pre-switch wait.
+                            // End previous traffic on the same pair of states before launching the return trip.
+                            const switched = (state.edges || []).find(edge => edge.id === id);
+                            if (switched) {
+                                const endpoints = new Set([switched.fromStateId, switched.toStateId]);
+                                for (const edge of state.edges || []) {
+                                    if (endpoints.has(edge.fromStateId) || endpoints.has(edge.toStateId)) shipFlights.delete(edge.id);
+                                }
+                            }
+                            shipFlights.set(id, [performance.now() / 1000]);
+                        }
+                    }
+                } else shipFlights.clear();
                 edgeState = state || edgeState;
                 window.alcyoneGroups?.sync(state);
                 if (state?.language) window.alcyoneLanguage.set(state.language);

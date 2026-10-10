@@ -1,4 +1,24 @@
 .state-card[hidden] { display:none !important; }
+/* These SVG nodes are created by JS and do not carry Blazor scope attributes. */
+#edgeLayer .star-route-halo, #edgeLayer .star-route-guide,
+#edgeLayer .star-route-ship, #edgeLayer .star-route-signal { pointer-events:none; }
+.star-route-halo { filter:blur(3px); }
+.star-route-ship { offset-distance:0%; offset-rotate:auto; offset-anchor:0px 0px; animation:star-route-transit 1s linear; }
+@keyframes star-route-transit { from { offset-distance:0%; opacity:1; } to { offset-distance:100%; opacity:1; } }
+.star-route-craft { filter:drop-shadow(0 2px 2px #0009); }
+.star-route-exhaust { filter:drop-shadow(0 0 3px #59dfff); }
+.star-route-plumes { transform-box:fill-box; transform-origin:right center; animation:star-route-burn .24s ease-in-out infinite alternate; filter:drop-shadow(0 0 4px #49bfff); }
+@keyframes star-route-burn { from { transform:scaleX(.82) scaleY(.9); opacity:.75; } to { transform:scaleX(1.08) scaleY(1.05); opacity:1; } }
+.star-route-signal { offset-distance:0%; offset-rotate:auto; offset-anchor:0px 0px; animation:star-route-flight 1.8s linear infinite; filter:drop-shadow(0 0 4px #2bd59a); }
+@keyframes star-route-flight {
+    0% { offset-distance:0%; opacity:0; }
+    8%, 90% { opacity:1; }
+    100% { offset-distance:100%; opacity:0; }
+}
+@media (prefers-reduced-motion:reduce) {
+    .star-route-ship, .star-route-signal { display:none; animation:none; }
+    .star-route-plumes { animation:none; }
+}
 .state-card.box-selected { outline:2px solid #9fcaff; outline-offset:5px; box-shadow:0 0 0 8px #6aaaff15,0 15px 50px #0008 !important; }
 .canvas-gesture-hint { font-size:11px; color:#91a8c7; white-space:nowrap; padding:0 6px; }
 .canvas-selection-toolbar { position:absolute; z-index:150; transform:translateX(-50%); display:flex; align-items:center; gap:15px; padding:8px 10px 8px 18px; max-width:calc(100% - 24px); border:1px solid #88b9ff50; border-radius:15px; background:linear-gradient(125deg,#182c46ed,#0b1525f5); box-shadow:0 12px 35px #0009,inset 0 1px 0 #d8e9ff13; backdrop-filter:blur(16px); color:#dcecff; font-family:system-ui,sans-serif; }
