@@ -5,6 +5,9 @@
     let toolbarTimer = 0, toolbarVisible = false;
     function showToolbarOnClick(event) {
         if (!event.target.closest?.('.state-card,.alcyone-orb')) return;
+        showToolbar();
+    }
+    function showToolbar() {
         clearTimeout(toolbarTimer);
         toolbarVisible = true;
         controls();
@@ -512,9 +515,9 @@
             if (!gesture) return false;
             const g = gesture; gesture = null; box?.remove(); box = null;
             reportHitRegions();
-            if (g.type === 'box' && g.moved && selected.size) {
+            if (g.type === 'box' && g.moved && (selected.size || selectedGroups.size)) {
                 lastSelectionEnd = event ? point(event) : g.start;
-                controls();
+                showToolbar();
             }
             if (g.type === 'cards' && g.moved) {
                 clearDropTarget();

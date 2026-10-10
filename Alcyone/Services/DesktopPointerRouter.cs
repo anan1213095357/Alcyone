@@ -15,6 +15,7 @@ internal sealed class DesktopPointerRouter : IDisposable
     private readonly MouseProcedure _procedure;
     private nint _hook, _captured, _capturedChild;
     private bool _paused;
+    private bool _backgroundCapture;
     private uint _lastDown;
     private NativePoint _lastPoint;
     private nint _lastTarget;
@@ -53,9 +54,14 @@ internal sealed class DesktopPointerRouter : IDisposable
                 {
                     if (!IsWindow(window) || !GetWindowRect(window, out var bounds)) continue;
                     var x = (point.X - bounds.Left) / regions.Ratio; var y = (point.Y - bounds.Top) / regions.Ratio;
-                    if (message == 0x020a
-                        ? point.X >= bounds.Left && point.X < bounds.Right && point.Y >= bounds.Top && point.Y < bounds.Bottom
-                        : regions.Rectangles.Any(r => x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom)) { target = window; break; }
+                    var hit = regions.Rectangles.Any(r => x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom);
+                    var inside = point.X >= bounds.Left && point.X < bounds.Right && point.Y >= bounds.Top && point.Y < bounds.Bottom;
+                    if (hit || (inside && message is 0x0201 or 0x020a))
+                    {
+                        target = window;
+                        if (message == 0x0201) _backgroundCapture = !hit;
+                        break;
+                    }
                 }
             }
             if (target == 0 || !IsWindow(target)) { _captured = 0; return CallNextHookEx(_hook, code, message, data); }
@@ -83,10 +89,11 @@ internal sealed class DesktopPointerRouter : IDisposable
             if (message != 0x020a) MapWindowPoints(0, child, ref point, 1); // Wheel messages use screen coordinates.
             var buttons = message == 0x0201 || (message == 0x0200 && _captured != 0) ? 1u : 0u;
             PostMessageW(child, routedMessage, message == 0x020a ? mouse.Data & 0xffff0000u : buttons, (nint)((point.Y << 16) | (point.X & 0xffff)));
-            if (message == 0x0202) _captured = 0;
+            var passThrough = message == 0x0200 || (_backgroundCapture && message is 0x0201 or 0x0202);
+            if (message == 0x0202) { _captured = 0; _backgroundCapture = false; }
             // WH_MOUSE_LL runs before Windows updates the cursor position. Forwarding
             // WM_MOUSEMOVE must never suppress the physical pointer movement.
-            return message == 0x0200 ? CallNextHookEx(_hook, code, message, data) : 1;
+            return passThrough ? CallNextHookEx(_hook, code, message, data) : 1;
         }
         catch { return CallNextHookEx(_hook, code, message, data); }
     }
