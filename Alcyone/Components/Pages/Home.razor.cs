@@ -93,22 +93,21 @@ public partial class Home
     }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await SyncAnimationPauseAsync();
         if (firstRender)
         {
+            _jsBridge = new JsBridge(StateMoved, SelectStateFromJs, SelectEdgeFromJs, ClearSelectionFromJs, EscapeFromJs, DeleteSelectionFromJs);
+            _jsBridge.SaveGroups = SaveGroupsFromJs;
+            _jsBridge.EditSelection = EditSelectionFromJs;
+            _dotNetRef = DotNetObjectReference.Create(_jsBridge);
             if (IsWallpaperView)
             {
-                // Read-only subscribers never load/save files, discover actions or
-                // create another runtime. Every display observes the applied session.
-                await JS.InvokeVoidAsync("industrialStateMachineUi.init", null, true);
+                await JS.InvokeVoidAsync("industrialStateMachineUi.init", _dotNetRef, true);
                 _jsReady = true;
                 _desktopLayoutPending = true;
                 StateHasChanged();
                 return;
             }
-            _jsBridge = new JsBridge(StateMoved, SelectStateFromJs, SelectEdgeFromJs, ClearSelectionFromJs, EscapeFromJs, DeleteSelectionFromJs);
-            _jsBridge.SaveGroups = SaveGroupsFromJs;
-            _jsBridge.EditSelection = EditSelectionFromJs;
-            _dotNetRef = DotNetObjectReference.Create(_jsBridge);
             await JS.InvokeVoidAsync("industrialStateMachineUi.init", _dotNetRef);
             _jsReady = true;
             await RefreshConfigListAsync();
@@ -118,12 +117,23 @@ public partial class Home
                 var lastKey = (await File.ReadAllTextAsync(lastConfigPath)).Trim();
                 if (_configKeys.Contains(lastKey)) _configKey = lastKey;
             }
+            var restoreDesktop = Desktop.Available && DesktopPreferences.RestoreDesktop && DesktopPreferences.DesktopEnabled;
+            if (restoreDesktop && _configKeys.Contains(DesktopPreferences.ConfigKey)) _configKey = DesktopPreferences.ConfigKey;
             if (File.Exists(GetConfigFilePath(_configKey))) await LoadConfigAsync();
             else AttachSession();
             _autoSaveReady = true;
             await SaveConfigAsync();
             await JS.InvokeVoidAsync("industrialStateMachineUi.setZoom", 0.85, false);
             await JS.InvokeVoidAsync("industrialStateMachineUi.setInitialScroll", 40, 50);
+            if (restoreDesktop && _session is not null && _configKey == DesktopPreferences.ConfigKey)
+            {
+                // Explorer's desktop host may still be starting during Windows sign-in.
+                for (var attempt = 0; attempt < 5 && !_disposed && !Desktop.IsDesktop; attempt++)
+                {
+                    if (attempt > 0) await Task.Delay(1000);
+                    if (!_disposed) await SetAsDesktopAsync();
+                }
+            }
             StateHasChanged();
             return;
         }
@@ -184,6 +194,7 @@ public partial class Home
         _scriptHost = _session.ScriptHost;
         _session.Changed += OnRuntimeChanged;
         _scriptHost.Reloaded += OnScriptsReloaded;
+        _canvasRevision = -1;
         ApplyRuntimeSnapshot();
         DiscoverActionMethods();
     }
@@ -193,15 +204,23 @@ public partial class Home
         if (_session is null) return;
         var snapshot = _session.Snapshot;
         if (IsWallpaperView) Machine = snapshot.Machine;
+        else if (_canvasRevision != _session.CanvasRevision)
+        {
+            Machine = JsonSerializer.Deserialize<MachineModel>(JsonSerializer.Serialize(snapshot.Machine, _jsonOptions), _jsonOptions)!;
+            _savedConfigJson = null;
+        }
+        _canvasRevision = _session.CanvasRevision;
         Runtime = snapshot.Runtime; Logs = snapshot.Logs;
         if (!snapshot.Executing && !snapshot.Runtime.Running) _stoppingRuntime = false;
         _colorResults.Clear(); foreach (var pair in snapshot.ColorResults) _colorResults[pair.Key] = pair.Value;
         _recognitionResults.Clear(); foreach (var pair in snapshot.RecognitionResults) _recognitionResults[pair.Key] = pair.Value;
     }
     private int _runtimeRefreshPending;
+    private long _canvasRevision = -1;
     private void OnRuntimeChanged()
     {
-        if (_disposed || Interlocked.Exchange(ref _runtimeRefreshPending, 1) != 0) return;
+        if (_disposed || Desktop.AnimationsPaused || (!IsWallpaperView && Desktop.EditorHidden) ||
+            Interlocked.Exchange(ref _runtimeRefreshPending, 1) != 0) return;
         _ = RefreshRuntimeViewAsync();
     }
 
@@ -213,7 +232,7 @@ public partial class Home
             await Task.Delay(IsWallpaperView ? 200 : 150);
             await InvokeAsync(() =>
             {
-                if (_disposed) return;
+                if (_disposed || Desktop.AnimationsPaused || (!IsWallpaperView && Desktop.EditorHidden)) return;
                 ApplyRuntimeSnapshot();
                 _scrollLog = !IsWallpaperView;
                 StateHasChanged();
@@ -1738,6 +1757,7 @@ public partial class Home
     // =========================================================
     private async Task StateMoved(string stateId, double x, double y)
     {
+        if (IsWallpaperView) { await SaveDesktopLayoutAsync([new(stateId, x, y)]); return; }
         var state = GetState(stateId);
         if (state is not null)
         {

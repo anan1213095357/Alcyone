@@ -1,5 +1,5 @@
 import * as monaco from 'monaco-editor/editor/editor.api.js';
-import 'monaco-editor/languages/definitions/csharp/register.js';
+import { language, conf } from 'monaco-editor/languages/definitions/csharp/csharp.js';
 import 'monaco-editor/editor/contrib/find/browser/findController.js';
 import 'monaco-editor/editor/contrib/folding/browser/folding.js';
 import 'monaco-editor/editor/contrib/suggest/browser/suggestController.js';
@@ -12,9 +12,23 @@ import 'monaco-editor/editor/contrib/linesOperations/browser/linesOperations.js'
 import 'monaco-editor/editor/contrib/multicursor/browser/multicursor.js';
 
 self.MonacoEnvironment = { getWorker: () => new Worker(new URL('./worker.js', import.meta.url), { type: 'module' }) };
+monaco.languages.register({ id: 'csharp', extensions: ['.cs', '.csx'] });
+monaco.languages.setLanguageConfiguration('csharp', conf);
+// Extend the stock grammar so comments, strings and interpolation retain C# tokenization.
+const scriptSymbols = [
+    [/\b(?:StateAction|StateParameter)(?:Attribute)?\b/, 'script.attribute'],
+    [/\b(?:StateScript|StateScriptContext|StateVariables|ColorProbeResult)\b/, 'type.identifier'],
+    [/\b(?:Api|Vars)\b/, 'script.api'],
+    [/\b(?:Log|Service|Delay|Click|MoveTo|DoubleClickAsync|MouseDown|MouseUp|Scroll|Press|Hotkey|KeyDown|KeyUp|TypeText|DragAsync|ReleaseAll|FindAsync|Last|GetNode|SetNode|Get|Set)\b(?=\s*(?:<|\())/, 'script.method']
+];
+monaco.languages.setMonarchTokensProvider('csharp', {
+    ...language, tokenizer: { ...language.tokenizer,
+        root: [...scriptSymbols, ...language.tokenizer.root],
+        qualified: [...scriptSymbols, ...language.tokenizer.qualified] }
+});
 monaco.editor.defineTheme('alcyone-studio', {
     base: 'vs-dark', inherit: true,
-    rules: [{ token: 'comment', foreground: '6F9477' }, { token: 'keyword', foreground: 'C792EA' }, { token: 'string', foreground: 'CE9178' }, { token: 'number', foreground: 'B5CEA8' }, { token: 'type.identifier', foreground: '4EC9B0' }],
+    rules: [{ token: 'comment', foreground: '6F9477' }, { token: 'keyword', foreground: 'C792EA' }, { token: 'string', foreground: 'CE9178' }, { token: 'number', foreground: 'B5CEA8' }, { token: 'type.identifier', foreground: '4EC9B0' }, { token: 'script.attribute', foreground: 'DCDCAA' }, { token: 'script.api', foreground: '9CDCFE' }, { token: 'script.method', foreground: 'DCDCAA' }],
     colors: { 'editor.background': '#181C24', 'editor.foreground': '#D4D8E2', 'editorLineNumber.foreground': '#596272', 'editorLineNumber.activeForeground': '#B5C6DF', 'editor.lineHighlightBackground': '#222834', 'editor.selectionBackground': '#36557A80', 'editorCursor.foreground': '#91BFFF', 'editorIndentGuide.background1': '#2A303C', 'editorWidget.background': '#222834', 'editorWidget.border': '#3A4454' }
 });
 let completion;
@@ -24,22 +38,27 @@ export function create(host, status, reference, docs) {
     }
     completion?.dispose();
     completion = monaco.languages.registerCompletionItemProvider('csharp', {
-        triggerCharacters: ['.'],
+        triggerCharacters: ['.', '['],
         provideCompletionItems(model, position) {
             const word = model.getWordUntilPosition(position);
             const before = model.getLineContent(position.lineNumber).slice(0, word.startColumn - 1);
             const prefix = before.match(/[A-Za-z_][\w.]*\.$/)?.[0] ?? '';
-            const items = docs.filter(d => !prefix || d.title.startsWith(prefix)).map(d => {
+            const canonical = prefix.replace(/^Api\.Color\./, 'Api.Recognition.').replace(/^Api\.Vars\./, 'Vars.');
+            const attribute = /\[\s*$/.test(before);
+            const items = docs.filter(d => attribute ? ['StateAction', 'StateParameter'].includes(d.title) :
+                (!canonical || (d.title.startsWith(canonical) && !d.title.slice(canonical.length).includes('.')))).map(d => {
                 const name = d.title.replace(/<T>$/, '');
                 const sampleStart = d.insert.indexOf(name);
                 const sample = sampleStart >= 0 ? d.insert.slice(sampleStart).split('\n')[0] : d.insert;
-                return { label: prefix ? d.title.slice(prefix.length) : d.title,
-                    kind: monaco.languages.CompletionItemKind.Method,
+                const closingBracket = attribute && model.getLineContent(position.lineNumber).slice(word.endColumn - 1).startsWith(']');
+                const text = attribute ? d.insert.slice(1, closingBracket ? -1 : undefined) : canonical && sample.startsWith(canonical) ? sample.slice(canonical.length) : sample;
+                return { label: canonical ? d.title.slice(canonical.length) : d.title,
+                    kind: ['StateAction', 'StateParameter', 'StateScript'].includes(d.title) ? monaco.languages.CompletionItemKind.Class : monaco.languages.CompletionItemKind.Method,
                     documentation: d.description, detail: d.signature,
-                    insertText: prefix && sample.startsWith(prefix) ? sample.slice(prefix.length) : sample,
+                    insertText: text,
                     range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn) };
             });
-            if (prefix === 'Api.') for (const name of ['Input', 'Recognition', 'Color', 'Vars'])
+            if (prefix === 'Api.') for (const name of ['Input', 'Recognition', 'Color', 'Vars', 'Services', 'Log'])
                 items.push({ label: name, kind: monaco.languages.CompletionItemKind.Module, insertText: name,
                     range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn) });
             return { suggestions: items };
@@ -52,6 +71,7 @@ export function create(host, status, reference, docs) {
         roundedSelection: false, renderLineHighlight: 'all', smoothScrolling: true,
         bracketPairColorization: { enabled: true }, guides: { indentation: true, bracketPairs: true },
         tabSize: 4, insertSpaces: true, folding: true, glyphMargin: true,
+        quickSuggestions: { other: true, comments: false, strings: false }, suggestOnTriggerCharacters: true,
         ariaLabel: 'C# 脚本编辑器', fixedOverflowWidgets: true, stickyScroll: { enabled: false }
     });
     const models = new Map(); let active; let disposed = false;

@@ -8,7 +8,7 @@ using StateActionAttribute = StateMachine.Scripting.Metadata.StateActionAttribut
 using StateParameterAttribute = StateMachine.Scripting.Metadata.StateParameterAttribute;
 namespace StateMachine.Execution;
 
-public sealed class MachineSession : IAsyncDisposable
+public sealed partial class MachineSession : IAsyncDisposable
 {
     private readonly MachineDispatcher _dispatcher;
     private readonly IServiceProvider Services;

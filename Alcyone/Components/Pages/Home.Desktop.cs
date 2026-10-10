@@ -6,10 +6,26 @@ namespace StateMachine.Components.Pages;
 public partial class Home
 {
     [Inject] private DesktopWallpaperService Desktop { get; set; } = default!;
+    [Inject] private DesktopPreferences DesktopPreferences { get; set; } = default!;
     [Parameter] public string? WallpaperToken { get; set; }
     private bool IsWallpaperView => WallpaperToken is not null;
     private bool _desktopMode => IsWallpaperView;
     private bool _desktopBusy, _desktopLayoutPending;
+    private bool _toolbarMenuOpen;
+    private bool? _lastAnimationPause;
+
+    private async Task SyncAnimationPauseAsync()
+    {
+        var paused = Desktop.AnimationsPaused || (!IsWallpaperView && Desktop.EditorHidden);
+        if (_lastAnimationPause == paused) return;
+        try
+        {
+            await JS.InvokeVoidAsync("alcyoneAnimation.setNativePaused", paused);
+            _lastAnimationPause = paused;
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
     private string? _desktopError;
     private string DesktopSummary => L["每个屏幕显示一份完整画板，双击托盘图标或按 Ctrl+Alt+F10 打开设置。"] + "\n" +
         string.Join("\n", Desktop.Displays.Select(display => $"{display.Device} · {display.Width} × {display.Height} · {display.Dpi * 100 / 96}%"));
@@ -60,10 +76,13 @@ public partial class Home
     private void OnDesktopChanged()
     {
         if (_disposed) return;
-        _ = InvokeAsync(() =>
+        _ = InvokeAsync(async () =>
         {
             if (_disposed) return;
+            await SyncAnimationPauseAsync();
+            if (_disposed) return;
             if (IsWallpaperView) AttachWallpaperSession();
+            if (!Desktop.AnimationsPaused) ApplyRuntimeSnapshot();
             _desktopError = Desktop.Error;
             _desktopLayoutPending = IsWallpaperView;
             StateHasChanged();

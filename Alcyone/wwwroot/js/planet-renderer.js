@@ -82,16 +82,62 @@
             light: .045 + .955 * Math.pow(light, .8), rim: Math.pow(1 - nz, 3) * (.12 + light * .55),
             alpha: clamp((1 - Math.sqrt(r)) * radius) * 255 });
     }
+    // Numeric lookup tables avoid object traversal and invariant arithmetic per pixel/frame.
+    const offsets = Uint32Array.from(projection, p => p.at);
+    const longitude = Float64Array.from(projection, p => p.u * mapWidth);
+    const rows = Uint32Array.from(projection, p => p.v * mapWidth);
+    const lighting = Float64Array.from(projection, p => p.light);
+    const rimRed = Float64Array.from(projection, p => 57 * p.rim);
+    const rimGreen = Float64Array.from(projection, p => 144 * p.rim);
+    const rimBlue = Float64Array.from(projection, p => 242 * p.rim);
+    const gpu = window.alcyoneGpu?.create(
+        'attribute vec2 position; void main(){gl_Position=vec4(position,0,1);}',
+        `precision highp float; uniform sampler2D terrain; uniform float phase;
+        void main(){
+            vec2 p=vec2(gl_FragCoord.x-96.0,96.0-gl_FragCoord.y)/75.0;
+            float r=dot(p,p); if(r>1.0){gl_FragColor=vec4(0);return;}
+            float z=sqrt(1.0-r), light=max(0.0,dot(vec3(p,z),vec3(-.62,-.38,.69)));
+            float u=atan(p.x,z)/6.28318530718+.5;
+            float v=min(127.0,floor((asin(p.y)/3.14159265359+.5)*128.0));
+            vec3 color=texture2D(terrain,vec2((mod(floor((u+phase)*256.0),256.0)+.5)/256.0,(v+.5)/128.0)).rgb;
+            color=color*(.045+.955*pow(light,.8))+vec3(57,144,242)/255.0*pow(1.0-z,3.0)*(.12+light*.55);
+            float alpha=clamp((1.0-sqrt(r))*75.0,0.0,1.0);
+            gl_FragColor=vec4(clamp(color,0.0,1.0)*alpha,alpha);
+        }`, [['position', 2]]);
+    const gpuTextures = new Map(), triangle = new Float32Array([-1,-1,3,-1,-1,3]);
+    const phaseUniform = gpu?.uniform('phase');
+    if (gpu) gpu.canvas.width = gpu.canvas.height = size;
+    function drawGpu(record) {
+        if (!gpu || gpu.lost) return false;
+        const gl = gpu.gl;
+        let texture = gpuTextures.get(record.texture);
+        if (!texture) {
+            texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,mapWidth,mapHeight,0,gl.RGB,gl.UNSIGNED_BYTE,new Uint8Array(record.texture.data.buffer));
+            gpuTextures.set(record.texture,texture);
+        } else gl.bindTexture(gl.TEXTURE_2D,texture);
+        gl.uniform1f(phaseUniform,record.phase);
+        if (!gpu.draw(triangle,3)) return false;
+        record.ctx.clearRect(0,0,size,size); record.ctx.drawImage(gpu.canvas,0,0); return true;
+    }
     function draw(record) {
-        const data = record.pixels.data, texture = record.texture;
-        for (const p of projection) {
-            const sample = ((p.v * mapWidth) + (Math.floor((p.u + record.phase) * mapWidth) & (mapWidth - 1))) * 3;
-            data[p.at] = texture.data[sample] * p.light + 57 * p.rim;
-            data[p.at + 1] = texture.data[sample + 1] * p.light + 144 * p.rim;
-            data[p.at + 2] = texture.data[sample + 2] * p.light + 242 * p.rim;
-            data[p.at + 3] = p.alpha;
-        }
-        record.ctx.putImageData(record.pixels, 0, 0);
+        const texture = record.texture;
+        if (!drawGpu(record)) {
+            const data = record.pixels.data, source = texture.data;
+            const shift = record.phase * mapWidth;
+            for (let i = 0; i < offsets.length; i++) {
+                const at = offsets[i], light = lighting[i];
+                const sample = (rows[i] + ((longitude[i] + shift) & (mapWidth - 1))) * 3;
+                data[at] = source[sample] * light + rimRed[i];
+                data[at + 1] = source[sample + 1] * light + rimGreen[i];
+                data[at + 2] = source[sample + 2] * light + rimBlue[i];
+            }
+            record.ctx.putImageData(record.pixels, 0, 0);
+            }
         if (texture.ringed) {
             const ctx = record.ctx;
             ctx.save(); ctx.translate(size / 2, size / 2); ctx.rotate(-.36);
@@ -102,36 +148,45 @@
             ctx.beginPath(); ctx.ellipse(0, 0, 93, 29, 0, 0, Math.PI); ctx.stroke(); ctx.restore();
         }
     }
+    function createPixels(ctx) {
+        const pixels = ctx.createImageData(size, size);
+        for (const p of projection) pixels.data[p.at + 3] = p.alpha;
+        return pixels;
+    }
+    const hasVisiblePlanets = () => [...records.values()].some(r => r.visible && r.canvas.isConnected);
     function tick(now) {
         frame = 0;
-        const visible = [...records.values()].filter(r => r.visible && r.canvas.isConnected);
-        const budgetFps = Math.min(24, Math.max(2, 100 / Math.max(1, visible.length)));
-        for (const record of visible) {
+        let visibleCount = 0;
+        for (const record of records.values()) if (record.visible && record.canvas.isConnected) visibleCount++;
+        const budgetFps = Math.min(24, Math.max(2, 100 / Math.max(1, visibleCount)));
+        for (const record of records.values()) {
+            if (!record.visible || !record.canvas.isConnected) continue;
             const target = record.active ? .035 : .005;
             const elapsed = record.time ? Math.min((now - record.time) / 1000, .15) : 0;
             record.time = now; record.speed += (target - record.speed) * Math.min(1, elapsed * 3);
             record.phase = (record.phase + elapsed * record.speed * record.texture.direction + 1) % 1;
             if (now - record.drawn >= 1000 / Math.min(record.active ? 24 : 8, budgetFps)) { draw(record); record.drawn = now; }
         }
-        if (records.size && !document.hidden && !reduced.matches) frame = requestAnimationFrame(tick);
+        if (visibleCount && !document.hidden && !reduced.matches) frame = window.alcyoneAnimation.requestFrame(tick);
     }
     function resume() {
-        cancelAnimationFrame(frame); frame = 0;
+        window.alcyoneAnimation.cancelFrame(frame); frame = 0;
         records.forEach(record => record.time = 0);
-        if (records.size && !document.hidden && !reduced.matches) frame = requestAnimationFrame(tick);
+        if (hasVisiblePlanets() && !document.hidden && !reduced.matches) frame = window.alcyoneAnimation.requestFrame(tick);
     }
     window.alcyonePlanets = {
         init(root) {
             observer?.disconnect();
             observer = new IntersectionObserver(entries => {
                 for (const entry of entries) { const record = records.get(entry.target); if (record) { record.visible = entry.isIntersecting; record.time = 0; } }
+                if (!frame) resume();
             }, { root });
             document.addEventListener('visibilitychange', resume); reduced.addEventListener('change', resume);
         },
         attach(canvas, appearance = 'ocean') {
             canvas.width = canvas.height = size;
             const ctx = canvas.getContext('2d'), texture = surface(appearance);
-            const record = { canvas, ctx, texture, appearance, pixels: ctx.createImageData(size, size), phase: texture.phase, active: false, speed: .005, visible: true, time: 0, drawn: 0 };
+            const record = { canvas, ctx, texture, appearance, pixels: createPixels(ctx), phase: texture.phase, active: false, speed: .005, visible: true, time: 0, drawn: 0 };
             records.set(canvas, record); observer?.observe(canvas); draw(record);
             if (!frame) resume();
         },
@@ -144,10 +199,10 @@
         preview(canvas, appearance) {
             canvas.width = canvas.height = size;
             const ctx = canvas.getContext('2d'), texture = surface(appearance);
-            draw({ ctx, texture, pixels: ctx.createImageData(size, size), phase: texture.phase });
+            draw({ ctx, texture, pixels: createPixels(ctx), phase: texture.phase });
         },
-        detach(canvas) { observer?.unobserve(canvas); records.delete(canvas); if (!records.size) { cancelAnimationFrame(frame); frame = 0; } },
-        clear() { observer?.disconnect(); records.clear(); cancelAnimationFrame(frame); frame = 0; },
+        detach(canvas) { observer?.unobserve(canvas); records.delete(canvas); if (!records.size) { window.alcyoneAnimation.cancelFrame(frame); frame = 0; } },
+        clear() { observer?.disconnect(); records.clear(); window.alcyoneAnimation.cancelFrame(frame); frame = 0; },
         dispose() { this.clear(); document.removeEventListener('visibilitychange', resume); reduced.removeEventListener('change', resume); }
     };
 })();

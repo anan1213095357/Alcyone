@@ -2,8 +2,28 @@
     let api, layer, box, groups = [], selected = new Set(), gesture = null, confirmation = null;
     let configKey = null, busy = false, epoch = 0, active = new Set();
     let collapseButton, toolbar, selectedGroups = new Set(), pendingSelection = null;
+    let toolbarTimer = 0, toolbarVisible = false;
+    function showToolbarOnClick(event) {
+        if (!event.target.closest?.('.state-card,.alcyone-orb')) return;
+        clearTimeout(toolbarTimer);
+        toolbarVisible = true;
+        controls();
+        toolbarTimer = setTimeout(() => { toolbarVisible = false; controls(); }, 2000);
+    }
     let popupAnchor = null, lastSelectionEnd = null, transition = null;
     const animations = new Set();
+    let hitObserver = null, hitFrame = 0, lastHitRegions = '';
+    function reportHitRegions() {
+        if (gesture || hitFrame || !api?.desktopView || !window.external?.sendMessage) return;
+        hitFrame = window.alcyoneAnimation.requestFrame(() => {
+            hitFrame = 0;
+            if (gesture) return;
+            const rectangles = [...api.workspace.querySelectorAll('.state-card:not([hidden]),.alcyone-orb,.canvas-selection-toolbar:not([hidden]),.alcyone-fold-popover')]
+                .map(node => { const r = node.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
+            const json = JSON.stringify({ ratio: window.devicePixelRatio || 1, rectangles });
+            if (json !== lastHitRegions) { lastHitRegions = json; window.external.sendMessage('alcyone:desktop:hitregions:' + json); }
+        });
+    }
     const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
     const english = () => document.documentElement.lang === 'en';
     const cards = () => [...api.world.querySelectorAll('.state-card')];
@@ -16,10 +36,7 @@
     };
     function controls() {
         if (toolbar) {
-            toolbar.hidden = !selected.size && !selectedGroups.size;
-            toolbar.querySelector('.selection-count').textContent = english()
-                ? `${selected.size} cards · ${selectedGroups.size} planets`
-                : `已选 ${selected.size} 张卡片${selectedGroups.size ? ` · ${selectedGroups.size} 个星球` : ''}`;
+            toolbar.hidden = !toolbarVisible || (!selected.size && !selectedGroups.size);
             for (const button of toolbar.querySelectorAll('button')) {
                 const action = button.dataset.action;
                 button.disabled = busy || (action === 'fold' ? !selected.size : action === 'expand' ? !selectedGroups.size : action === 'appearance' ? selectedGroups.size !== 1 : !selected.size && !selectedGroups.size);
@@ -84,6 +101,7 @@
         const motion = matchMedia('(prefers-reduced-motion: reduce)').matches;
         const animation = element.animate(frames, { duration: motion ? 1 : 620, easing: 'cubic-bezier(.22,.8,.2,1)', ...options });
         animations.add(animation);
+        window.alcyoneAnimation.track(animation);
         return animation.finished.catch(() => {}).finally(() => animations.delete(animation));
     }
     function toward(card, group) {
@@ -108,20 +126,20 @@
     }
     function animateConnections(current, expanding, duration) {
         return new Promise(resolve => {
-            const start = performance.now(); current.finish = resolve;
+            const start = window.alcyoneAnimation.now(); current.finish = resolve;
             const tick = now => {
                 if (transition !== current || !api) { resolve(); return; }
                 const t = Math.min(1, (now - start) / duration);
                 const eased = 1 - Math.pow(1 - t, 3);
                 current.progress = expanding ? 1 - eased : eased;
                 api.drawEdges();
-                if (t < 1) current.frame = requestAnimationFrame(tick); else resolve();
+                if (t < 1) current.frame = window.alcyoneAnimation.requestFrame(tick); else resolve();
             };
-            current.frame = requestAnimationFrame(tick);
+            current.frame = window.alcyoneAnimation.requestFrame(tick);
         });
     }
     function clearTransition() {
-        if (transition) { cancelAnimationFrame(transition.frame); transition.finish?.(); }
+        if (transition) { window.alcyoneAnimation.cancelFrame(transition.frame); transition.finish?.(); }
         transition = null;
     }
     async function save(version, previous, positions = []) {
@@ -365,12 +383,13 @@
     function createToolbar() {
         toolbar = document.createElement('div'); toolbar.className = 'canvas-selection-toolbar'; toolbar.hidden = true;
         toolbar.setAttribute('role', 'toolbar'); toolbar.setAttribute('aria-label', english() ? 'Selection actions' : '选中项操作');
-        toolbar.innerHTML = '<div class="selection-count"></div><div class="selection-actions">'
+        toolbar.innerHTML = '<div class="selection-actions">'
             + '<button type="button" data-action="fold"><svg viewBox="0 0 20 20"><path d="M2 2l5 5M3 7h4V3m11-1-5 5m0-4v4h4M2 18l5-5m-4 0h4v4m11 1-5-5m0 4v-4h4"/></svg><span></span></button>'
             + '<button type="button" data-action="copy"><svg viewBox="0 0 20 20"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M12 7V3H3v9h4"/></svg><span></span></button>'
             + '<button type="button" data-action="delete"><svg viewBox="0 0 20 20"><path d="M3 5h14M7 5V3h6v2M5 5l1 12h8l1-12M8 8v6m4-6v6"/></svg><span></span></button>'
             + '<button type="button" data-action="expand"><svg viewBox="0 0 20 20"><path d="M8 8 3 3m0 4V3h4m5 5 5-5m-4 0h4v4M8 12l-5 5m0-4v4h4m5-5 5 5m-4 0h4v-4"/></svg><span></span></button>'
             + '<button type="button" data-action="appearance"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6"/><ellipse cx="10" cy="10" rx="9" ry="3" transform="rotate(-30 10 10)"/></svg><span></span></button></div>';
+        if (api.desktopView) toolbar.querySelectorAll('[data-action="copy"],[data-action="delete"]').forEach(button => button.remove());
         toolbar.addEventListener('click', onToolbarClick);
         toolbar.addEventListener('pointerdown', event => event.stopPropagation());
         api.workspace.append(toolbar);
@@ -390,9 +409,11 @@
     }
     window.alcyoneGroups = {
         init(context) {
+            context.workspace.addEventListener('click', showToolbarOnClick, true);
             api = context; layer = document.getElementById('alcyoneGroupLayer');
             window.alcyonePlanets.init(api.workspace);
             createToolbar();
+            if (api.desktopView) { hitObserver = new MutationObserver(reportHitRegions); hitObserver.observe(api.workspace, { childList:true,subtree:true,attributes:true,attributeFilter:['style','hidden','class'] }); reportHitRegions(); }
             api.workspace.addEventListener('scroll', positionPopover);
             window.addEventListener('resize', positionPopover);
             document.addEventListener('pointerdown', onOutsidePointerDown);
@@ -402,6 +423,7 @@
         sync(state) {
             if (!api) return;
             if (state.configKey !== configKey) {
+                clearTimeout(toolbarTimer); toolbarVisible = false;
                 clearTransition(); window.alcyonePlanets.clear();
                 epoch++; dismissConfirmation(); cancelGesture(); animations.forEach(a => a.cancel()); animations.clear();
                 cards().forEach(c => c.getAnimations().forEach(a => a.cancel()));
@@ -489,6 +511,7 @@
         pointerUp(event) {
             if (!gesture) return false;
             const g = gesture; gesture = null; box?.remove(); box = null;
+            reportHitRegions();
             if (g.type === 'box' && g.moved && selected.size) {
                 lastSelectionEnd = event ? point(event) : g.start;
                 controls();
@@ -555,6 +578,9 @@
             return 1;
         },
         dispose() {
+            clearTimeout(toolbarTimer); toolbarTimer = 0; toolbarVisible = false;
+            api?.workspace.removeEventListener('click', showToolbarOnClick, true);
+            hitObserver?.disconnect(); hitObserver = null; window.alcyoneAnimation.cancelFrame(hitFrame); hitFrame = 0; lastHitRegions = '';
             clearTransition(); window.alcyonePlanets.dispose();
             epoch++; dismissConfirmation(); cancelGesture(); animations.forEach(a => a.cancel()); animations.clear();
             if (api) cards().forEach(c => { c.hidden = false; c.classList.remove('box-selected'); c.getAnimations().forEach(a => a.cancel()); });

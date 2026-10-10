@@ -21,6 +21,59 @@ public partial class ScriptWorkbench
     private string _fileQuery = "", _docQuery = "", _docCategory = "全部";
     private string _status = "编辑器就绪。Ctrl+S / F8 保存全部修改并编译；Ctrl+F 查找。", _outputTime = "READY";
     private List<CompileError> _errors = [];
+    private bool _newScriptOpen;
+    private string _newScriptName = "MyActions", _newScriptError = "";
+
+    private void RequestNewScript()
+    {
+        _newScriptName = "MyActions";
+        _newScriptError = "";
+        _newScriptOpen = true;
+    }
+
+    private async Task CreateScriptAsync()
+    {
+        if (_busy || !_ready) return;
+        var name = _newScriptName.Trim();
+        if (name.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)) name = name[..^4];
+        if (!Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]*$") ||
+            !Microsoft.CodeAnalysis.CSharp.SyntaxFacts.IsValidIdentifier(name) ||
+            Microsoft.CodeAnalysis.CSharp.SyntaxFacts.GetKeywordKind(name) != Microsoft.CodeAnalysis.CSharp.SyntaxKind.None ||
+            Regex.IsMatch(name, "^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])$", RegexOptions.IgnoreCase))
+        {
+            _newScriptError = "请输入有效的 C# 类名（英文字母、数字、下划线，不能以数字开头或使用关键字）。";
+            return;
+        }
+        var file = name + ".csx";
+        var source = $$"""
+            // 保存并编译后，可在状态卡片中选择此动作。
+            public sealed class {{name}} : StateScript
+            {
+                [StateAction("{{name}} 示例动作", "自定义")]
+                public async Task Run([StateParameter("等待毫秒")] int milliseconds = 300)
+                {
+                    Log("开始执行");
+                    await Api.Delay(milliseconds);
+                    Vars.Set("{{name}}执行次数", Vars.Get<int>("{{name}}执行次数", 0) + 1);
+                    Log("动作完成", level: "good");
+                }
+            }
+            """;
+        try
+        {
+            // CreateNew prevents an existing script from being overwritten.
+            await using (var stream = new FileStream(Path.Combine(Host.ScriptDirectory, file), FileMode.CreateNew, FileAccess.Write))
+            await using (var writer = new StreamWriter(stream))
+                await writer.WriteAsync(source);
+            _files = _files.Append(file).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+            _fileQuery = "";
+            _newScriptOpen = false;
+            await OpenFileAsync(file);
+            await CompileAsync();
+        }
+        catch (IOException ex) { _newScriptError = File.Exists(Path.Combine(Host.ScriptDirectory, file)) ? "同名脚本已存在，请换一个名称。" : ex.Message; }
+        catch (Exception ex) { _newScriptError = "新建失败：" + ex.Message; }
+    }
     private IEnumerable<ApiDoc> FilteredDocs => Docs.Where(d => (_docCategory == "全部" || d.Category == _docCategory) &&
         (d.Title + d.Description + d.Signature).Contains(_docQuery, StringComparison.OrdinalIgnoreCase));
 

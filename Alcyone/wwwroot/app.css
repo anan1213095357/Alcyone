@@ -3,6 +3,10 @@
     box-sizing: border-box;
 }
 
+html.alcyone-animations-paused *,
+html.alcyone-animations-paused *::before,
+html.alcyone-animations-paused *::after { animation-play-state: paused !important; }
+
 :root {
     --bg: #070a10;
     --panel: #0d121c;
@@ -70,7 +74,10 @@ button {
 }
 
 #app {
+    width: 100%;
+    min-width: 0;
     height: 100vh;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 58px 1fr 220px;
 }

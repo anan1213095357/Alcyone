@@ -1,0 +1,4 @@
+.desktop-settings-backdrop{position:fixed;inset:0;z-index:5000;display:grid;place-items:center;background:#0009}
+.desktop-settings-dialog{width:min(440px,90vw);padding:24px;background:#111925;border:1px solid #344158;border-radius:12px;box-shadow:0 20px 70px #0008;color:#dce5f2}
+.desktop-settings-dialog h2{font-size:18px;margin:0 0 20px}.desktop-settings-dialog label{display:flex;gap:10px;align-items:center;margin:16px 0;font-size:13px}.desktop-settings-dialog input{accent-color:#4c8dff}.desktop-settings-dialog p{font-size:12px;line-height:1.8;color:#8190a7}.desktop-settings-dialog [role=alert]{color:#ff6472}.desktop-settings-dialog button{padding:7px 20px;border:1px solid #344158;border-radius:6px;background:#1b2c46;color:#dce5f2}
+.btn{height:32px;padding:0 10px;border:1px solid #2a374b;border-radius:7px;background:#141d2b;color:#c7d3e4;font-size:12px;white-space:nowrap;cursor:pointer}.btn:hover{background:#1b2c46}

@@ -21,6 +21,16 @@ internal static class Program
             : Path.GetDirectoryName(Environment.ProcessPath!)!;
         var verifyHost = args.Contains("--check-host", StringComparer.Ordinal);
         var browserHost = args.Contains("--browser-host", StringComparer.Ordinal);
+        using var instance = verifyHost || browserHost ? null : new Mutex(false, @"Local\Alcyone.Desktop");
+        var ownsInstance = true;
+        try { ownsInstance = instance?.WaitOne(0) ?? true; }
+        catch (AbandonedMutexException) { /* Recover ownership after an unclean shutdown. */ }
+        if (!ownsInstance)
+        {
+            var existing = DesktopNative.FindWindowW(null, "Alcyone");
+            if (existing != 0) { DesktopNative.ShowWindow(existing, 9); DesktopNative.SetForegroundWindow(existing); }
+            return;
+        }
         var bundledSettings = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
         var desktopSettings = Path.Combine(desktopDirectory, "appsettings.json");
         if (File.Exists(bundledSettings) && !File.Exists(desktopSettings))
@@ -39,7 +49,7 @@ internal static class Program
         }
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
-            Args = args.Where(argument => argument is not ("--check-host" or "--browser-host")).ToArray(),
+            Args = args.Where(argument => argument is not ("--check-host" or "--browser-host" or "--startup")).ToArray(),
             ContentRootPath = desktopDirectory,
             WebRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot")
         });
@@ -65,6 +75,7 @@ internal static class Program
         builder.Services.AddSingleton<IColorProbeScanner, DesktopColorProbeScanner>();
         builder.Services.AddSingleton<MachineRuntimeService>();
         builder.Services.AddSingleton<DesktopWallpaperService>();
+        builder.Services.AddSingleton<DesktopPreferences>();
         var app = builder.Build();
         app.UseExceptionHandler("/Error", createScopeForErrors: true);
         app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
@@ -108,12 +119,20 @@ internal static class Program
                 app.WaitForShutdownAsync().GetAwaiter().GetResult();
                 return;
             }
+            var primaryDisplay = DesktopDisplays.Enumerate().FirstOrDefault();
+            const int initialWidth = 1366, initialHeight = 768;
+            var initialLeft = primaryDisplay is null ? 0 : primaryDisplay.X + Math.Max(0, (primaryDisplay.Width - initialWidth) / 2);
+            var initialTop = primaryDisplay is null ? 0 : primaryDisplay.Y + Math.Max(0, (primaryDisplay.Height - initialHeight) / 2);
             var window = new PhotinoWindow()
                 .SetTitle("Alcyone")
+                .SetChromeless(true)
                 .SetUseOsDefaultSize(false)
+                .SetUseOsDefaultLocation(false)
+                .SetSize(initialWidth, initialHeight)
+                .SetLeft(initialLeft).SetTop(initialTop)
                 .SetMaximized(true)
                 .SetResizable(true)
-                .SetMinSize(1366,768)
+                .SetMinSize(640,480)
                 .SetIconFile(Path.Combine(AppContext.BaseDirectory, "wwwroot", "favicon.ico"))
                 .SetContextMenuEnabled(false)
 #if DEBUG

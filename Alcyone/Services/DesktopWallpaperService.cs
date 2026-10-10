@@ -8,7 +8,7 @@ namespace StateMachine;
 
 /// <summary>One read-only webview per monitor, all observing the editor's existing runtime.
 /// Wallpaper windows have their own viewport/DPI; the editor never becomes a shell child.</summary>
-public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpaperService> logger) : IDisposable
+public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpaperService> logger, DesktopPreferences preferences) : IDisposable
 {
     private const uint TrayMessage = 0x8001;
     private const int HotkeyId = 0x414c;
@@ -24,6 +24,12 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     private uint _taskbarCreated;
     private NotifyIconData _tray;
     private bool _trayAdded, _hotkey, _disposed;
+    private Timer? _animationMonitor;
+    private int _animationPollPending;
+    private nint _editorHandle;
+    private bool _lastEditorHidden;
+    private DesktopPointerRouter? _pointerRouter;
+    public bool AnimationsPaused { get; private set; }
     [DllImport("user32.dll", EntryPoint = "LoadImageW",
     CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern nint LoadImageW(
@@ -34,6 +40,15 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     public IReadOnlyList<DesktopDisplay> Displays => Volatile.Read(ref _displays);
     public DesktopPresentation? Presentation => Volatile.Read(ref _presentation);
     public bool HotkeyAvailable => _hotkey;
+    public bool IsMaximized => Available && IsZoomed(_window!.WindowHandle);
+    public bool EditorHidden
+    {
+        get
+        {
+            var handle = Volatile.Read(ref _editorHandle);
+            return Available && handle != 0 && (!IsWindowVisible(handle) || IsIconic(handle));
+        }
+    }
     public string? Error { get; private set; }
     public event Action? Changed;
 
@@ -41,7 +56,106 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     {
         _window = window;
         _url = url;
+        window.RegisterWebMessageReceivedHandler((sender, message) =>
+        {
+            if (_disposed || sender != _window) return;
+            var handle = window.WindowHandle;
+            Volatile.Write(ref _editorHandle, handle);
+            switch (message)
+            {
+                case "alcyone:window:state":
+                    ApplyWindowCorners(handle);
+                    break;
+                case "alcyone:window:minimize":
+                    ShowWindow(handle, IsDesktop ? 0u : 6u);
+                    break;
+                case "alcyone:window:maximize":
+                    ShowWindow(handle, IsZoomed(handle) ? 9u : 3u);
+                    ApplyWindowCorners(handle);
+                    break;
+                case "alcyone:window:close":
+                    if (IsDesktop) ShowWindow(handle, 0);
+                    else window.Close();
+                    break;
+                case "alcyone:window:drag":
+                    if (IsZoomed(handle) && GetWindowRect(handle, out var maximized) && GetCursorPos(out var cursor))
+                    {
+                        var fraction = Math.Clamp((double)(cursor.X - maximized.Left) / Math.Max(1, maximized.Right - maximized.Left), 0, 1);
+                        ShowWindow(handle, 9);
+                        if (GetWindowRect(handle, out var restored))
+                            SetWindowPos(handle, 0, cursor.X - (int)((restored.Right - restored.Left) * fraction), cursor.Y - 24, 0, 0, 0x0015);
+                    }
+                    ReleaseCapture();
+                    // Let Windows run its native move loop, including snapping to screen edges.
+                    GetCursorPos(out var dragCursor);
+                    PostMessageW(handle, 0x00a1, 2, (nint)((dragCursor.Y << 16) | (dragCursor.X & 0xffff)));
+                    break;
+                default:
+                    if (!message.StartsWith("alcyone:window:resize:", StringComparison.Ordinal) || IsZoomed(handle)) return;
+                    var direction = message["alcyone:window:resize:".Length..] switch
+                    {
+                        "w" => 1, "e" => 2, "n" => 3, "nw" => 4,
+                        "ne" => 5, "s" => 6, "sw" => 7, "se" => 8, _ => 0
+                    };
+                    if (direction == 0) return;
+                    ReleaseCapture();
+                    PostMessageW(handle, 0x0112, (nuint)(0xf000 + direction), 0);
+                    break;
+            }
+            Changed?.Invoke();
+        });
         Volatile.Write(ref _displays, DesktopDisplays.Enumerate());
+        _animationMonitor = new Timer(_ => PollFullscreenWindow(), null, 500, 500);
+    }
+
+    private static bool OtherWindowIsFullscreen()
+    {
+        var foreground = GetForegroundWindow();
+        if (foreground == 0 || !IsWindowVisible(foreground) || IsIconic(foreground)) return false;
+        GetWindowThreadProcessId(foreground, out var processId);
+        if (processId == Environment.ProcessId || processId == 0) return false;
+        // Explorer's desktop is itself monitor-sized; it must not pause the wallpaper.
+        var className = new System.Text.StringBuilder(256);
+        GetClassNameW(foreground, className, className.Capacity);
+        if (className.ToString() is "Progman" or "WorkerW" ||
+            FindWindowExW(foreground, 0, "SHELLDLL_DefView", null) != 0) return false;
+        var monitor = MonitorFromWindow(foreground, 2);
+        var info = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>(), Device = "" };
+        if (monitor == 0 || !GetMonitorInfoW(monitor, ref info) || !GetWindowRect(foreground, out var bounds)) return false;
+        return bounds.Left <= info.Monitor.Left + 1 && bounds.Top <= info.Monitor.Top + 1 &&
+            bounds.Right >= info.Monitor.Right - 1 && bounds.Bottom >= info.Monitor.Bottom - 1;
+    }
+
+    private void PollFullscreenWindow()
+    {
+        if (_disposed || Volatile.Read(ref _editorHandle) == 0 || Interlocked.Exchange(ref _animationPollPending, 1) != 0) return;
+        try
+        {
+            var paused = OtherWindowIsFullscreen();
+            var hidden = EditorHidden;
+            if (_disposed || (paused == AnimationsPaused && hidden == _lastEditorHidden)) return;
+            AnimationsPaused = paused;
+            if (_pointerRouter is not null) _pointerRouter.Paused = paused;
+            _lastEditorHidden = hidden;
+            // Subscribers marshal to their Blazor circuit. Never call native WebView
+            // messaging from a timer, a native callback, or a newly created surface.
+            Changed?.Invoke();
+        }
+        catch (Exception ex) { if (!_disposed) logger.LogDebug(ex, "Fullscreen animation check failed"); }
+        finally { Volatile.Write(ref _animationPollPending, 0); }
+    }
+
+    private static void ApplyWindowCorners(nint handle)
+    {
+        var preference = IsZoomed(handle) ? 1 : 2; // Square when maximized, round otherwise.
+        DwmSetWindowAttribute(handle, 33, ref preference, sizeof(int));
+        // A chromeless popup is not always rounded by DWM, even when the request succeeds.
+        // Clip the actual window as well so the corners work on Windows 10 and 11.
+        if (IsZoomed(handle)) { SetWindowRgn(handle, 0, true); return; }
+        if (!GetWindowRect(handle, out var rectangle)) return;
+        var region = CreateRoundRectRgn(0, 0, rectangle.Right - rectangle.Left + 1,
+            rectangle.Bottom - rectangle.Top + 1, 20, 20);
+        if (region != 0 && SetWindowRgn(handle, region, true) == 0) DeleteObject(region);
     }
 
     public DesktopPresentation? GetPresentation(string token) => token == _viewToken ? Presentation : null;
@@ -61,10 +175,15 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
                     if (presentation is null) throw new ArgumentNullException(nameof(presentation));
                     var previous = Presentation;
                     Volatile.Write(ref _presentation, presentation);
-                    try { EnterDesktop(); }
-                    catch { Volatile.Write(ref _presentation, previous); throw; }
+                    try { EnterDesktop(); preferences.RememberDesktop(true, presentation.ConfigKey); }
+                    catch
+                    {
+                        if (previous is null) { StopDesktop(); RestoreEditor(); }
+                        Volatile.Write(ref _presentation, previous);
+                        throw;
+                    }
                 }
-                else { StopDesktop(); RestoreEditor(); }
+                else { preferences.RememberDesktop(false); StopDesktop(); RestoreEditor(); }
                 Changed?.Invoke();
                 completion.SetResult();
             }
@@ -121,13 +240,14 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         var host = FindWallpaperHost();
         if (host == 0) throw new InvalidOperationException(text["无法找到 Windows 桌面层，请重启资源管理器后重试。"]);
         _host = host;
+        _pointerRouter ??= new DesktopPointerRouter { Paused = AnimationsPaused };
         ReconcileDisplays(force: true);
         if (_surfaces.Count == 0) throw new InvalidOperationException(text["没有检测到可用显示器。"]);
         IsDesktop = true;
         // Watch DPI changes as well as display broadcasts. Some scaling changes do not
         // send WM_DISPLAYCHANGE to an off-screen control window.
         SetTimer(_helper, 1, 2000, 0);
-        ShowWindow(_window!.WindowHandle, 6);
+        ShowWindow(_window!.WindowHandle, 0); // Hide the editor and its taskbar button; keep the tray.
     }
 
     private PhotinoWindow CreateSurface(DesktopDisplay display)
@@ -141,6 +261,12 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             .SetChromeless(true).SetResizable(false).SetMinimized(true)
             .SetContextMenuEnabled(false).SetDevToolsEnabled(false)
             .Load(_url + "/desktop/" + _viewToken);
+        surface.RegisterWebMessageReceivedHandler((_, message) =>
+        {
+            const string prefix = "alcyone:desktop:hitregions:";
+            if (!_disposed && message.StartsWith(prefix, StringComparison.Ordinal))
+                _pointerRouter?.Update(surface.WindowHandle, message[prefix.Length..]);
+        });
         try
         {
             // Photino 4 creates secondary windows without starting another message loop
@@ -165,7 +291,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     private void RestoreEditor()
     {
         var handle = _window!.WindowHandle;
-        ShowWindow(handle, 9);
+        ShowWindow(handle, IsZoomed(handle) ? 3u : 9u);
         // An unplugged monitor must not leave the settings window off-screen.
         if (GetWindowRect(handle, out var rect) && Displays.Count > 0 &&
             !Displays.Any(display => rect.Left < display.X + display.Width && rect.Right > display.X &&
@@ -234,14 +360,16 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         finally { if (previous != 0) SetThreadDpiAwarenessContext(previous); }
     }
 
-    private static void CloseSurface(PhotinoWindow surface)
+    private void CloseSurface(PhotinoWindow surface)
     {
+        _pointerRouter?.Remove(surface.WindowHandle);
         if (IsWindow(surface.WindowHandle)) surface.Close();
     }
 
     private void StopDesktop()
     {
         IsDesktop = false;
+        _pointerRouter?.Dispose(); _pointerRouter = null;
         if (_helper != 0) KillTimer(_helper, 1);
         foreach (var surface in _surfaces.Values) CloseSurface(surface);
         _surfaces.Clear();
@@ -324,7 +452,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             var command = TrackPopupMenu(menu, 0x0102, cursor.X, cursor.Y, 0, _helper, 0);
             PostMessageW(_helper, 0, 0, 0);
             if (command == 1) { RestoreEditor(); Changed?.Invoke(); }
-            else if (command == 3) { StopDesktop(); RestoreEditor(); Changed?.Invoke(); }
+            else if (command == 3) { preferences.RememberDesktop(false); StopDesktop(); RestoreEditor(); Changed?.Invoke(); }
             else if (command == 2)
             {
                 RestoreEditor();
@@ -351,6 +479,9 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     {
         if (_disposed) return;
         _disposed = true;
+        Volatile.Write(ref _editorHandle, 0);
+        _animationMonitor?.Dispose();
+        _animationMonitor = null;
         StopDesktop();
         if (_trayAdded) Shell_NotifyIconW(2, ref _tray);
         if (_hotkey) UnregisterHotKey(_helper, HotkeyId);

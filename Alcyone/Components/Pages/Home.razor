@@ -22,6 +22,9 @@
             <div class="logo-icon"><img src="images/favicon.png" alt="Alcyone" /></div>
             Alcyone
         </div>
+        <button class="btn toolbar-overflow-toggle" aria-label="展开工具栏" aria-expanded="@_toolbarMenuOpen" @onclick="() => _toolbarMenuOpen = !_toolbarMenuOpen">工具 ⋯</button>
+        @if (_toolbarMenuOpen) { <div class="toolbar-overflow-dismiss" @onclick="() => _toolbarMenuOpen = false"></div> }
+        <div class="toolbar-overflow @(_toolbarMenuOpen ? "is-open" : "")">
         <div class="toolbar-group edit-tools">
             <button class="btn" @onclick="OpenScriptEditorAsync">@L["脚本编译器"]</button>
             <button class="btn add-state-control" @onclick="AddStateAsync"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M10 6v8 M6 10h8"/></svg><span>@L["添加状态"]</span></button>
@@ -34,7 +37,6 @@
             <button class="btn quiet" @onclick="FitCanvasAsync">@L["适配"]</button>
             <span class="canvas-gesture-hint">@L["左键框选 · 右键平移"]</span>
         </div>
-        <div class="spacer"></div>
         <div class="execution-controls" role="group" aria-label="@L["运行控制"]">
             <span class="execution-status @RuntimeStatusClass"><i></i>@L[RuntimeStatusText]</span>
             <div class="execution-buttons">
@@ -53,6 +55,7 @@
             </div>
         </div>
         <LanguagePicker />
+        <DesktopSettings />
         <button class="btn desktop-control" disabled="@(!Desktop.Available || !_autoSaveReady || _desktopBusy)"
                 title="@(Desktop.Available ? DesktopSummary : L["请在 Windows 桌面程序中使用此功能。"])"
                 @onclick="SetAsDesktopAsync">@L[_desktopBusy ? "切换中…" : Desktop.IsDesktop ? "更新全部屏幕" : "全部屏幕桌面"]</button>
@@ -90,7 +93,24 @@
             }
             <InputFile id="importFile" OnChange="ImportConfigAsync" accept=".json,application/json" style="display:none" />
         </div>
+        </div>
+        <div class="spacer"></div>
+        @if (Desktop.Available)
+        {
+            <div class="window-controls" role="group" aria-label="窗口控制">
+                <button type="button" data-window-command="minimize" title="最小化" aria-label="最小化"><svg viewBox="0 0 16 16"><path d="M3 8h10" /></svg></button>
+                <button type="button" data-window-command="maximize" title="@(Desktop.IsMaximized ? "还原" : "最大化")" aria-label="@(Desktop.IsMaximized ? "还原" : "最大化")"><svg viewBox="0 0 16 16">@if (Desktop.IsMaximized) { <path d="M5 5V3h8v8h-2 M3 5h8v8H3z" /> } else { <path d="M3 3h10v10H3z" /> }</svg></button>
+                <button type="button" class="window-close" data-window-command="close" title="关闭" aria-label="关闭"><svg viewBox="0 0 16 16"><path d="m4 4 8 8 M12 4l-8 8" /></svg></button>
+            </div>
+        }
     </div>
+    @if (Desktop.Available && !Desktop.IsMaximized)
+    {
+        @foreach (var edge in new[] { "n", "s", "e", "w", "nw", "ne", "sw", "se" })
+        {
+            <div class="window-resize-edge edge-@edge" data-window-resize="@edge" aria-hidden="true"></div>
+        }
+    }
 
     }
     @if (!string.IsNullOrEmpty(_desktopError))
@@ -178,8 +198,8 @@
         </aside>
 
         }
-        <main id="workspace" class="workspace" inert="@IsWallpaperView">
-            <div class="starfield-anchor" aria-hidden="true"><canvas id="workspaceStarfield"></canvas></div>
+        <main id="workspace" class="workspace">
+            <div class="starfield-anchor" aria-hidden="true"><canvas id="workspaceBackdrop"></canvas><canvas id="workspaceStarfield"></canvas></div>
             <div id="worldScale">
                 <div id="world">
                     <div id="alcyoneGroupLayer"></div>
@@ -1221,11 +1241,12 @@
         function scheduleDrawEdges() {
             // A minimized WebView pauses animation frames. Keep only the latest repaint.
             if (edgeFrame) return;
-            edgeFrame = requestAnimationFrame(() => { edgeFrame = 0; drawEdges(); });
+            edgeFrame = window.alcyoneAnimation.requestFrame(() => { edgeFrame = 0; drawEdges(); });
         }
 
         function drawEdges() {
             if (!edgeLayer) return;
+            if (window.alcyoneAnimation.paused) { scheduleDrawEdges(); return; }
             clearTimeout(flightCleanup);
             let nextArrival = Infinity;
             let html = `<defs>
@@ -1252,7 +1273,7 @@
                     route.setAttribute("d", d);
                     return Math.max(.8, route.getTotalLength() / STARSHIP_SPEED);
                 })() : 0;
-                const now = performance.now() / 1000;
+                const now = window.alcyoneAnimation.now() / 1000;
                 const flights = interplanet ? (shipFlights.get(edge.id) || []).filter(started => now < started + flightDuration) : [];
                 if (interplanet && !flights.length) shipFlights.delete(edge.id);
                 const highlighted = interplanet ? flights.length > 0 : running.has(edge.id);
@@ -1326,7 +1347,7 @@
         route.setAttribute("d", d);
         const duration = Math.max(.01, route.getTotalLength() / 160);
         for (let signal = 0; signal < 2; signal++) {
-            const delay = -(performance.now() / 1000 % duration + signal * duration / 2);
+            const delay = -(window.alcyoneAnimation.now() / 1000 % duration + signal * duration / 2);
             html += `<g opacity="${edgeOpacity * (running.has(edge.id) ? 1 : .65)}" aria-hidden="true">
                 <g class="star-route-signal" style="offset-path:path('${d}');animation-duration:${duration}s;animation-delay:${delay}s">
                     <path d="M -32 0 L 0 0" stroke="url(#signal-tail)" stroke-width="4" stroke-linecap="round"/>
@@ -1454,9 +1475,9 @@
         }
 
         function onPointerDown(event) {
-            if (desktopView) return;
             if (!workspace) return;
             if (window.alcyoneGroups?.pointerDown(event)) return;
+            if (desktopView) return;
             const header = event.target.closest?.(".state-header");
             if (header && event.button === 0) {
                 const card = header.closest(".state-card");
@@ -1551,19 +1572,24 @@
         function onCanvasContextMenu(event) { event.preventDefault(); }
 
         function onWheel(event) {
-            if (desktopView) return;
-            if (!workspace || (!event.ctrlKey && !event.metaKey)) return;
+            if (!workspace || event.target.closest('input, textarea, select, .canvas-selection-toolbar, .alcyone-fold-popover')) return;
             event.preventDefault();
             const rect = workspace.getBoundingClientRect();
             const mouseX = event.clientX - rect.left;
             const mouseY = event.clientY - rect.top;
-            const worldX = (workspace.scrollLeft + mouseX) / canvasZoom;
-            const worldY = (workspace.scrollTop + mouseY) / canvasZoom;
+            const worldRect = world.getBoundingClientRect();
+            const worldX = (event.clientX - worldRect.left) / canvasZoom;
+            const worldY = (event.clientY - worldRect.top) / canvasZoom;
             const factor = event.deltaY < 0 ? 1.1 : 0.9;
             const newZoom = clampZoom(canvasZoom * factor);
             setZoom(newZoom, false);
-            workspace.scrollLeft = worldX * newZoom - mouseX;
-            workspace.scrollTop = worldY * newZoom - mouseY;
+            if (desktopView) {
+                scaleBox.style.left = `${mouseX - worldX * newZoom}px`;
+                scaleBox.style.top = `${mouseY - worldY * newZoom}px`;
+            } else {
+                workspace.scrollLeft = worldX * newZoom - mouseX;
+                workspace.scrollTop = worldY * newZoom - mouseY;
+            }
         }
 
         function onKeyDown(event) {
@@ -1580,12 +1606,14 @@
             stopStarfield?.();
             const canvas = document.getElementById("workspaceStarfield");
             if (!canvas || !workspace) return;
-            const ctx = canvas.getContext("2d", { alpha: false });
+            const ctx = canvas.getContext("2d");
             if (!ctx) return;
             const host = workspace;
             const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
             let width = 1, height = 1, stars = [], frame = 0, last = 0, stopped = false;
-            const backdrop = document.createElement("canvas");
+            const backdrop = document.getElementById("workspaceBackdrop");
+            if (!backdrop) return;
+            const gpuStars = window.alcyoneGpu?.stars();
             function buildBackdrop() {
                 backdrop.width = width; backdrop.height = height;
                 const sky = backdrop.getContext("2d");
@@ -1625,8 +1653,10 @@
                     size: .35 + Math.random() * .85, blue: Math.random() < .2 };
             }
             function resize() {
-                width = Math.max(1, host.clientWidth); height = Math.max(1, host.clientHeight);
+                const nextWidth = Math.max(1, host.clientWidth), nextHeight = Math.max(1, host.clientHeight);
                 const ratio = Math.min(window.devicePixelRatio || 1, 2);
+                if (canvas.width === Math.round(nextWidth * ratio) && canvas.height === Math.round(nextHeight * ratio)) return;
+                width = nextWidth; height = nextHeight;
                 canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
                 canvas.style.width = width + "px"; canvas.style.height = height + "px";
                 ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -1635,7 +1665,9 @@
                 paint(0);
             }
             function paint(dt) {
-                ctx.drawImage(backdrop, 0, 0, width, height);
+                // The static sky is composited separately; only moving stars need repainting.
+                ctx.clearRect(0, 0, width, height);
+                const useGpu = gpuStars?.begin(width, height, canvas.width / width);
                 const cx = width * .5, cy = height * .46, scale = Math.max(width, height) * .5;
                 for (let i = 0; i < stars.length; i++) {
                     let star = stars[i];
@@ -1647,9 +1679,15 @@
                     }
                     const depth = 1 - star.z;
                     const alpha = .22 + depth * .57;
+                    const radius = star.size * (.45 + depth * 1.25);
+                    if (useGpu) {
+                        const tailZ = star.z + Math.max(previous - star.z, .006) * 2.2;
+                        gpuStars.star(x,y,radius,star.blue,alpha,cx+star.x*scale/tailZ,cy+star.y*scale/tailZ,
+                            dt>0 && depth>.35 ? Math.max(.5,radius*.85) : 0);
+                        continue;
+                    }
                     ctx.strokeStyle = star.blue ? `rgba(166,203,255,${alpha})` : `rgba(228,237,255,${alpha})`;
                     ctx.fillStyle = ctx.strokeStyle;
-                    const radius = star.size * (.45 + depth * 1.25);
                     if (dt > 0 && depth > .35) {
                         const tailZ = star.z + Math.max(previous - star.z, .006) * 2.2;
                         ctx.lineWidth = Math.max(.5, radius * .85);
@@ -1657,15 +1695,16 @@
                     }
                     ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
                 }
+                if (useGpu) gpuStars.end(ctx, width, height);
             }
             function tick(time) {
                 if (stopped) return;
                 const dt = last ? Math.min((time - last) / 1000, .05) : 0; last = time;
-                paint(dt); frame = requestAnimationFrame(tick);
+                paint(dt); frame = window.alcyoneAnimation.requestFrame(tick);
             }
             function resume() {
-                cancelAnimationFrame(frame); last = 0;
-                if (!document.hidden && !reduced.matches) frame = requestAnimationFrame(tick);
+                window.alcyoneAnimation.cancelFrame(frame); last = 0;
+                if (!document.hidden && !reduced.matches) frame = window.alcyoneAnimation.requestFrame(tick);
                 else paint(0);
             }
             const observer = new ResizeObserver(resize); observer.observe(host);
@@ -1673,7 +1712,8 @@
             reduced.addEventListener("change", resume);
             resize(); resume();
             stopStarfield = () => {
-                stopped = true; cancelAnimationFrame(frame); observer.disconnect();
+                stopped = true; window.alcyoneAnimation.cancelFrame(frame); observer.disconnect();
+                gpuStars?.dispose();
                 document.removeEventListener("visibilitychange", resume); reduced.removeEventListener("change", resume);
             };
         }
@@ -1689,7 +1729,7 @@
                 tempEdge = document.getElementById("tempEdge");
                 if (initialized) return;
                 initialized = true;
-                window.alcyoneGroups?.init({ workspace, world, dotnet, drawEdges, zoom: () => canvasZoom });
+                window.alcyoneGroups?.init({ workspace, world, dotnet, drawEdges: scheduleDrawEdges, desktopView, zoom: () => canvasZoom });
                 startStarfield();
                 desktopResize = new ResizeObserver(fitDesktop);
                 if (workspace) desktopResize.observe(workspace);
@@ -1713,7 +1753,7 @@
                 workspace?.removeEventListener("contextmenu", onCanvasContextMenu);
                 workspace?.removeEventListener("click", onClick);
                 workspace?.removeEventListener("wheel", onWheel);
-                cancelAnimationFrame(edgeFrame); edgeFrame = 0;
+                window.alcyoneAnimation.cancelFrame(edgeFrame); edgeFrame = 0;
                 workspace?.removeEventListener("scroll", drawEdges);
                 window.removeEventListener("pointermove", onPointerMove);
                 window.removeEventListener("pointerup", onPointerUp);
@@ -1735,7 +1775,7 @@
                                     if (endpoints.has(edge.fromStateId) || endpoints.has(edge.toStateId)) shipFlights.delete(edge.id);
                                 }
                             }
-                            shipFlights.set(id, [performance.now() / 1000]);
+                            shipFlights.set(id, [window.alcyoneAnimation.now() / 1000]);
                         }
                     }
                 } else shipFlights.clear();

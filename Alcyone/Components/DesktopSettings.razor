@@ -1,0 +1,22 @@
+@inject DesktopPreferences Preferences
+@inject DesktopWallpaperService Desktop
+<button class="btn" @onclick="() => _open = true">桌面设置</button>
+@if (_open)
+{
+    <div class="desktop-settings-backdrop" @onclick="() => _open = false">
+        <section class="desktop-settings-dialog" role="dialog" aria-modal="true" aria-label="桌面设置" @onclick:stopPropagation="true">
+            <h2>桌面设置</h2>
+            <label><input type="checkbox" checked="@Preferences.AutoStart" disabled="@(!Desktop.Available)" @onchange="SetAutoStart" />登录 Windows 后自动启动</label>
+            <label><input type="checkbox" checked="@Preferences.RestoreDesktop" @onchange="SetRestore" />启动时恢复上次启用的桌面</label>
+            <p>桌面卡片和星球可拖动，选中卡片可折叠，双击星球可展开。位置与折叠状态自动保存。</p>
+            @if (_error is not null) { <p role="alert">@_error</p> }
+            <button class="btn" @onclick="() => _open = false">完成</button>
+        </section>
+    </div>
+}
+@code {
+    private bool _open;
+    private string? _error;
+    private void SetAutoStart(ChangeEventArgs args) { try { Preferences.SetAutoStart(args.Value is true); _error = null; } catch (Exception ex) { _error = ex.Message; } }
+    private void SetRestore(ChangeEventArgs args) { try { Preferences.SetRestore(args.Value is true); _error = null; } catch (Exception ex) { _error = ex.Message; } }
+}

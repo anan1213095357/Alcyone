@@ -25,6 +25,12 @@ public partial class Home
     private async Task<CanvasEditResult> EditSelectionFromJs(string configKey, string command, List<string> ids, List<CanvasStatePosition> positions)
     {
         if (configKey != _configKey || _switchingConfig) return new(new(), new());
+        if (IsWallpaperView)
+        {
+            if (command != "move") throw new InvalidOperationException("桌面模式仅支持布局编辑。");
+            await SaveDesktopLayoutAsync(positions);
+            return new(new(), new()) { Groups = Machine.StateGroups };
+        }
         var selected = ids.ToHashSet(StringComparer.Ordinal);
         var result = new CanvasEditResult(new(), new());
         if (command == "move") ApplyCanvasPositions(positions);
@@ -75,6 +81,7 @@ public partial class Home
     private async Task SaveGroupsFromJs(string configKey, List<StateGroupModel> groups, List<CanvasStatePosition> positions)
     {
         if (configKey != _configKey || _switchingConfig) return;
+        if (IsWallpaperView) { await SaveDesktopLayoutAsync(positions, groups); return; }
         ApplyCanvasPositions(positions);
         var used = new HashSet<string>(StringComparer.Ordinal);
         var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -110,6 +117,16 @@ public partial class Home
         SelectedEdgeId = null;
         PendingConnection = null;
         await SaveConfigCoreAsync(true);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SaveDesktopLayoutAsync(List<CanvasStatePosition> positions, List<StateGroupModel>? groups = null)
+    {
+        if (_session is null || Desktop.GetPresentation(WallpaperToken!)?.Session != _session)
+            throw new InvalidOperationException("桌面会话已结束。");
+        await _session.UpdateCanvasLayoutAsync(GetConfigFilePath(_configKey), _canvasRevision,
+            positions.Select(p => new MachineSession.LayoutPosition(p.Id, p.X, p.Y)).ToArray(), groups);
+        ApplyRuntimeSnapshot();
         await InvokeAsync(StateHasChanged);
     }
 }

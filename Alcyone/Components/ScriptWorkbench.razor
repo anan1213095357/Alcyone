@@ -11,6 +11,7 @@
             <button class="studio-icon close" title="关闭工作台" aria-label="关闭工作台" disabled="@_busy" @onclick="RequestCloseAsync">×</button>
         </header>
         <nav class="studio-toolbar" aria-label="编辑器工具栏">
+            <button disabled="@(_busy || !_ready)" @onclick="RequestNewScript">＋ 新建脚本</button>
             <button class="studio-build" disabled="@(_busy || !_ready)" @onclick="CompileAsync"><span>▷</span>@(_busy ? "正在编译…" : "保存并编译")<kbd>F8</kbd></button>
             <span class="studio-toolbar-divider"></span>
             <button disabled="@(!_ready)" @onclick='() => EditorActionAsync("actions.find")'><span>⌕</span>查找<kbd>Ctrl F</kbd></button>
@@ -30,7 +31,7 @@
                     {
                         <button class="studio-file @(file == _active ? "selected" : "")" title="@file" disabled="@_busy" @onclick="() => OpenFileAsync(file)"><span class="csharp-icon">C#</span><span>@file</span>@if (_dirty.Contains(file)) { <i class="dirty-dot"></i> }</button>
                     }
-                    @if (_files.Length == 0) { <p class="studio-empty-explorer">还没有脚本。通过 AI 开发创建第一个动作。</p> }
+                    @if (_files.Length == 0) { <p class="studio-empty-explorer">还没有脚本。点击“新建脚本”从模板创建第一个动作。</p> }
                 </div>
                 <div class="studio-explorer-footer"><span class="studio-folder-icon">⌘</span><div>脚本工作区<small>保存后自动编译，下一次动作使用新代码</small></div></div>
             </aside>
@@ -88,6 +89,16 @@
         @if (_confirm is not null)
         {
             <div class="studio-confirm-overlay"><section class="studio-confirm" role="alertdialog" aria-label="未保存的修改"><h3>@(_confirm == "reload" ? "重新读取文件？" : "还有未保存的修改")</h3><p>@(_confirm == "reload" ? "这会用磁盘文件替换当前编辑内容。" : "保存并编译后关闭，或放弃这次编辑。")</p><div><button @onclick="() => _confirm = null">继续编辑</button><button @onclick="DiscardAsync">放弃修改</button>@if (_confirm == "close") { <button class="studio-build" @onclick="SaveAndCloseAsync">保存并关闭</button> }</div></section></div>
+        }
+        @if (_newScriptOpen)
+        {
+            <div class="studio-confirm-overlay"><section class="studio-confirm" role="dialog" aria-modal="true" aria-label="新建热重载脚本">
+                <h3>新建热重载脚本</h3><p>创建包含动作特性、参数、日志、等待和变量的模板，自动保存并编译。</p>
+                <label class="studio-search"><input aria-label="脚本类名" placeholder="MyActions" @bind="_newScriptName" /></label>
+                <p>文件：@(_newScriptName.Trim().EndsWith(".csx", StringComparison.OrdinalIgnoreCase) ? _newScriptName.Trim() : _newScriptName.Trim() + ".csx")</p>
+                @if (_newScriptError.Length > 0) { <p role="alert" class="output-error">@_newScriptError</p> }
+                <div><button disabled="@_busy" @onclick="() => _newScriptOpen = false">取消</button><button class="studio-build" disabled="@_busy" @onclick="CreateScriptAsync">创建并编译</button></div>
+            </section></div>
         }
     </section>
 </div>

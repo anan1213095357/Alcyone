@@ -77,4 +77,16 @@ internal static class DesktopNative
     [DllImport("user32.dll")] internal static extern nuint SetTimer(nint window, nuint id, uint interval, nint callback);
     [DllImport("user32.dll")] internal static extern bool KillTimer(nint window, nuint id);
     [DllImport("user32.dll")] internal static extern bool GetWindowRect(nint window, out NativeRect rectangle);
+    [DllImport("user32.dll")] internal static extern bool IsZoomed(nint window);
+    [DllImport("user32.dll")] internal static extern nint GetForegroundWindow();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetClassNameW(nint window, System.Text.StringBuilder name, int maxCount);
+    [DllImport("user32.dll")] internal static extern bool IsWindowVisible(nint window);
+    [DllImport("user32.dll")] internal static extern bool IsIconic(nint window);
+    [DllImport("user32.dll")] internal static extern uint GetWindowThreadProcessId(nint window, out uint processId);
+    [DllImport("user32.dll")] internal static extern nint MonitorFromWindow(nint window, uint flags);
+    [DllImport("user32.dll")] internal static extern bool ReleaseCapture();
+    [DllImport("dwmapi.dll")] internal static extern int DwmSetWindowAttribute(nint window, int attribute, ref int value, int size);
+    [DllImport("gdi32.dll")] internal static extern nint CreateRoundRectRgn(int left, int top, int right, int bottom, int width, int height);
+    [DllImport("gdi32.dll")] internal static extern bool DeleteObject(nint value);
+    [DllImport("user32.dll")] internal static extern int SetWindowRgn(nint window, nint region, bool redraw);
 }

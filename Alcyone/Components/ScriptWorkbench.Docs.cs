@@ -4,6 +4,8 @@ public partial class ScriptWorkbench
 {
     private static readonly ApiDoc[] Docs =
     [
+        new("基础", "StateAction", "将公开方法注册为卡片动作", "[StateAction(string displayName, string group = \"二次开发\")]", "标注继承 StateScript 的类中的公开方法。", "[StateAction(\"我的动作\", \"自定义\")]", ""),
+        new("基础", "StateParameter", "设置动作参数的显示名称", "[StateParameter(string displayName)]", "放在方法参数前，显示为卡片参数名称。", "[StateParameter(\"参数名称\")]", ""),
         new("基础", "StateScript", "定义可在卡片里调用的动作", "class MyActions : StateScript", "继承 StateScript，用 StateAction 标注公开方法。异步动作返回 Task；参数会显示在状态卡片中。", "public sealed class MyActions : StateScript\n{\n    [StateAction(\"我的动作\", \"自定义\")]\n    public async Task Run()\n    {\n        Log(\"开始执行\");\n        await Api.Delay(300);\n    }\n}", ""),
         new("基础", "Api.Delay", "等待，并响应停止指令", "Task Delay(int milliseconds)", "单位为毫秒。使用 await 等待，避免 Thread.Sleep 阻塞动作线程。", "await Api.Delay(500);", "Api"),
         new("基础", "Api.CancellationToken", "在循环中响应停止", "CancellationToken CancellationToken", "较长循环应检查取消令牌。Delay 和内置识别接口已处理取消。", "Api.CancellationToken.ThrowIfCancellationRequested();", "Api"),
