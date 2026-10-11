@@ -1095,7 +1095,7 @@
                     </div>
 
                     <button class="btn green"
-                            disabled="@(_aiBusy || Runtime.Running || _executing)"
+                            disabled="@_aiBusy"
                             @onclick="ApplyPendingAiPlanAsync">
                         @L["应用变更"]
                     </button>

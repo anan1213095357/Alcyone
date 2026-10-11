@@ -2350,18 +2350,24 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
 
     private async Task ApplyPendingAiPlanAsync()
     {
-        if (_pendingAiPlan is null || _aiBusy || Runtime.Running || _executing)
+        if (_pendingAiPlan is null || _aiBusy)
             return;
 
         _aiBusy = true;
         _aiError = string.Empty;
 
+        var resumeRuntime = _session?.Snapshot.Runtime.Running == true;
         var plan = _pendingAiPlan;
         _aiProgress = new("", "", "正在编译并应用方案…");
         List<AiScriptBackup>? scriptBackups = null;
 
         try
         {
+            if (_session is not null)
+            {
+                await _session.StopAsync();
+                ApplyRuntimeSnapshot();
+            }
             if (plan.Scripts.Count > 0)
             {
                 if (_scriptHost is null)
@@ -2443,7 +2449,16 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
         }
         finally
         {
-            _aiBusy = false;
+            try
+            {
+                if (resumeRuntime && _session is not null)
+                {
+                    await _session.StartAsync();
+                    ApplyRuntimeSnapshot();
+                }
+            }
+            catch (Exception ex) { _aiError += " 恢复运行失败：" + ex.GetBaseException().Message; }
+            finally { _aiBusy = false; }
         }
     }
 
