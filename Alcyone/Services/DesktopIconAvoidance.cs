@@ -14,7 +14,9 @@ internal sealed class DesktopIconAvoidance : IDisposable
     private int _dirty;
     private volatile bool _disposed;
     private nint _autoArrangeWindow;
-    private uint _blockedProcess;
+    private long _retryAfter, _iconCacheAt;
+    private nint _iconCacheWindow;
+    private List<(int Index, NativeRect Rect)>? _iconCache;
     private bool _ipcTimedOut;
     public DesktopIconAvoidance() => _timer = new Timer(_ => Run(), null, Timeout.Infinite, Timeout.Infinite);
     public void Update(nint window, string json, bool moving = false)
@@ -28,8 +30,7 @@ internal sealed class DesktopIconAvoidance : IDisposable
                 if (_disposed) return;
                 if (moving) { if (_surfaces.TryGetValue(window, out var current)) _surfaces[window] = (current.Fixed, regions); }
                 else _surfaces[window] = (regions, null);
-                Interlocked.Exchange(ref _dirty, 1);
-                _timer.Change(24, Timeout.Infinite);
+                if (Interlocked.Exchange(ref _dirty, 1) == 0) _timer.Change(16, Timeout.Infinite);
             }
         }
         catch (JsonException) { }
@@ -37,7 +38,7 @@ internal sealed class DesktopIconAvoidance : IDisposable
     public void Remove(nint window) { lock (_gate) _surfaces.Remove(window); }
     public void Invalidate()
     {
-        lock (_gate) { if (_disposed) return; Interlocked.Exchange(ref _dirty, 1); _timer.Change(24, Timeout.Infinite); }
+        lock (_gate) { if (_disposed) return; Interlocked.Exchange(ref _iconCacheAt, 0); if (Interlocked.Exchange(ref _dirty, 1) == 0) _timer.Change(16, Timeout.Infinite); }
     }
     private void Run()
     {
@@ -46,13 +47,19 @@ internal sealed class DesktopIconAvoidance : IDisposable
         {
             if (_disposed || Interlocked.Exchange(ref _dirty, 0) == 0) return;
             var dpi = SetThreadDpiAwarenessContext(-4);
-            try { Avoid(); } catch (Exception ex) when (ex is ArgumentException or OverflowException or System.ComponentModel.Win32Exception) { }
+            try { _ipcTimedOut = false; if (Environment.TickCount64 >= _retryAfter) Avoid(); else Interlocked.Exchange(ref _dirty, 1); } catch (Exception ex) when (ex is ArgumentException or OverflowException or System.ComponentModel.Win32Exception) { }
             finally { if (dpi != 0) SetThreadDpiAwarenessContext(dpi); }
         }
         finally
         {
+            if (_ipcTimedOut)
+            {
+                _retryAfter = Environment.TickCount64 + 2000;
+                Interlocked.Exchange(ref _iconCacheAt, 0);
+                Interlocked.Exchange(ref _dirty, 1);
+            }
             Monitor.Exit(_workGate);
-            lock (_gate) if (!_disposed && Volatile.Read(ref _dirty) != 0) _timer.Change(16, Timeout.Infinite);
+            lock (_gate) if (!_disposed && Volatile.Read(ref _dirty) != 0) _timer.Change((int)Math.Clamp(_retryAfter - Environment.TickCount64, 16, 2000), Timeout.Infinite);
         }
     }
     private void Avoid()
@@ -72,7 +79,6 @@ internal sealed class DesktopIconAvoidance : IDisposable
         var list = FindIconList();
         if (list == 0 || !Send(list, 0x1004, 0, 0, out var count) || count == 0 || count > 1000) return;
         GetWindowThreadProcessId(list, out var pid);
-        if (_blockedProcess == pid) return;
         _ipcTimedOut = false;
         var process = OpenProcess(0x0038, false, pid); // VM_OPERATION | VM_READ | VM_WRITE
         if (process == 0) return;
@@ -81,15 +87,21 @@ internal sealed class DesktopIconAvoidance : IDisposable
         var clock = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            var icons = new List<(int Index, NativeRect Rect)>();
+            var cached = _iconCacheWindow == list && _iconCache?.Count == (int)count
+                && Environment.TickCount64 - Interlocked.Read(ref _iconCacheAt) < 500;
+            var icons = cached ? new List<(int Index, NativeRect Rect)>(_iconCache!) : new List<(int Index, NativeRect Rect)>();
             var origin = new NativePoint(); MapWindowPoints(list, 0, ref origin, 1);
-            for (var i = 0; i < (int)count; i++)
+            for (var i = 0; !cached && i < (int)count; i++)
             {
                 if (clock.ElapsedMilliseconds > 1000 || _disposed) return;
                 if (!WriteProcessMemory(process, buffer, new byte[16], 16, out _) || !Send(list, 0x100e, (nuint)i, buffer, out var ok) || ok == 0) continue;
                 var bytes = new byte[16]; if (!ReadProcessMemory(process, buffer, bytes, 16, out _)) continue;
                 icons.Add((i, new NativeRect { Left = BitConverter.ToInt32(bytes, 0) + origin.X, Top = BitConverter.ToInt32(bytes, 4) + origin.Y, Right = BitConverter.ToInt32(bytes, 8) + origin.X, Bottom = BitConverter.ToInt32(bytes, 12) + origin.Y }));
             }
+            if (_ipcTimedOut) return;
+            _iconCacheWindow = list; _iconCache = new(icons);
+            if (!cached) Interlocked.Exchange(ref _iconCacheAt, Environment.TickCount64);
+            var originalRects = icons.ToDictionary(icon => icon.Index, icon => icon.Rect);
             var workAreas = new List<NativeRect>();
             var moves = new List<(int Index, int FromX, int FromY, int ToX, int ToY)>();
             EnumDisplayMonitors(0, 0, (nint monitor, nint dc, ref NativeRect rect, nint data) => { var info = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() }; if (GetMonitorInfoW(monitor, ref info)) workAreas.Add(info.Work); return true; }, 0);
@@ -121,21 +133,34 @@ internal sealed class DesktopIconAvoidance : IDisposable
             {
                 var style = GetWindowLongPtrW(list, -16).ToInt64();
                 if ((style & 0x100) != 0) { _autoArrangeWindow = list; SetWindowLongPtrW(list, -16, (nint)(style & ~0x100)); }
-                // Animate all displaced icons together; never delay the mouse/UI thread.
+                // Refresh destinations during dragging rather than finishing a stale flight.
                 var animation = System.Diagnostics.Stopwatch.StartNew();
                 var bytes = new byte[8];
                 while (!_disposed && !_ipcTimedOut)
                 {
                     var frame = animation.ElapsedMilliseconds;
-                    var t = Math.Min(1, frame / 220d); var eased = 1 - Math.Pow(1 - t, 3);
+                    var t = Math.Min(1, frame / 160d); var eased = t;
                     foreach (var move in moves)
                     {
                         var x = (int)Math.Round(move.FromX + (move.ToX - move.FromX) * eased);
                         var y = (int)Math.Round(move.FromY + (move.ToY - move.FromY) * eased);
-                        BitConverter.GetBytes(x).CopyTo(bytes, 0); BitConverter.GetBytes(y).CopyTo(bytes, 4);
-                        if (!WriteProcessMemory(process, buffer, bytes, 8, out _) || !Send(list, 0x1031, (nuint)move.Index, buffer, out _)) break;
+                        // Standard desktop coordinates fit LVM_SETITEMPOSITION; no cross-process
+                        // pointer or allocation is needed for each animation frame.
+                        bool moved;
+                        if (x is >= short.MinValue and <= short.MaxValue && y is >= short.MinValue and <= short.MaxValue)
+                            moved = Send(list, 0x100f, (nuint)move.Index, (nint)((y << 16) | (x & 0xffff)), out _);
+                        else
+                        {
+                            BitConverter.GetBytes(x).CopyTo(bytes, 0); BitConverter.GetBytes(y).CopyTo(bytes, 4);
+                            moved = WriteProcessMemory(process, buffer, bytes, 8, out _) && Send(list, 0x1031, (nuint)move.Index, buffer, out _);
+                        }
+                        if (!moved) break;
+                        var rect = originalRects[move.Index];
+                        var dx = x - move.FromX; var dy = y - move.FromY;
+                        var index = _iconCache!.FindIndex(icon => icon.Index == move.Index);
+                        if (index >= 0) _iconCache[index] = (move.Index, new NativeRect { Left = rect.Left + dx, Right = rect.Right + dx, Top = rect.Top + dy, Bottom = rect.Bottom + dy });
                     }
-                    if (t >= 1) break;
+                    if (t >= 1 || (frame >= 48 && Volatile.Read(ref _dirty) != 0)) break;
                     Thread.Sleep((int)Math.Max(1, 16 - (animation.ElapsedMilliseconds - frame)));
                 }
             }
@@ -143,8 +168,13 @@ internal sealed class DesktopIconAvoidance : IDisposable
         finally
         {
             // A timed-out window message may still consume its pointer later.
-            // Leave that tiny buffer alive until Explorer exits; suspend this PID.
-            if (_ipcTimedOut) _blockedProcess = pid;
+            // Quarantine that buffer, but retry automatically after Explorer recovers.
+            if (_ipcTimedOut)
+            {
+                _retryAfter = Environment.TickCount64 + 2000;
+                Interlocked.Exchange(ref _iconCacheAt, 0);
+                Interlocked.Exchange(ref _dirty, 1);
+            }
             else VirtualFreeEx(process, buffer, 0, 0x8000);
             CloseHandle(process);
         }

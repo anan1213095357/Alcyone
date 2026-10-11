@@ -42,7 +42,7 @@
             avoid:node.matches('.state-card,.alcyone-orb,.desktop-ai-console,.ai-response,.ai-suggestions') };
     }
     function reportMovingObstacles() {
-        if (!api?.desktopView || !window.external?.sendMessage || !gesture || performance.now()-lastAvoidance < 60) return;
+        if (!api?.desktopView || !window.external?.sendMessage || !gesture || performance.now()-lastAvoidance < 32) return;
         lastAvoidance = performance.now();
         const nodes = gesture.type === 'cards' ? gesture.items.map(i => i.card) : gesture.type === 'orb' ? [gesture.orb] : [];
         if(nodes.length) window.external.sendMessage('alcyone:desktop:avoid:' + JSON.stringify({ratio:window.devicePixelRatio||1,rectangles:[...nodes.map(rectangle),...routeObstacles()]}));
