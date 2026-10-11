@@ -203,7 +203,7 @@
         }
         <main id="workspace" class="workspace">
             @if (IsWallpaperView) { <DesktopAiConsole Submit="SendDesktopAiAsync" Reply="@_desktopAiReply" Progress="_desktopAiProgress" CliPreview="@DesktopCliPreview" CliOutput="@_desktopCliOutput" CliStatus="@_desktopCliStatus" CliBusy="_desktopCliBusy" ExecuteCli="ExecuteDesktopCliAsync" CancelCli="CancelDesktopCli" StateNames="@Machine.States.Select(s => s.Name)" VariableNames="@Machine.Variables.Select(v => v.Name)" /> }
-            <div class="starfield-anchor" aria-hidden="true"><canvas id="workspaceBackdrop"></canvas><canvas id="workspaceStarfield"></canvas></div>
+            <div class="starfield-anchor" aria-hidden="true"><canvas id="workspaceBackdrop"></canvas><canvas class="nebula-layer nebula-violet"></canvas><canvas class="nebula-layer nebula-aurora"></canvas><canvas id="workspaceStarfield"></canvas></div>
             <div id="worldScale">
                 <div id="world">
                     <div id="alcyoneGroupLayer"></div>
@@ -1591,6 +1591,7 @@
             let width = 1, height = 1, stars = [], frame = 0, last = 0, stopped = false;
             const backdrop = document.getElementById("workspaceBackdrop");
             if (!backdrop) return;
+            const nebulaLayers = [...host.querySelectorAll(".nebula-layer")];
             const gpuStars = window.alcyoneGpu?.stars();
             function buildBackdrop() {
                 backdrop.width = width; backdrop.height = height;
@@ -1598,15 +1599,29 @@
                 sky.fillStyle = "#030610"; sky.fillRect(0, 0, width, height);
                 let seed = 73519;
                 const random = () => { seed = Math.imul(seed, 1664525) + 1013904223 | 0; return (seed >>> 0) / 4294967296; };
-                // A cached, irregular cloud band with distant stars behind the moving foreground.
+                const clouds = nebulaLayers.map(layer => {
+                    layer.width = width; layer.height = height;
+                    return layer.getContext("2d");
+                });
+                // Cached cloud textures crossfade on the compositor; no per-frame sky painting.
                 for (let i = 0; i < 65; i++) {
                     const t = random(), x = width * (t * 1.3 - .15);
                     const y = height * (.8 - t * .55 + (random() - .5) * .4);
                     const radius = Math.max(width, height) * (.08 + random() * .17);
                     const glow = sky.createRadialGradient(x, y, 0, x, y, radius);
-                    const tint = i % 3 === 0 ? "92,63,154" : i % 3 === 1 ? "39,89,135" : "40,104,117";
-                    glow.addColorStop(0, `rgba(${tint},.065)`); glow.addColorStop(.4, `rgba(${tint},.025)`); glow.addColorStop(1, `rgba(${tint},0)`);
+                    const tint = i % 3 === 0 ? "112,66,168" : i % 3 === 1 ? "39,104,165" : "40,126,135";
+                    glow.addColorStop(0, `rgba(${tint},.10)`); glow.addColorStop(.4, `rgba(${tint},.035)`); glow.addColorStop(1, `rgba(${tint},0)`);
                     sky.fillStyle = glow; sky.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+                    clouds.forEach((cloud, phase) => {
+                        if (!cloud) return;
+                        const colors = phase === 0 ? ["145,63,194", "183,72,133", "87,65,170"] : ["32,159,160", "43,110,196", "74,153,123"];
+                        const color = colors[i % colors.length];
+                        const haze = cloud.createRadialGradient(x, y, 0, x, y, radius * 1.15);
+                        haze.addColorStop(0, `rgba(${color},.16)`);
+                        haze.addColorStop(.45, `rgba(${color},.045)`);
+                        haze.addColorStop(1, `rgba(${color},0)`);
+                        cloud.fillStyle = haze; cloud.fillRect(x - radius * 1.15, y - radius * 1.15, radius * 2.3, radius * 2.3);
+                    });
                 }
                 const count = Math.min(2600, Math.max(700, width * height / 600));
                 for (let i = 0; i < count; i++) {

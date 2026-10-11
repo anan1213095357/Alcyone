@@ -2112,3 +2112,8 @@
 .script-ai-context{padding:10px 24px;color:#adbed6;background:#182537;border-bottom:1px solid #33435a;font-size:12px;line-height:1.7}
 .inspector .input,.inspector .select{font-size:13px;min-height:38px;line-height:1.5}.inspector .transition-head .input{font-size:14px;font-weight:600}.inspector .condition-row-b,.inspector .condition-row-c{grid-template-columns:92px minmax(0,1fr);gap:8px;margin-bottom:10px}.inspector .condition-row-c>div:first-child{font-size:12px!important;color:#afc0d6!important}.inspector .field>label:has(input[type=checkbox]){font-size:12px!important;line-height:1.6}.inspector .empty-inspector{font-size:12px;line-height:1.9}.inspector .recognition-filter-row{grid-template-columns:76px minmax(0,1fr)}.inspector .recognition-filter-row.numeric{grid-template-columns:76px 65px minmax(0,1fr)}.inspector .recognition-filter-row.text-filter{grid-template-columns:76px minmax(70px,auto) minmax(0,1fr)}
 .logo-icon{width:42px;height:42px;background:transparent;box-shadow:none}.logo-icon img{transform:none;object-fit:contain}
+
+.nebula-layer{position:absolute;top:0;left:0;display:block;pointer-events:none;opacity:0;animation:nebula-colors 80s ease-in-out infinite;will-change:opacity}
+.nebula-aurora{animation-delay:-40s}
+@keyframes nebula-colors{0%,100%{opacity:.08}35%,55%{opacity:.85}80%{opacity:.08}}
+@media(prefers-reduced-motion:reduce){.nebula-layer{animation:none;opacity:.22}.nebula-aurora{opacity:.12}}
