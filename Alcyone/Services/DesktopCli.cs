@@ -18,7 +18,7 @@ public static class DesktopCli
         var start = new ProcessStartInfo(shell) { WorkingDirectory = directory, UseShellExecute = false, CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardOutput = true, RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
-        foreach (var argument in new[] { "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", Convert.ToBase64String(Encoding.Unicode.GetBytes("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $ErrorActionPreference = 'Stop';\n" + script)) }) start.ArgumentList.Add(argument);
+        foreach (var argument in new[] { "-NoLogo", "-NoProfile", "-NonInteractive", "-OutputFormat", "Text", "-EncodedCommand", Convert.ToBase64String(Encoding.Unicode.GetBytes("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';\ntry { & {\n" + script + "\n} *>&1 | Out-String -Stream | ForEach-Object { [Console]::WriteLine($_) } } catch { [Console]::Error.WriteLine(($_ | Out-String)); exit 1 }")) }) start.ArgumentList.Add(argument);
         using var process = new Process { StartInfo = start };
         process.Start();
         var log = new StringBuilder();
