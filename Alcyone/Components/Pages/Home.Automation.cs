@@ -38,12 +38,29 @@ public partial class Home
     { if (_session is not null) { await _session.ConfigureAsync(Machine); await _session.TestConditionAsync(condition); ApplyRuntimeSnapshot(); } }
     private string ConditionTarget(ConditionModel condition)
     {
+        if (string.IsNullOrEmpty(condition.Kind)) return "";
+        if (condition.Kind == "script") return "script:" + condition.ScriptMethod;
+        if (condition.Kind == "windows") return "windows:" + condition.SystemCheck;
         if (condition.Kind == "recognition") return "recognition:" + condition.RecognitionId;
         var variable = Machine.Variables.FirstOrDefault(v => v.Name == condition.Left);
         return variable is null ? "" : "variable:" + variable.Id;
     }
     private void ChangeConditionTarget(ConditionModel condition, string target)
     {
+        if (target == "script:new")
+        {
+            _startWithConditionTemplate = true;
+            _scriptEditorOpen = _scriptHost is not null;
+            return;
+        }
+        if (target.StartsWith("script:", StringComparison.Ordinal))
+        { condition.Kind = "script"; condition.ScriptMethod = target[7..]; RefreshCurrentConditionResults(); return; }
+        if (target.StartsWith("windows:", StringComparison.Ordinal))
+        {
+            var check = target[8..];
+            if (condition.SystemCheck.Split('.')[0] != check.Split('.')[0]) condition.SystemQuery = "";
+            condition.Kind = "windows"; condition.SystemCheck = check; RefreshCurrentConditionResults(); return;
+        }
         if (target.StartsWith("recognition:", StringComparison.Ordinal))
         {
             var item = Machine.Recognitions.FirstOrDefault(i => !i.IsFolder && i.Id == target[12..]);

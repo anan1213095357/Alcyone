@@ -4,6 +4,7 @@ public partial class ScriptWorkbench
 {
     private static readonly ApiDoc[] Docs =
     [
+        new("基础", "StateCondition", "注册自定义条件函数", "[StateCondition(string displayName, string group = \"自定义\")]", "公开无参数方法返回 bool、Task<bool> 或 ValueTask<bool>。等待执行完成后判断，通过 Vars 读取变量。在条件 API 菜单的自定义条件中选择。", "[StateCondition(\"已就绪\", \"自定义\")]\npublic bool IsReady() => Vars.Get<bool>(\"就绪\", false);", ""),
         new("基础", "StateAction", "将公开方法注册为卡片动作", "[StateAction(string displayName, string group = \"二次开发\")]", "标注继承 StateScript 的类中的公开方法。", "[StateAction(\"我的动作\", \"自定义\")]", ""),
         new("基础", "StateParameter", "设置动作参数的显示名称", "[StateParameter(string displayName)]", "放在方法参数前，显示为卡片参数名称。", "[StateParameter(\"参数名称\")]", ""),
         new("基础", "StateScript", "定义可在卡片里调用的动作", "class MyActions : StateScript", "继承 StateScript，用 StateAction 标注公开方法。异步动作返回 Task；参数会显示在状态卡片中。", "public sealed class MyActions : StateScript\n{\n    [StateAction(\"我的动作\", \"自定义\")]\n    public async Task Run()\n    {\n        Log(\"开始执行\");\n        await Api.Delay(300);\n    }\n}", ""),

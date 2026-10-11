@@ -1,0 +1,22 @@
+@using Markdig
+<div class="ai-markdown">@((MarkupString)_html)</div>
+@code {
+    [Parameter] public string Text { get; set; } = "";
+    private string? _previous;
+    private string _html = "";
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseAutoLinks().DisableHtml().Build();
+    protected override void OnParametersSet()
+    {
+        if (_previous == Text) return;
+        _previous = Text;
+        _html = System.Text.RegularExpressions.Regex.Replace(Markdown.ToHtml(Text ?? "", Pipeline),
+            "(href|src)=\"([^\"]*)\"", match =>
+            {
+                var url = System.Net.WebUtility.HtmlDecode(match.Groups[2].Value).Trim();
+                var allowed = url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                    || url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    || (match.Groups[1].Value == "href" && (url.StartsWith("#") || url.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase)));
+                return allowed ? match.Value : match.Groups[1].Value + "=\"\"";
+            });
+    }
+}

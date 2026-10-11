@@ -16,13 +16,44 @@
     let popupAnchor = null, lastSelectionEnd = null, transition = null;
     const animations = new Set();
     let hitObserver = null, hitFrame = 0, lastHitRegions = '';
+    let lastAvoidance = 0;
+    let routeStamp = '', routeRectangles = [];
+    function routeObstacles() {
+        const paths = [...api.world.querySelectorAll('.edge-hit')].filter(p => p.style.pointerEvents !== 'none');
+        const matrix = paths[0]?.getScreenCTM();
+        if (!matrix) return [];
+        const stamp = [matrix.a,matrix.b,matrix.c,matrix.d,matrix.e,matrix.f,...paths.map(p=>p.getAttribute('d'))].join('|');
+        if (stamp === routeStamp) return routeRectangles;
+        routeStamp = stamp; routeRectangles = [];
+        for (const path of paths) {
+            const length = path.getTotalLength();
+            const steps = Math.min(256,Math.max(1,Math.ceil(length*Math.hypot(matrix.a,matrix.b)/24)));
+            for(let i=0;i<=steps && routeRectangles.length<1400;i++) {
+                const p=path.getPointAtLength(length*i/steps).matrixTransform(matrix);
+                routeRectangles.push({left:p.x-9,top:p.y-9,right:p.x+9,bottom:p.y+9,avoid:true,hit:false,route:true});
+            }
+        }
+        return routeRectangles;
+    }
+    function rectangle(node) {
+        const r = node.getBoundingClientRect();
+        return { left:r.left, top:r.top, right:r.right, bottom:r.bottom,
+            focus:!!node.closest('.desktop-ai-console'),
+            avoid:node.matches('.state-card,.alcyone-orb,.desktop-ai-console,.ai-response,.ai-suggestions') };
+    }
+    function reportMovingObstacles() {
+        if (!api?.desktopView || !window.external?.sendMessage || !gesture || performance.now()-lastAvoidance < 60) return;
+        lastAvoidance = performance.now();
+        const nodes = gesture.type === 'cards' ? gesture.items.map(i => i.card) : gesture.type === 'orb' ? [gesture.orb] : [];
+        if(nodes.length) window.external.sendMessage('alcyone:desktop:avoid:' + JSON.stringify({ratio:window.devicePixelRatio||1,rectangles:[...nodes.map(rectangle),...routeObstacles()]}));
+    }
     function reportHitRegions() {
         if (gesture || hitFrame || !api?.desktopView || !window.external?.sendMessage) return;
         hitFrame = window.alcyoneAnimation.requestFrame(() => {
             hitFrame = 0;
             if (gesture) return;
-            const rectangles = [...api.workspace.querySelectorAll('.state-card:not([hidden]),.alcyone-orb,.canvas-selection-toolbar:not([hidden]),.alcyone-fold-popover')]
-                .map(node => { const r = node.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
+            const rectangles = [...api.workspace.querySelectorAll('.state-card:not([hidden]),.alcyone-orb,.canvas-selection-toolbar:not([hidden]),.alcyone-fold-popover,.desktop-ai-console,.ai-response,.ai-suggestions')].map(rectangle);
+            rectangles.push(...routeObstacles());
             const json = JSON.stringify({ ratio: window.devicePixelRatio || 1, rectangles });
             if (json !== lastHitRegions) { lastHitRegions = json; window.external.sendMessage('alcyone:desktop:hitregions:' + json); }
         });
@@ -333,6 +364,16 @@
         popupActions(panel, english() ? 'OK' : '知道了', dismissConfirmation);
     }
     function onOutsidePointerDown(event) {
+        const input = event.target.closest?.('.desktop-ai-console input[data-native-input]');
+        if (input && api?.desktopView && window.external?.sendMessage) {
+            event.preventDefault(); // Native EDIT owns focus; don't focus the shell WebView.
+            const r = input.getBoundingClientRect();
+            window.external.sendMessage('alcyone:desktop:text-input:' + JSON.stringify({
+                id:input.dataset.nativeInput, text:input.value, left:r.left, top:r.top,
+                width:r.width, height:r.height, ratio:window.devicePixelRatio || 1
+            }));
+        }
+        if (!event.target.closest?.('.desktop-ai-console')) blurDesktopChat();
         if (confirmation && !confirmation.contains(event.target) && event.target !== collapseButton) dismissConfirmation();
     }
     function allSelectedIds() {
@@ -410,6 +451,33 @@
         }
         gesture = null; box?.remove(); box = null;
     }
+    function blurDesktopChat() {
+        const input = document.querySelector('.desktop-ai-console input');
+        if (input && document.activeElement === input) input.blur();
+    }
+    function hideDesktopSuggestions() {
+        // IME candidate windows can deactivate the WebView. Blurring the DOM input
+        // here cancels composition before the committed characters arrive.
+        document.querySelector('.desktop-ai-console')?.classList.add('chat-inactive');
+    }
+    function restoreDesktopSuggestions() {
+        document.querySelector('.desktop-ai-console')?.classList.remove('chat-inactive');
+    }
+    let desktopComposition = false, desktopCommitAt = 0;
+    function onDesktopComposition(event) {
+        if (!event.target.closest?.('.desktop-ai-console input')) return;
+        desktopComposition = event.type === 'compositionstart';
+        if (!desktopComposition) desktopCommitAt = performance.now();
+    }
+    function guardDesktopImeKey(event) {
+        if (event.target.closest?.('.desktop-ai-console input') && (desktopComposition || event.isComposing || event.keyCode === 229))
+            event.stopImmediatePropagation(); // Keep native IME behavior; skip Blazor shortcuts.
+    }
+    function guardDesktopImeSubmit(event) {
+        if (event.target.closest?.('.desktop-ai-console form') && (desktopComposition || performance.now() - desktopCommitAt < 80)) {
+            event.preventDefault(); event.stopImmediatePropagation();
+        }
+    }
     window.alcyoneGroups = {
         init(context) {
             context.workspace.addEventListener('click', showToolbarOnClick, true);
@@ -420,6 +488,12 @@
             api.workspace.addEventListener('scroll', positionPopover);
             window.addEventListener('resize', positionPopover);
             document.addEventListener('pointerdown', onOutsidePointerDown);
+            window.addEventListener('blur', hideDesktopSuggestions);
+            window.addEventListener('focus', restoreDesktopSuggestions);
+            document.addEventListener('compositionstart', onDesktopComposition, true);
+            document.addEventListener('compositionend', onDesktopComposition, true);
+            document.addEventListener('keydown', guardDesktopImeKey, true);
+            document.addEventListener('submit', guardDesktopImeSubmit, true);
             window.addEventListener('pointercancel', cancelGesture);
             window.addEventListener('blur', cancelGesture);
         },
@@ -452,7 +526,7 @@
             if (!busy && !gesture) render();
         },
         pointerDown(event) {
-            if (event.target.closest?.('.alcyone-fold-popover,.orb-name,.canvas-selection-toolbar')) return true;
+            if (event.target.closest?.('.alcyone-fold-popover,.orb-name,.canvas-selection-toolbar,.desktop-ai-console')) return true;
             if (busy) return true;
             const card = event.target.closest?.('.state-card');
             if (event.button === 0 && card && !event.shiftKey && !event.target.closest('button,input,select,textarea,.port')) {
@@ -509,6 +583,7 @@
                 if (Math.abs(p.x - g.start.x) + Math.abs(p.y - g.start.y) > 3) g.moved = true;
                 g.orb.style.left = `${g.group.x}px`; g.orb.style.top = `${g.group.y}px`; api.drawEdges();
             }
+            reportMovingObstacles();
             return true;
         },
         pointerUp(event) {
@@ -535,7 +610,7 @@
             return g.moved;
         },
         click(event) {
-            if (event.target.closest?.('.alcyone-fold-popover,.canvas-selection-toolbar')) return true;
+            if (event.target.closest?.('.alcyone-fold-popover,.canvas-selection-toolbar,.desktop-ai-console')) return true;
             if (busy || event.target.closest?.('.alcyone-orb')) return true;
             const card = event.target.closest?.('.state-card');
             if (event.shiftKey && card && !event.target.closest('button,input,select,.port')) {
@@ -547,6 +622,7 @@
             return false;
         },
         keyDown(event) {
+            if (event.target.closest?.('input,textarea,select,[contenteditable="true"],.desktop-ai-console')) return false;
             if (event.key === 'Escape') { dismissConfirmation(); cancelGesture(); selected.clear(); selectedGroups.clear(); controls(); return false; }
             if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'g') { event.preventDefault(); requestCollapse(); return true; }
             if ((selected.size || selectedGroups.size) && event.key === 'Delete') { event.preventDefault(); void editSelection('delete'); return true; }
@@ -591,6 +667,13 @@
             api?.workspace.removeEventListener('scroll', positionPopover);
             window.removeEventListener('resize', positionPopover);
             document.removeEventListener('pointerdown', onOutsidePointerDown);
+            window.removeEventListener('blur', hideDesktopSuggestions);
+            window.removeEventListener('focus', restoreDesktopSuggestions);
+            document.removeEventListener('compositionstart', onDesktopComposition, true);
+            document.removeEventListener('compositionend', onDesktopComposition, true);
+            document.removeEventListener('keydown', guardDesktopImeKey, true);
+            document.removeEventListener('submit', guardDesktopImeSubmit, true);
+            desktopComposition = false; desktopCommitAt = 0;
             window.removeEventListener('pointercancel', cancelGesture); window.removeEventListener('blur', cancelGesture);
             layer?.replaceChildren(); groups = []; selected.clear(); selectedGroups.clear(); pendingSelection = null; configKey = null; busy = false; api = null;
         }

@@ -1,0 +1,305 @@
+﻿{
+  "regions": [
+    {
+      "id": "region_17041a5a70de4e6ebdb8dc7e4aa82ba6",
+      "name": "\u661F\u9645\u822A\u7EBF"
+    }
+  ],
+  "variables": [],
+  "recognitions": [],
+  "states": [
+    {
+      "id": "state_c98f8ca8c3834a848f2f2926bb732074",
+      "regionId": "region_17041a5a70de4e6ebdb8dc7e4aa82ba6",
+      "name": "\u84DD\u6D77",
+      "x": 905.6404161597809,
+      "y": 980.9490451567625,
+      "isStart": true,
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "inputs": [
+        {
+          "id": "input_300dfa1e3bf44498937cd1278e181733",
+          "name": "\u8FDB\u5165"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output_3c40737b9bcb46889d7625040f782aaa",
+          "name": "\u661F\u9645\u822A\u884C",
+          "matchMode": "always",
+          "conditions": [],
+          "actionMethod": "",
+          "actionArguments": [],
+          "actionPath": "",
+          "actionArgs": "[]"
+        }
+      ]
+    },
+    {
+      "id": "state_a8fbb9ccb3ba41f7a1e1754b4db070ef",
+      "regionId": "region_17041a5a70de4e6ebdb8dc7e4aa82ba6",
+      "name": "\u6668\u66E6",
+      "x": 1174.058540635776,
+      "y": 404.4694262351011,
+      "isStart": false,
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "inputs": [
+        {
+          "id": "input_be1d03c7efe84199bb39c1a5aa3908be",
+          "name": "\u8FDB\u5165"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output_190ffcf0647d42b5bee3a3918608bc42",
+          "name": "\u661F\u9645\u822A\u884C",
+          "matchMode": "always",
+          "conditions": [],
+          "actionMethod": "",
+          "actionArguments": [],
+          "actionPath": "",
+          "actionArgs": "[]"
+        }
+      ]
+    },
+    {
+      "id": "state_f3b7848a90a94a02abcfb4531fcc2497",
+      "regionId": "region_17041a5a70de4e6ebdb8dc7e4aa82ba6",
+      "name": "\u971C\u6708",
+      "x": 2397.9410415232933,
+      "y": 625.4179922893354,
+      "isStart": false,
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "inputs": [
+        {
+          "id": "input_a03d7a61d63149eea0bba4c2191a467c",
+          "name": "\u8FDB\u5165"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output_405fc2e9bb124a9a908d3e4f01210dbb",
+          "name": "\u661F\u9645\u822A\u884C",
+          "matchMode": "always",
+          "conditions": [],
+          "actionMethod": "",
+          "actionArguments": [],
+          "actionPath": "",
+          "actionArgs": "[]"
+        }
+      ]
+    },
+    {
+      "id": "state_92fdc652805c41868f4d49fb8d19bbb9",
+      "regionId": "region_17041a5a70de4e6ebdb8dc7e4aa82ba6",
+      "name": "\u7EEF\u4E91",
+      "x": 2043.5260362861568,
+      "y": 1689.531613184401,
+      "isStart": false,
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "inputs": [
+        {
+          "id": "input_63bab8b5e8e34a5bae004a38a8ac45b7",
+          "name": "\u8FDB\u5165"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output_68d7509beed846d884ecf6001f179ff1",
+          "name": "\u661F\u9645\u822A\u884C",
+          "matchMode": "always",
+          "conditions": [],
+          "actionMethod": "",
+          "actionArguments": [],
+          "actionPath": "",
+          "actionArgs": "[]"
+        }
+      ]
+    },
+    {
+      "id": "state_ad1e71b6b15840ca9f397ce2feeed422",
+      "regionId": "region_17041a5a70de4e6ebdb8dc7e4aa82ba6",
+      "name": "\u7FE1\u7FE0",
+      "x": 774.9942957148113,
+      "y": 1722.5223993134628,
+      "isStart": false,
+      "beforeLeaveAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "loopAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "afterEnterAction": {
+        "actionMethod": "",
+        "actionArguments": []
+      },
+      "inputs": [
+        {
+          "id": "input_dc08ec3bf49f4185ac8ef2f87cb26838",
+          "name": "\u8FDB\u5165"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output_2c04b7c34e814217815e4740133535df",
+          "name": "\u661F\u9645\u822A\u884C",
+          "matchMode": "always",
+          "conditions": [],
+          "actionMethod": "",
+          "actionArguments": [],
+          "actionPath": "",
+          "actionArgs": "[]"
+        }
+      ]
+    }
+  ],
+  "stateGroups": [
+    {
+      "id": "group_9bf32a8b9eb343b1a0f03da1b26c03ca",
+      "name": "\u84DD\u6D77",
+      "appearance": "ocean",
+      "isCollapsed": true,
+      "stateIds": [
+        "state_c98f8ca8c3834a848f2f2926bb732074"
+      ],
+      "x": 905.6404161597809,
+      "y": 980.9490451567625
+    },
+    {
+      "id": "group_985840ee83f54a39857c830206a3f70c",
+      "name": "\u6668\u66E6",
+      "appearance": "sand",
+      "isCollapsed": true,
+      "stateIds": [
+        "state_a8fbb9ccb3ba41f7a1e1754b4db070ef"
+      ],
+      "x": 1174.058540635776,
+      "y": 404.4694262351011
+    },
+    {
+      "id": "group_e4ff0c51b02940d093dbad8650d1dcc5",
+      "name": "\u971C\u6708",
+      "appearance": "ice",
+      "isCollapsed": true,
+      "stateIds": [
+        "state_f3b7848a90a94a02abcfb4531fcc2497"
+      ],
+      "x": 2397.9410415232933,
+      "y": 625.4179922893354
+    },
+    {
+      "id": "group_bfe94f8e0155481a9884f46a618ba820",
+      "name": "\u7EEF\u4E91",
+      "appearance": "rose",
+      "isCollapsed": true,
+      "stateIds": [
+        "state_92fdc652805c41868f4d49fb8d19bbb9"
+      ],
+      "x": 2043.5260362861568,
+      "y": 1689.531613184401
+    },
+    {
+      "id": "group_32d9196b90334e6c8a45b96613878949",
+      "name": "\u7FE1\u7FE0",
+      "appearance": "jade",
+      "isCollapsed": true,
+      "stateIds": [
+        "state_ad1e71b6b15840ca9f397ce2feeed422"
+      ],
+      "x": 774.9942957148113,
+      "y": 1722.5223993134628
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_3c244353f9574ba585583a9c84a407eb",
+      "delayMilliseconds": 4000,
+      "fromStateId": "state_c98f8ca8c3834a848f2f2926bb732074",
+      "fromPortId": "output_3c40737b9bcb46889d7625040f782aaa",
+      "toStateId": "state_a8fbb9ccb3ba41f7a1e1754b4db070ef",
+      "toPortId": "input_be1d03c7efe84199bb39c1a5aa3908be"
+    },
+    {
+      "id": "edge_ff89b937241c4bc3a9cdf552b10506ea",
+      "delayMilliseconds": 4000,
+      "fromStateId": "state_a8fbb9ccb3ba41f7a1e1754b4db070ef",
+      "fromPortId": "output_190ffcf0647d42b5bee3a3918608bc42",
+      "toStateId": "state_f3b7848a90a94a02abcfb4531fcc2497",
+      "toPortId": "input_a03d7a61d63149eea0bba4c2191a467c"
+    },
+    {
+      "id": "edge_2d799db5c836492a8be82dc5b02c59e1",
+      "delayMilliseconds": 4000,
+      "fromStateId": "state_f3b7848a90a94a02abcfb4531fcc2497",
+      "fromPortId": "output_405fc2e9bb124a9a908d3e4f01210dbb",
+      "toStateId": "state_92fdc652805c41868f4d49fb8d19bbb9",
+      "toPortId": "input_63bab8b5e8e34a5bae004a38a8ac45b7"
+    },
+    {
+      "id": "edge_c99a5ba646384586b053d13ac8f43b40",
+      "delayMilliseconds": 4000,
+      "fromStateId": "state_92fdc652805c41868f4d49fb8d19bbb9",
+      "fromPortId": "output_68d7509beed846d884ecf6001f179ff1",
+      "toStateId": "state_ad1e71b6b15840ca9f397ce2feeed422",
+      "toPortId": "input_dc08ec3bf49f4185ac8ef2f87cb26838"
+    },
+    {
+      "id": "edge_632745f93ff44c2abc77286e28ab346c",
+      "delayMilliseconds": 4000,
+      "fromStateId": "state_ad1e71b6b15840ca9f397ce2feeed422",
+      "fromPortId": "output_2c04b7c34e814217815e4740133535df",
+      "toStateId": "state_c98f8ca8c3834a848f2f2926bb732074",
+      "toPortId": "input_300dfa1e3bf44498937cd1278e181733"
+    }
+  ],
+  "settings": {
+    "cycleDelay": 50,
+    "autoStart": true
+  }
+}

@@ -1,6 +1,6 @@
 @inject DesktopPreferences Preferences
 @inject DesktopWallpaperService Desktop
-<button class="btn" @onclick="() => _open = true">桌面设置</button>
+<button class="desktop-settings-entry" @onclick="() => _open = true"><span>桌面与启动</span><small>开机自启与桌面恢复</small><span>›</span></button>
 @if (_open)
 {
     <div class="desktop-settings-backdrop" @onclick="() => _open = false">
@@ -20,3 +20,4 @@
     private void SetAutoStart(ChangeEventArgs args) { try { Preferences.SetAutoStart(args.Value is true); _error = null; } catch (Exception ex) { _error = ex.Message; } }
     private void SetRestore(ChangeEventArgs args) { try { Preferences.SetRestore(args.Value is true); _error = null; } catch (Exception ex) { _error = ex.Message; } }
 }
+

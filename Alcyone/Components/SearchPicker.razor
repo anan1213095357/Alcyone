@@ -1,0 +1,51 @@
+@using Microsoft.AspNetCore.Components.Web
+<div class="search-picker">
+    <button type="button" class="picker-trigger" aria-haspopup="dialog" aria-expanded="@_open" @onclick="Open"><span><small>@Selected?.Group</small>@(Selected?.Label ?? (string.IsNullOrEmpty(Value) ? Placeholder : Value))</span><span class="chevron">⌕</span></button>
+    @if (_open)
+    {
+        <div class="picker-dismiss" @onclick="Close"></div>
+        <div class="picker-menu" role="dialog" aria-label="@Placeholder">
+            <div class="search-line"><span>⌕</span><input @ref="_input" value="@_query" @oninput="Search" @onkeydown="KeyDown" placeholder="@SearchHint" aria-label="搜索选项" autocomplete="off" /><button type="button" @onclick="Close" aria-label="关闭">×</button></div>
+            <div class="breadcrumb"><div class="category-location"><small>当前分类</small><strong>@(_path.Length == 0 ? "全部 API" : _path.Replace("/", " / "))</strong></div><div class="category-navigation"><button type="button" @onclick='() => Navigate("")'>全部</button>@if (_path.Length > 0) { <button type="button" @onclick="Back">返回上级</button> }</div></div>
+            <div class="picker-results">
+                @if (string.IsNullOrWhiteSpace(_query))
+                {
+                    @foreach (var category in Categories) { <button type="button" class="category" @onclick="() => Navigate(category.Path)"><span>▤ @category.Name</span><span>›</span></button> }
+                }
+                @{ var choices = Choices.ToList(); }
+                @for (var i = 0; i < choices.Count; i++)
+                {
+                    var item = choices[i]; var index = i;
+                    <button type="button" class="option @(index == _index ? "focused" : "") @(item.Value == Value ? "selected" : "")" @onclick="() => Choose(item.Value)"><span><strong>@item.Label</strong><small>@(string.IsNullOrWhiteSpace(_query) ? item.Description : item.Group + " · " + item.Description)</small></span>@if(item.Value==Value){<span>✓</span>}</button>
+                }
+                @if (!choices.Any() && (!string.IsNullOrWhiteSpace(_query) || !Categories.Any())) { <div class="no-result">@(Options.Any() ? "没有匹配项，试试名称、API 或分类。" : "还没有可选项目，请先创建项目。")</div> }
+                @if (AllowCustom && !string.IsNullOrWhiteSpace(_query) && !Options.Any(o => o.Value == _query.Trim())) { <button type="button" class="custom" @onclick="() => Choose(_query.Trim())">使用输入值：@_query.Trim()</button> }
+            </div>
+            <div class="picker-help">@(AllowCustom ? "优先选择已有值，找不到时可使用输入值。" : "输入搜索，或逐级展开分类。↑ ↓ 选择，Enter 确认。")</div>
+        </div>
+    }
+</div>
+@code {
+    [Parameter] public IEnumerable<PickerOption> Options { get; set; } = [];
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "选择项目";
+    [Parameter] public string SearchHint { get; set; } = "搜索名称、API 或分类…";
+    [Parameter] public bool AllowCustom { get; set; }
+    private bool _open, _focus;
+    private string _query = "", _path = "";
+    private int _index;
+    private ElementReference _input;
+    private PickerOption? Selected => Options.FirstOrDefault(o => o.Value == Value);
+    private IEnumerable<PickerOption> Choices => Options.Where(o => string.IsNullOrWhiteSpace(_query) ? o.Group == _path : ($"{o.Label} {o.Value} {o.Group} {o.Description}").Contains(_query.Trim(), StringComparison.OrdinalIgnoreCase));
+    private IEnumerable<(string Path, string Name)> Categories => Options.Select(o => o.Group).Where(g => g.Length > 0 && (_path.Length == 0 || g.StartsWith(_path + "/", StringComparison.Ordinal))).Select(g => { var rest = _path.Length == 0 ? g : g[(_path.Length + 1)..]; var name = rest.Split('/')[0]; return (Path: _path.Length == 0 ? name : _path + "/" + name, Name: name); }).Distinct();
+    private void Open() { _open = true; _focus = true; _query = ""; _path = Selected?.Group ?? ""; _index = 0; }
+    private void Close() => _open = false;
+    private void Navigate(string path) { _path = path; _index = 0; }
+    private void Back() { var slash = _path.LastIndexOf('/'); Navigate(slash < 0 ? "" : _path[..slash]); }
+    private void Search(ChangeEventArgs args) { _query = args.Value?.ToString() ?? ""; _index = 0; }
+    private async Task Choose(string value) { _open = false; await ValueChanged.InvokeAsync(value); }
+    private async Task KeyDown(KeyboardEventArgs e) { var items = Choices.ToList(); if(e.Key=="Escape")Close(); else if(e.Key=="ArrowDown")_index=Math.Min(items.Count-1,_index+1); else if(e.Key=="ArrowUp")_index=Math.Max(0,_index-1); else if(e.Key=="Enter" && items.Count>0)await Choose(items[Math.Clamp(_index,0,items.Count-1)].Value); }
+    protected override async Task OnAfterRenderAsync(bool firstRender) { if(_focus && _open){_focus=false;await _input.FocusAsync();} }
+}
+

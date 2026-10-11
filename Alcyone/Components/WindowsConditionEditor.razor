@@ -1,0 +1,57 @@
+@using StateMachine.Execution
+@using System.Diagnostics
+<div class="windows-condition">
+    <div class="field-caption">@QueryLabel</div>
+    @if (Condition.SystemCheck.StartsWith("file.") || Condition.SystemCheck.StartsWith("directory."))
+    {
+        <FilePathPicker Value="@Condition.SystemQuery" ValueChanged="ChooseQuery" FileOnly="@Condition.SystemCheck.StartsWith("file.")" />
+    }
+    else
+    {
+        <SearchPicker Options="_options" Value="@Condition.SystemQuery" ValueChanged="ChooseQuery" AllowCustom="true" Placeholder="@QueryLabel" />
+        @if (!string.IsNullOrWhiteSpace(Condition.SystemQuery)) { <div class="selected-target">@Condition.SystemQuery</div> }
+    }
+    <small>@QueryHelp</small>
+    @if (WindowsConditions.Numeric(Condition.SystemCheck))
+    {
+        <div class="field-caption">比较数值 · @Unit</div>
+        <div class="numeric"><select @bind="Condition.Operator" @bind:after="NotifyChanged">@foreach(var op in new[]{"==","!=",">",">=","<","<="}){<option>@op</option>}</select><input type="number" step="any" @bind="Condition.SystemValue" @bind:after="NotifyChanged" aria-label="@($"比较数值（{Unit}）")" /></div>
+        <small>例如：@(Condition.SystemCheck == "disk.free" ? "剩余空间 >= 10 GB" : Condition.SystemCheck == "file.size" ? "文件大小 > 1 MB" : "最后修改距今 < 60 秒")</small>
+    }
+    else { <div class="field-caption">期望结果</div><select value="@(Condition.ExpectedSuccess ? "true" : "false")" @onchange="ChangeExpected"><option value="true">满足 / 存在</option><option value="false">不满足 / 不存在</option></select> }
+    <button type="button" @onclick="LoadOptions">刷新可选目标</button>
+    <button type="button" @onclick="Test">测试当前条件</button>
+    @if (_result is not null) { <small>@_result</small> }
+</div>
+@code {
+    [Parameter, EditorRequired] public ConditionModel Condition { get; set; } = default!;
+    [Parameter] public EventCallback Changed { get; set; }
+    private string? _result, _check;
+    private List<PickerOption> _options = [];
+    private string QueryLabel => Condition.SystemCheck.Split('.')[0] switch { "file"=>"目标文件", "directory"=>"目标文件夹", "disk"=>"目标磁盘", "window"=>"窗口标题", _=>"进程名称" };
+    private string QueryHelp => Condition.SystemCheck.Split('.')[0] switch { "file"=>"选择文件夹后可继续浏览文件；也可输入完整路径，例如 C:\\Logs\\app.log。支持 %USERPROFILE%。", "directory"=>"选择已有文件夹，或输入完整路径，例如 C:\\Downloads。", "disk"=>"选择磁盘，例如 C:\\。空间单位为 GB。", "window"=>"选择当前窗口，或输入标题的一部分。忽略大小写；未打开的窗口可手动输入。", _=>"选择正在运行的进程，或输入进程名，例如 notepad（无需 .exe）。" };
+    private string Unit => Condition.SystemCheck == "disk.free" ? "GB" : Condition.SystemCheck == "file.size" ? "MB" : "秒";
+    protected override void OnParametersSet() { if(_check!=Condition.SystemCheck){_check=Condition.SystemCheck;LoadOptions();} }
+    private async Task ChooseQuery(string value) { Condition.SystemQuery=value;LoadOptions();await NotifyChanged(); }
+    private Task NotifyChanged() { _result = null; return Changed.InvokeAsync(); }
+    private Task ChangeExpected(ChangeEventArgs e) { Condition.ExpectedSuccess = e.Value?.ToString() == "true"; return NotifyChanged(); }
+    private void LoadOptions()
+    {
+        _options=[];
+        if (Condition.SystemCheck.StartsWith("file.") || Condition.SystemCheck.StartsWith("directory.")) return;
+        try
+        {
+            var kind=Condition.SystemCheck.Split('.')[0];
+            if(kind=="window")_options=WindowsConditions.WindowTitles().Select(t=>new PickerOption(t,t,"当前窗口","按标题包含匹配")).ToList();
+            else if(kind=="process") {var processes=Process.GetProcesses();try{_options=processes.Select(p=>p.ProcessName).Distinct().Order().Select(n=>new PickerOption(n,n,"运行中进程")).ToList();}finally{foreach(var p in processes)p.Dispose();}}
+            else
+            {
+                _options=DriveInfo.GetDrives().Where(d=>d.IsReady).Select(d=>new PickerOption(d.Name,d.Name,"磁盘",$"可用 {d.AvailableFreeSpace/1073741824d:F1} GB")).ToList();
+            }
+        }
+        catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception or InvalidOperationException){ }
+    }
+    private void Test() => _result = WindowsConditions.Evaluate(Condition) ? "条件满足" : "条件不满足（请检查目标和期望结果）";
+}
+
+

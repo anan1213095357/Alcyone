@@ -16,7 +16,7 @@ monaco.languages.register({ id: 'csharp', extensions: ['.cs', '.csx'] });
 monaco.languages.setLanguageConfiguration('csharp', conf);
 // Extend the stock grammar so comments, strings and interpolation retain C# tokenization.
 const scriptSymbols = [
-    [/\b(?:StateAction|StateParameter)(?:Attribute)?\b/, 'script.attribute'],
+    [/\b(?:StateAction|StateCondition|StateParameter)(?:Attribute)?\b/, 'script.attribute'],
     [/\b(?:StateScript|StateScriptContext|StateVariables|ColorProbeResult)\b/, 'type.identifier'],
     [/\b(?:Api|Vars)\b/, 'script.api'],
     [/\b(?:Log|Service|Delay|Click|MoveTo|DoubleClickAsync|MouseDown|MouseUp|Scroll|Press|Hotkey|KeyDown|KeyUp|TypeText|DragAsync|ReleaseAll|FindAsync|Last|GetNode|SetNode|Get|Set)\b(?=\s*(?:<|\())/, 'script.method']
@@ -45,7 +45,7 @@ export function create(host, status, reference, docs) {
             const prefix = before.match(/[A-Za-z_][\w.]*\.$/)?.[0] ?? '';
             const canonical = prefix.replace(/^Api\.Color\./, 'Api.Recognition.').replace(/^Api\.Vars\./, 'Vars.');
             const attribute = /\[\s*$/.test(before);
-            const items = docs.filter(d => attribute ? ['StateAction', 'StateParameter'].includes(d.title) :
+            const items = docs.filter(d => attribute ? ['StateAction', 'StateCondition', 'StateParameter'].includes(d.title) :
                 (!canonical || (d.title.startsWith(canonical) && !d.title.slice(canonical.length).includes('.')))).map(d => {
                 const name = d.title.replace(/<T>$/, '');
                 const sampleStart = d.insert.indexOf(name);
@@ -53,7 +53,7 @@ export function create(host, status, reference, docs) {
                 const closingBracket = attribute && model.getLineContent(position.lineNumber).slice(word.endColumn - 1).startsWith(']');
                 const text = attribute ? d.insert.slice(1, closingBracket ? -1 : undefined) : canonical && sample.startsWith(canonical) ? sample.slice(canonical.length) : sample;
                 return { label: canonical ? d.title.slice(canonical.length) : d.title,
-                    kind: ['StateAction', 'StateParameter', 'StateScript'].includes(d.title) ? monaco.languages.CompletionItemKind.Class : monaco.languages.CompletionItemKind.Method,
+                    kind: ['StateAction', 'StateCondition', 'StateParameter', 'StateScript'].includes(d.title) ? monaco.languages.CompletionItemKind.Class : monaco.languages.CompletionItemKind.Method,
                     documentation: d.description, detail: d.signature,
                     insertText: text,
                     range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn) };
@@ -97,6 +97,7 @@ export function create(host, status, reference, docs) {
             active = path; editor.setModel(item.model); if (item.view) editor.restoreViewState(item.view); editor.focus();
         },
         dirtyFiles() { return [...models].filter(([,v]) => v.model.getValue() !== v.original).map(([path,v]) => ({path, source:v.model.getValue(), original:v.original})); },
+        aiContext() { const model = editor.getModel(); const selection = editor.getSelection(); return {source: model?.getValue() ?? '', selection: model && selection ? model.getValueInRange(selection) : ''}; },
         markSaved(path, source) { const item = models.get(path); if (item) { item.original = source; item.dirty = item.model.getValue() !== source; invoke('DirtyChanged', path, item.dirty); } },
         reload(path, source) { const item = models.get(path); if (item) { item.original = source; item.model.setValue(source); item.dirty = false; invoke('DirtyChanged', path, false); } },
         action(id) { editor.getAction(id)?.run(); },

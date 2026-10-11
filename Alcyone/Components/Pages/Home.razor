@@ -19,7 +19,7 @@
     {
     <div class="topbar">
         <div class="logo">
-            <div class="logo-icon"><img src="images/favicon.png" alt="Alcyone" /></div>
+            <div class="logo-icon"><img src="images/planet-logo-transparent.png" alt="Alcyone" /></div>
             Alcyone
         </div>
         <button class="btn toolbar-overflow-toggle" aria-label="展开工具栏" aria-expanded="@_toolbarMenuOpen" @onclick="() => _toolbarMenuOpen = !_toolbarMenuOpen">工具 ⋯</button>
@@ -29,13 +29,6 @@
             <button class="btn" @onclick="OpenScriptEditorAsync">@L["脚本编译器"]</button>
             <button class="btn add-state-control" @onclick="AddStateAsync"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M10 6v8 M6 10h8"/></svg><span>@L["添加状态"]</span></button>
             <button class="btn ai-development-control" @onclick="OpenAiDialog"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 2 2.2 5.8L18 10l-5.8 2.2L10 18l-2.2-5.8L2 10l5.8-2.2z"/></svg><span>@L["AI 开发"]</span></button>
-        </div>
-        <div class="toolbar-group view-tools">
-            <button class="btn quiet icon-control" title="@L["缩小"]" aria-label="@L["缩小"]" @onclick="ZoomOutAsync">−</button>
-            <div id="zoomLabel" class="zoom-label">85%</div>
-            <button class="btn quiet icon-control" title="@L["放大"]" aria-label="@L["放大"]" @onclick="ZoomInAsync">+</button>
-            <button class="btn quiet" @onclick="FitCanvasAsync">@L["适配"]</button>
-            <span class="canvas-gesture-hint">@L["左键框选 · 右键平移"]</span>
         </div>
         <div class="execution-controls" role="group" aria-label="@L["运行控制"]">
             <span class="execution-status @RuntimeStatusClass"><i></i>@L[RuntimeStatusText]</span>
@@ -54,15 +47,6 @@
                 </button>
             </div>
         </div>
-        <LanguagePicker />
-        <DesktopSettings />
-        <button class="btn desktop-control" disabled="@(!Desktop.Available || !_autoSaveReady || _desktopBusy)"
-                title="@(Desktop.Available ? DesktopSummary : L["请在 Windows 桌面程序中使用此功能。"])"
-                @onclick="SetAsDesktopAsync">@L[_desktopBusy ? "切换中…" : Desktop.IsDesktop ? "更新全部屏幕" : "全部屏幕桌面"]</button>
-        @if (Desktop.IsDesktop)
-        {
-            <button class="btn quiet" disabled="@_desktopBusy" title="@L["关闭所有屏幕桌面"]" @onclick="StopDesktopAsync">@L["关闭桌面"]</button>
-        }
         <div class="config-control">
             <button class="config-trigger @(_configMenuOpen ? "is-open" : "")" aria-label="@L["选择配置"]" aria-expanded="@_configMenuOpen" @onclick="() => _configMenuOpen = !_configMenuOpen">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2.5h7l3 3v12H5z M12 2.5v4h3 M8 10h4 M8 13h4" /></svg>
@@ -95,6 +79,25 @@
         </div>
         </div>
         <div class="spacer"></div>
+        <div class="application-controls">
+            <button class="desktop-launch" disabled="@(!Desktop.Available || !_autoSaveReady || _desktopBusy)" title="@(Desktop.Available ? DesktopSummary : L["请在 Windows 桌面程序中使用此功能。"])" @onclick="SetAsDesktopAsync"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="10" rx="2"/><path d="M7 17h6 M10 13.5V17"/></svg><span>@(_desktopBusy ? "切换中…" : Desktop.IsDesktop ? "更新桌面" : "启用桌面")</span></button>
+            <button class="app-settings-toggle" title="设置" aria-label="设置" aria-expanded="@_appSettingsOpen" @onclick="() => _appSettingsOpen=!_appSettingsOpen"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3"/><path d="M8 2h4l.6 2 1.7 1 2-.5 2 3.5-1.5 1.5v2l1.5 1.5-2 3.5-2-.5-1.7 1-.6 2H8l-.6-2-1.7-1-2 .5-2-3.5 1.5-1.5v-2L1.7 7.5l2-3.5 2 .5 1.7-1z"/></svg></button>
+            @if (_appSettingsOpen)
+            {
+                <div class="app-settings-dismiss" @onclick="() => _appSettingsOpen=false"></div>
+                <section class="app-settings-menu" aria-label="应用设置">
+                    <div class="app-menu-heading">设置</div>
+                    <div class="app-language-row"><span>界面语言</span><LanguagePicker /></div>
+                    <AiConnectionDialog />
+                    <DesktopSettings />
+                    @if (Desktop.IsDesktop)
+                    {
+                        <div class="app-menu-divider"></div>
+                        <button class="close-desktop-entry" disabled="@_desktopBusy" @onclick="async () => { _appSettingsOpen=false; await StopDesktopAsync(); }"><span>关闭桌面</span><small>停止所有屏幕的桌面显示</small></button>
+                    }
+                </section>
+            }
+        </div>
         @if (Desktop.Available)
         {
             <div class="window-controls" role="group" aria-label="窗口控制">
@@ -199,6 +202,7 @@
 
         }
         <main id="workspace" class="workspace">
+            @if (IsWallpaperView) { <DesktopAiConsole Submit="SendDesktopAiAsync" Reply="@_desktopAiReply" Progress="_desktopAiProgress" CliPreview="@DesktopCliPreview" CliOutput="@_desktopCliOutput" CliStatus="@_desktopCliStatus" CliBusy="_desktopCliBusy" ExecuteCli="ExecuteDesktopCliAsync" CancelCli="CancelDesktopCli" StateNames="@Machine.States.Select(s => s.Name)" VariableNames="@Machine.Variables.Select(v => v.Name)" /> }
             <div class="starfield-anchor" aria-hidden="true"><canvas id="workspaceBackdrop"></canvas><canvas id="workspaceStarfield"></canvas></div>
             <div id="worldScale">
                 <div id="world">
@@ -296,7 +300,15 @@
                                                                 var rightVariable = condition.RightMode == "variable";
                                                                 var rightText = rightVariable ? "$" + NodeString(condition.RightValue) : DisplayNode(condition.RightValue, condition.RightType);
                                                                 <div class="condition-mini @rowClass" @key="condition.Id">
-                                                                    @if (condition.Kind == "recognition")
+                                                                    @if (string.IsNullOrEmpty(condition.Kind))
+                                                                    { <span>请选择判断 API</span> }
+                                                                    else if (condition.Kind == "script")
+                                                                    { <span>@(ScriptConditionOptions.FirstOrDefault(o => o.Value == "script:" + condition.ScriptMethod)?.Label ?? condition.ScriptMethod)</span> }
+                                                                    else if (condition.Kind == "windows")
+                                                    {
+                                                        <span class="expr-chip variable" title="@condition.SystemQuery">@WindowsConditions.Checks.GetValueOrDefault(condition.SystemCheck) · @condition.SystemQuery</span>
+                                                    }
+                                                    else if (condition.Kind == "recognition")
                                                                     {
                                                                         <span class="expr-chip variable" title="@RecognitionConditionText(condition)">@RecognitionConditionText(condition)</span>
                                                                     }
@@ -452,20 +464,7 @@
                                 <div class="action-box">
                                     <div class="field-label">@L[lifecycle.Title]</div>
 
-                                    <select class="select"
-                                            value="@actionCall.ActionMethod"
-                                            @onchange="e => ChangeStateActionMethod(state.Id, lifecycle.Key, e.Value?.ToString() ?? string.Empty)">
-                                        <option value="">@L["不调用动作"]</option>
-                                        @foreach (var group in ActionMethods.GroupBy(x => x.Group))
-                                        {
-                                            <optgroup label="@L[group.Key]">
-                                                @foreach (var action in group)
-                                                {
-                                                    <option value="@action.Key">@L[action.DisplayName]</option>
-                                                }
-                                            </optgroup>
-                                        }
-                                    </select>
+                                    <SearchPicker Options="LifecycleOptions" Value="@actionCall.ActionMethod" ValueChanged="value => ChangeStateActionMethod(state.Id, lifecycle.Key, value)" Placeholder="选择生命周期 API" />
 
                                     @if (actionDescriptor is not null)
                                     {
@@ -488,7 +487,8 @@
                                                             <div class="field-label" style="margin:0;flex:1">@L[parameter.DisplayName]</div>
                                                         </div>
 
-                                                        <div style="display:grid;grid-template-columns:88px 1fr;gap:6px">
+                                                        <div class="hint">@ParameterHint(parameter)</div>
+                                                        <div style="display:grid;grid-template-columns:88px minmax(0,1fr);gap:6px">
                                                             <select class="select"
                                                                     value="@argument.Source"
                                                                     @onchange='e => ChangeStateActionArgumentSource(
@@ -508,21 +508,11 @@
                                                             @if (argument.Source == "variable" &&
                                                                  CanBindGlobalVariable(actionCall, parameter))
                                                             {
-                                                                <select class="select"
-                                                                        value="@argument.VariableName"
-                                                                        @onchange="e => ChangeStateActionArgumentVariable(
-                                                                                            state.Id,
-                                                                                            lifecycle.Key,
-                                                                                            parameter.Name,
-                                                                                            e.Value?.ToString() ?? string.Empty)">
-
-            @foreach (var variable in compatibleVariables)
-                                                                    {
-                                                                        <option value="@variable.Name">
-                                                                            @variable.Name (@variable.Type)
-                                                                        </option>
-                                                                    }
-                                                                </select>
+                                                                <SearchPicker Options="@VariableOptions(compatibleVariables)" Value="@argument.VariableName" ValueChanged="value => ChangeStateActionArgumentVariable(state.Id, lifecycle.Key, parameter.Name, value)" Placeholder="选择全局变量" />
+                                                            }
+                                                            else if (editorKind == "string")
+                                                            {
+                                                                <SearchPicker Options="@ParameterOptions(parameter)" Value="@argument.LiteralValue" ValueChanged="value => ChangeStateActionArgumentLiteral(state.Id, lifecycle.Key, parameter.Name, value)" AllowCustom="@(!IsReferenceParameter(parameter))" Placeholder="@L[parameter.DisplayName]" />
                                                             }
                                                             else if (editorKind == "boolean")
                                                             {
@@ -668,30 +658,27 @@
                                                 <div class="condition-editor" @key="condition.Id">
                                                     <div class="condition-index">@L.Format("条件 {0}", conditionIndex + 1)</div>
                                                     <div class="recognition-condition-row">
-                                                        <select class="select" aria-label="@L["选择出口判断项目"]" value="@ConditionTarget(condition)" @onchange="e => ChangeConditionTarget(condition, e.Value?.ToString() ?? string.Empty)">
-                                                            <option value="" disabled>@L["选择变量或库中的名称"]</option>
-                                                            <optgroup label="@L["全局变量"]">
-                                                                @foreach (var variable in Machine.Variables)
-                                                                {
-                                                                    <option value="@($"variable:{variable.Id}")">@variable.Name</option>
-                                                                }
-                                                            </optgroup>
-                                                            <optgroup label="@L["多点色库"]">
-                                                                @foreach (var item in Machine.Recognitions.Where(i => !i.IsFolder && i.Settings.Mode == "feature"))
-                                                                {
-                                                                    <option value="@($"recognition:{item.Id}")">@RecognitionPath(item)</option>
-                                                                }
-                                                            </optgroup>
-                                                            <optgroup label="@L["字典库"]">
-                                                                @foreach (var item in Machine.Recognitions.Where(i => i.Settings.Mode == "dictionary"))
-                                                                {
-                                                                    <option value="@($"recognition:{item.Id}")">@RecognitionPath(item)</option>
-                                                                }
-                                                            </optgroup>
-                                                        </select>
+                                                        <SearchPicker Options="ConditionOptions" Value="@ConditionTarget(condition)" ValueChanged="value => ChangeConditionTarget(condition, value)" Placeholder="选择判断 API" />
                                                         <button class="remove-btn" @onclick="() => RemoveCondition(state.Id, output.Id, condition.Id)">×</button>
                                                     </div>
-                                                    @if (condition.Kind == "recognition")
+                                                    @if (string.IsNullOrEmpty(condition.Kind))
+                                                    {
+                                                        <div class="hint">请选择判断 API，再配置条件。</div>
+                                                    }
+                                                    else if (condition.Kind == "script")
+                                                    {
+                                                        <div class="recognition-filter-row">
+                                                            <label>函数返回</label>
+                                                            <select class="select" value="@(condition.ExpectedSuccess ? "true" : "false")" @onchange='e => { condition.ExpectedSuccess = e.Value?.ToString() == "true"; RefreshCurrentConditionResults(); }'><option value="true">true 时触发</option><option value="false">false 时触发</option></select>
+                                                            <button class="btn" @onclick="() => TestRecognitionConditionAsync(condition)">测试条件</button>
+                                                        </div>
+                                                        <div class="hint">等待函数执行完毕后判断。通过 Vars 读取变量；异常时不会触发，详情见日志。</div>
+                                                    }
+                                                    else if (condition.Kind == "windows")
+                                                    {
+                                                        <WindowsConditionEditor Condition="condition" Changed="RefreshCurrentConditionResults" />
+                                                    }
+                                                    else if (condition.Kind == "recognition")
                                                     {
                                                         var criteria = RecognitionCriteriaFor(condition);
                                                         @if (IsDictionaryCondition(condition))
@@ -706,7 +693,7 @@
                                                             {
                                                                 <div class="recognition-filter-row">
                                                                     <label>@L["查找文字"]</label>
-                                                                    <input class="input" placeholder="@L["必须填写固定文字，例如：确定"]" value="@(criteria.SearchText ?? Machine.Recognitions.FirstOrDefault(i => i.Id == condition.RecognitionId)?.Settings.Query)" @onchange="e => { criteria.SearchText = e.Value?.ToString() ?? string.Empty; RefreshCurrentConditionResults(); }" />
+                                                                    <SearchPicker Options="@RecognitionTextOptions(condition)" Value="@(criteria.SearchText ?? Machine.Recognitions.FirstOrDefault(i => i.Id == condition.RecognitionId)?.Settings.Query ?? string.Empty)" ValueChanged="value => { criteria.SearchText = value; RefreshCurrentConditionResults(); }" AllowCustom="true" Placeholder="选择或输入要查找的文字" />
                                                                 </div>
                                                                 <div class="hint">@L["在所选字典中匹配这段固定文字，按找到／未找到判断。"]</div>
                                                             }
@@ -749,11 +736,11 @@
                                                             <select class="select" @bind="criteria.TextOperator" @bind:after="RefreshCurrentConditionResults">
                                                                 <option value="contains">@L["包含"]</option><option value="==">@L["等于"]</option><option value="!=">@L["不等于"]</option><option value="startsWith">@L["开头"]</option><option value="endsWith">@L["结尾"]</option>
                                                             </select>
-                                                            <input class="input" placeholder="@L["留空不判断"]" @bind="criteria.Text" @bind:after="RefreshCurrentConditionResults" />
+                                                            <SearchPicker Options="@RecognitionTextOptions(condition, true)" Value="@(criteria.Text ?? string.Empty)" ValueChanged="value => { criteria.Text = string.IsNullOrEmpty(value) ? null : value; RefreshCurrentConditionResults(); }" AllowCustom="true" Placeholder="不判断，或选择比较文字" />
                                                         </div>
                                                         <div class="recognition-filter-row">
                                                             <label>@L["是否整数"]</label>
-                                                            <select class="select" @bind="criteria.IsInteger" @bind:after="RefreshCurrentConditionResults"><option value="">@L["不判断"]</option><option value="true">@L["是"]</option><option value="false">@L["否"]</option></select>
+                                                            <select class="select" value="@(criteria.IsInteger switch { true => "true", false => "false", null => "" })" @onchange='e => { criteria.IsInteger = e.Value?.ToString() switch { "true" => true, "false" => false, _ => (bool?)null }; RefreshCurrentConditionResults(); }'><option value="">@L["不判断"]</option><option value="true">@L["是"]</option><option value="false">@L["否"]</option></select>
                                                         </div>
                                                         <div class="recognition-filter-row text-filter">
                                                             <label>@L["整数比较"]</label>
@@ -788,9 +775,9 @@
                                                         @if (condition.RightMode == "literal")
                                                         {
                                                             <select class="select" value="@condition.RightType" @onchange='e => ChangeConditionRightType(state.Id, output.Id, condition.Id, e.Value?.ToString() ?? "string")'>
-                                                                <option value="number">number</option>
-                                                                <option value="string">string</option>
-                                                                <option value="boolean">boolean</option>
+                                                                <option value="number">数值</option>
+                                                                <option value="string">文本</option>
+                                                                <option value="boolean">是 / 否</option>
                                                             </select>
                                                         }
                                                         else
@@ -799,22 +786,10 @@
                                                         }
                                                     </div>
                                                     <div class="condition-row-c">
-                                                        <div style="display:flex;align-items:center;color:#718097;font-size:9px">@L["右值"]</div>
+                                                        <div style="display:flex;align-items:center;color:#718097;font-size:9px">@L["比较值"]</div>
                                                         @if (condition.RightMode == "variable")
                                                         {
-                                                            <select class="select" value="@NodeString(condition.RightValue)" @onchange="e => ChangeConditionRightValue(state.Id, output.Id, condition.Id, e.Value?.ToString() ?? string.Empty)">
-                                                                @if (Machine.Variables.Count == 0)
-                                                                {
-                                                                    <option value="">@L["没有变量"]</option>
-                                                                }
-                                                                else
-                                                                {
-                                                                    @foreach (var variable in Machine.Variables)
-                                                                    {
-                                                                        <option value="@variable.Name">@variable.Name</option>
-                                                                    }
-                                                                }
-                                                            </select>
+                                                            <SearchPicker Options="@VariableOptions(Machine.Variables)" Value="@NodeString(condition.RightValue)" ValueChanged="value => ChangeConditionRightValue(state.Id, output.Id, condition.Id, value)" Placeholder="选择比较变量" />
                                                         }
                                                         else if (condition.RightType == "boolean")
                                                         {
@@ -825,7 +800,7 @@
                                                         }
                                                         else
                                                         {
-                                                            <input class="input" value="@DisplayNode(condition.RightValue, condition.RightType)" @onchange="e => ChangeConditionRightValue(state.Id, output.Id, condition.Id, e.Value?.ToString() ?? string.Empty)" />
+                                                            <SearchPicker Options="@ConditionValueOptions(condition)" Value="@DisplayNode(condition.RightValue, condition.RightType)" ValueChanged="value => ChangeConditionRightValue(state.Id, output.Id, condition.Id, value)" AllowCustom="true" Placeholder="输入或选择比较值" />
                                                         }
                                                     </div>
                                                     }
@@ -964,6 +939,10 @@
                 <button class="@(_aiScope == "machine" ? "active" : "")" disabled="@_aiBusy" @onclick='() => _aiScope = "machine"'>@L["仅流程"]</button>
             </div>
             <!-- 对话主体 -->
+            @if (_aiScope == "script" && _scriptAiContext is not null)
+            {
+                <div class="script-ai-context">正在编写：@ScriptAiKindLabel(_scriptAiContext.Kind) · @_scriptAiContext.File<br />已附带当前代码、所选片段和编译错误。直接描述需求即可。</div>
+            }
             <div class="ai-body">
 
                 @if (_aiMessages.Count == 0 && !_aiBusy)
@@ -1034,8 +1013,9 @@
                                         </div>
                                     }
 
+                                    @if (!string.IsNullOrEmpty(message.Reasoning)) { <AiStreamView Progress="@(new AiStreamProgress("", message.Reasoning, ""))" /> }
                                     <div class="ai-message-bubble">
-                                        @message.Text
+                                        @if (message.Role == "assistant") { <AiMarkdown Text="@message.Text" /> } else { @message.Text }
                                     </div>
 
                                 </div>
@@ -1057,11 +1037,7 @@
                                         AI
                                     </div>
 
-                                    <div class="ai-message-bubble ai-loading">
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
-                                    </div>
+                                    <AiStreamView Progress="_aiProgress" Busy="true" />
 
                                 </div>
 
@@ -1203,6 +1179,7 @@
 
         function fitDesktop() {
             if (!desktopView || !workspace || !scaleBox) return;
+            workspace.style.setProperty('--desktop-taskbar-inset', `${Math.max(0, screen.height - screen.availHeight)}px`);
             const zoom = Math.min(workspace.clientWidth / WORLD_WIDTH, workspace.clientHeight / WORLD_HEIGHT);
             setZoom(zoom, false);
             scaleBox.style.left = `${Math.max(0, (workspace.clientWidth - WORLD_WIDTH * canvasZoom) / 2)}px`;
@@ -1249,6 +1226,7 @@
             if (window.alcyoneAnimation.paused) { scheduleDrawEdges(); return; }
             clearTimeout(flightCleanup);
             let nextArrival = Infinity;
+            let ships = '';
             let html = `<defs>
                 <clipPath id="starship-photo-silhouette" clipPathUnits="userSpaceOnUse">
                     <path d="M 480 85 Q 488 84 495 90 Q 530 139 549 195 L 560 205 L 602 291 L 614 363 L 579 369 L 578 841 L 596 877 L 676 1006 L 675 1165 L 340 1165 L 341 1001 L 363 878 L 382 842 L 383 370 L 346 363 L 356 291 L 400 205 L 418 190 Q 445 122 473 89 Z"/>
@@ -1318,7 +1296,7 @@
             if (elapsed >= duration) continue;
             nextArrival = Math.min(nextArrival, duration - elapsed);
             const delay = -elapsed;
-            html += `<g class="star-route-ship" style="offset-path:path('${d}');animation-duration:${duration}s;animation-delay:${delay}s;animation-iteration-count:1;animation-fill-mode:both;opacity:${edgeOpacity}" aria-hidden="true">
+            ships += `<g class="star-route-ship" style="offset-path:path('${d}');animation-duration:${duration}s;animation-delay:${delay}s;animation-iteration-count:1;animation-fill-mode:both;opacity:${edgeOpacity};pointer-events:none" aria-hidden="true">
                 <g class="star-route-craft" transform="scale(2)">
                     <g class="star-route-plumes">
                         <g class="star-route-plume" style="animation-delay:-.08s">
@@ -1391,7 +1369,7 @@
                     </g>`;
                 }
             }
-            edgeLayer.innerHTML = html;
+            edgeLayer.innerHTML = html + ships;
             if (Number.isFinite(nextArrival)) flightCleanup = setTimeout(drawEdges, nextArrival * 1000 + 20);
         }
 
@@ -1572,7 +1550,7 @@
         function onCanvasContextMenu(event) { event.preventDefault(); }
 
         function onWheel(event) {
-            if (!workspace || event.target.closest('input, textarea, select, .canvas-selection-toolbar, .alcyone-fold-popover')) return;
+            if (!workspace || event.target.closest('input, textarea, select, .canvas-selection-toolbar, .alcyone-fold-popover, .desktop-ai-console')) return;
             event.preventDefault();
             const rect = workspace.getBoundingClientRect();
             const mouseX = event.clientX - rect.left;
@@ -1836,5 +1814,13 @@
 
 @if (_scriptEditorOpen && _scriptHost is not null)
 {
-    <ScriptWorkbench Host="_scriptHost" OnClose="() => _scriptEditorOpen = false" OnAi="OpenScriptAi" />
+    <ScriptWorkbench @ref="_scriptWorkbench" Host="_scriptHost" StartWithConditionTemplate="_startWithConditionTemplate" OnClose="() => _scriptEditorOpen = false" OnAi="OpenScriptAi" />
 }
+
+
+
+
+
+
+
+

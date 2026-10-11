@@ -1,4 +1,11 @@
 namespace StateMachine.Scripting.Metadata;
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class StateConditionAttribute(string displayName, string group = "自定义") : Attribute
+{
+ public string DisplayName { get; } = displayName;
+ public string Group { get; } = group;
+}
+
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public class StateActionAttribute(string displayName, string group = "二次开发") : Attribute
 {

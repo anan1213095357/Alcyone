@@ -87,7 +87,7 @@ public sealed partial class MachineSession : IAsyncDisposable
     {
         if (_executing) return;
         BeginExecution();
-        try { await ScanRecognitionConditionAsync(condition); }
+        try { if (condition.Kind == "script") { var matched = await EvaluateScriptConditionAsync(condition); AddLog("CONDITION", matched ? "自定义条件满足" : "自定义条件不满足", "info"); RefreshCurrentConditionResults(); } else await ScanRecognitionConditionAsync(condition); }
         catch (OperationCanceledException) { }
         catch (Exception ex) { AddLog("RECOGNITION", ex.Message, "error"); }
         finally { EndExecution(); Notify(); }
@@ -164,6 +164,18 @@ public sealed partial class MachineSession : IAsyncDisposable
     private void DiscoverActionMethods()
     {
         _actionMethods.Clear();
+        _scriptConditionResults.Clear();
+        _scriptConditions.Clear();
+        foreach (var target in _scriptHost?.ActionTargets ?? Array.Empty<object>())
+            foreach (var method in target.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance))
+                if (!method.ContainsGenericParameters && method.GetParameters().Length == 0 &&
+                    method.GetCustomAttribute<StateMachine.Scripting.Metadata.StateConditionAttribute>() is not null &&
+                    (method.ReturnType == typeof(bool) || method.ReturnType == typeof(Task<bool>) || method.ReturnType == typeof(ValueTask<bool>)))
+                {
+                    var key = target.GetType().FullName + "." + method.Name;
+                    if (!_scriptConditions.TryAdd(key, (target, method)))
+                        throw new InvalidOperationException("条件函数重名：" + key);
+                }
 
         RegisterActionTarget(this, isHotScript: false);
 
@@ -709,8 +721,37 @@ public sealed partial class MachineSession : IAsyncDisposable
         return string.Equals(Convert.ToString(left, CultureInfo.InvariantCulture), Convert.ToString(right, CultureInfo.InvariantCulture), StringComparison.Ordinal);
     }
 
+    private readonly Dictionary<string, bool> _scriptConditionResults = new();
+    private readonly Dictionary<string, (object Target, MethodInfo Method)> _scriptConditions = new(StringComparer.Ordinal);
+    private async Task<bool> EvaluateScriptConditionAsync(ConditionModel condition)
+    {
+        _scriptConditionResults[condition.Id] = false;
+        try
+        {
+            if (!_scriptConditions.TryGetValue(condition.ScriptMethod, out var entry))
+                throw new InvalidOperationException("条件函数不存在或签名无效：" + condition.ScriptMethod);
+            _executionCancellation.Token.ThrowIfCancellationRequested();
+            var result = entry.Method.Invoke(entry.Target, null);
+            var value = result switch
+            {
+                bool b => b,
+                Task<bool> task => await task.WaitAsync(_executionCancellation.Token),
+                ValueTask<bool> task => await task.AsTask().WaitAsync(_executionCancellation.Token),
+                _ => throw new InvalidOperationException("条件函数必须返回 bool、Task<bool> 或 ValueTask<bool>。")
+            };
+            _executionCancellation.Token.ThrowIfCancellationRequested();
+            return _scriptConditionResults[condition.Id] = value == condition.ExpectedSuccess;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (TargetInvocationException ex) when (ex.InnerException is OperationCanceledException) { throw new OperationCanceledException(_executionCancellation.Token); }
+        catch (Exception ex) { AddLog("CONDITION", ex.InnerException?.Message ?? ex.Message, "error"); return false; }
+    }
+
     private bool EvaluateCondition(ConditionModel condition)
     {
+        if (string.IsNullOrEmpty(condition.Kind)) return false;
+        if (condition.Kind == "script") return _scriptConditionResults.GetValueOrDefault(condition.Id);
+        if (condition.Kind == "windows") return WindowsConditions.Evaluate(condition);
         if (condition.Kind == "recognition") return EvaluateRecognitionCondition(condition);
         Runtime.Variables.TryGetValue(condition.Left, out var leftNode);
         JsonNode? rightNode;
@@ -831,6 +872,7 @@ public sealed partial class MachineSession : IAsyncDisposable
         Runtime.EnteredStates.Clear();
         Runtime.CurrentEdgeIds.Clear();
         Runtime.ConditionResults.Clear();
+        _scriptConditionResults.Clear();
 
         foreach (var variable in Machine.Variables)
             Runtime.Variables[variable.Name] = CloneNode(variable.Value);
@@ -880,6 +922,8 @@ public sealed partial class MachineSession : IAsyncDisposable
 
         foreach (var output in state.Outputs)
         {
+            foreach (var condition in output.Conditions.Where(c => c.Kind == "script" && output.MatchMode != "always"))
+                await EvaluateScriptConditionAsync(condition);
             var detail = EvaluateOutputDetailed(output);
 
             if (!Runtime.ConditionResults.TryGetValue(state.Id, out var resultMap))

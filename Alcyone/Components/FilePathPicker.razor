@@ -1,0 +1,64 @@
+<div class="path-picker">
+    <div class="target-path"><input aria-label="目标完整路径" placeholder="输入完整路径，或点击浏览选择" value="@Value" @onchange="EnterPath" /><button type="button" @onclick="Open">浏览…</button></div>
+    @if (!string.IsNullOrWhiteSpace(Value)) { <div class="target-preview"><span>已选目标</span><strong>@Value</strong></div> }
+    @if (_open)
+    {
+        <div class="path-dismiss" @onclick="() => _open = false"></div>
+        <div class="path-browser" role="dialog" aria-label="@(FileOnly ? "选择文件" : "选择文件夹")">
+            <header><strong>@(FileOnly ? "选择文件" : "选择文件夹")</strong><button type="button" @onclick="() => _open = false">关闭</button></header>
+            <label class="location-label">当前浏览位置</label>
+            <div class="location"><input aria-label="浏览文件夹路径" placeholder="输入文件夹路径" @bind="_location" /><button type="button" @onclick="() => Navigate(_location)">前往</button></div>
+            <nav><button type="button" @onclick='() => Navigate("")'>此电脑</button><button type="button" disabled="@string.IsNullOrEmpty(_directory)" @onclick="Up">上一级</button>@if (!FileOnly && _directory.Length > 0) { <button type="button" @onclick="() => Select(_directory)">选择此文件夹</button> }</nav>
+            <input class="path-search" aria-label="搜索当前文件夹" placeholder="搜索当前文件夹中的名称…" @bind="_search" @bind:event="oninput" />
+            @if (_error is not null) { <p class="path-error" role="alert">@_error</p> }
+            <div class="path-entries">
+                @foreach (var entry in Filtered.Take(_visible))
+                {
+                    <button type="button" class="path-entry" title="@entry.Path" @onclick="() => Pick(entry)"><span>@(entry.Directory ? "▣" : "▤")</span><span><strong>@entry.Name</strong><small>@entry.Path</small></span><span>@(entry.Directory ? "进入 ›" : "选择")</span></button>
+                }
+                @if (_error is null && !Filtered.Any()) { <p>@(FileOnly ? "没有匹配的文件或文件夹。也可在上方直接输入目标完整路径。" : "没有匹配的文件夹。")</p> }
+                @if (Filtered.Skip(_visible).Any()) { <button type="button" @onclick="() => _visible += 100">显示更多</button> }
+            </div>
+            <footer>点击文件夹继续浏览，@(FileOnly ? "点击文件完成选择。不存在的文件可直接输入完整路径。" : "点击“选择此文件夹”完成选择。")</footer>
+        </div>
+    }
+</div>
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool FileOnly { get; set; } = true;
+    private bool _open;
+    private string _directory = "", _location = "", _search = "";
+    private string? _error;
+    private int _visible = 100;
+    private List<Entry> _entries = [];
+    private IEnumerable<Entry> Filtered => _entries.Where(e => e.Name.Contains(_search, StringComparison.OrdinalIgnoreCase));
+    private sealed record Entry(string Path, string Name, bool Directory);
+    private Task EnterPath(ChangeEventArgs e) => ValueChanged.InvokeAsync(e.Value?.ToString()?.Trim() ?? "");
+    private void Open()
+    {
+        _open = true;
+        var path = Environment.ExpandEnvironmentVariables(Value);
+        try { Navigate(Directory.Exists(path) ? path : Path.GetDirectoryName(path) ?? ""); }
+        catch (ArgumentException) { Navigate(""); }
+    }
+    private void Navigate(string path)
+    {
+        _error = null; _entries = []; _search = ""; _visible = 100;
+        try
+        {
+            _directory = string.IsNullOrWhiteSpace(path) ? "" : Path.GetFullPath(Environment.ExpandEnvironmentVariables(path.Trim()));
+            _location = _directory;
+            _entries = _directory.Length == 0
+                ? DriveInfo.GetDrives().Select(d => new Entry(d.Name, d.Name, true)).ToList()
+                : Directory.EnumerateDirectories(_directory).Select(p => new Entry(p, Path.GetFileName(p), true))
+                    .Concat(FileOnly ? Directory.EnumerateFiles(_directory).Select(p => new Entry(p, Path.GetFileName(p), false)) : [])
+                    .OrderByDescending(e => e.Directory).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        { _error = "无法浏览此位置：" + ex.Message; }
+    }
+    private void Up() { try { Navigate(Directory.GetParent(_directory)?.FullName ?? ""); } catch (IOException ex) { _error = ex.Message; } }
+    private Task Pick(Entry entry) { if (entry.Directory) { Navigate(entry.Path); return Task.CompletedTask; } return Select(entry.Path); }
+    private async Task Select(string path) { await ValueChanged.InvokeAsync(path); _open = false; }
+}

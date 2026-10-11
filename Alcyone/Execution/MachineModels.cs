@@ -28,6 +28,7 @@ namespace StateMachine.Execution;
     public sealed class MachineSettings
     {
         public int CycleDelay { get; set; } = 50;
+        public bool AutoStart { get; set; }
     }
 
     public sealed class RegionModel
@@ -100,6 +101,10 @@ namespace StateMachine.Execution;
 
     public sealed class ConditionModel
     {
+        public string ScriptMethod { get; set; } = "";
+        public string SystemCheck { get; set; } = "file.exists";
+        public string SystemQuery { get; set; } = "";
+        public double SystemValue { get; set; }
         public RecognitionCriteria? Recognition { get; set; }
         public string Kind { get; set; } = "variable";
         public string RecognitionId { get; set; } = "";

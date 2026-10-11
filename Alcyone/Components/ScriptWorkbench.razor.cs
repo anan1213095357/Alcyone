@@ -9,7 +9,8 @@ public partial class ScriptWorkbench
 {
     [Parameter, EditorRequired] public StateScriptHost Host { get; set; } = default!;
     [Parameter] public EventCallback OnClose { get; set; }
-    [Parameter] public EventCallback OnAi { get; set; }
+    [Parameter] public EventCallback<ScriptAiContext> OnAi { get; set; }
+    [Parameter] public bool StartWithConditionTemplate { get; set; }
     private ElementReference _editorElement, _cursorElement;
     private IJSObjectReference? _module, _editor;
     private DotNetObjectReference<ScriptWorkbench>? _reference;
@@ -23,12 +24,66 @@ public partial class ScriptWorkbench
     private List<CompileError> _errors = [];
     private bool _newScriptOpen;
     private string _newScriptName = "MyActions", _newScriptError = "";
+    private string _newScriptTemplate = "action";
+    private string _aiScriptKind = "auto";
+
+    private async Task RequestAiAsync()
+    {
+        if (!_ready || _editor is null || _busy) return;
+        var draft = await _editor.InvokeAsync<EditorAiDraft>("aiContext");
+        var kind = _newScriptOpen ? _newScriptTemplate : _aiScriptKind;
+        if (kind == "auto")
+        {
+            var method = Regex.Match(draft.Source, @"\[StateCondition(?:Attribute)?\([^\]]*\)\]\s*public\s+(?<type>bool|Task\s*<\s*bool\s*>|ValueTask\s*<\s*bool\s*>|async\s+Task\s*<\s*bool\s*>|async\s+ValueTask\s*<\s*bool\s*>)");
+            kind = method.Success && !draft.Source.Contains("[StateAction") ? (method.Groups["type"].Value == "bool" ? "condition" : "async-condition")
+                : draft.Source.Contains("[StateAction") && !draft.Source.Contains("[StateCondition") ? "action" : "auto";
+        }
+        var file = _newScriptOpen ? _newScriptName.Trim() : _active ?? "";
+        if (_newScriptOpen && !file.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)) file += ".csx";
+        await OnAi.InvokeAsync(new ScriptAiContext(kind, file, _newScriptOpen ? "" : draft.Source, _newScriptOpen ? "" : draft.Selection, _errors.Select(e => e.Message).ToArray()));
+    }
+
+    public async Task AcceptAiChangesAsync(IEnumerable<string> files)
+    {
+        if (_editor is null || _disposed) return;
+        _files = Directory.GetFiles(Host.ScriptDirectory, "*.csx", SearchOption.AllDirectories)
+            .Select(p => Path.GetRelativePath(Host.ScriptDirectory, p).Replace('\\', '/')).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+        string? first = null;
+        foreach (var file in files)
+        {
+            var path = file.Replace('\\', '/');
+            if (!_files.Contains(path)) continue;
+            first ??= path;
+            await _editor.InvokeVoidAsync("reload", path, await File.ReadAllTextAsync(FilePath(path)));
+            _dirty.Remove(path);
+        }
+        _newScriptOpen = false;
+        _errors.Clear();
+        await _editor.InvokeVoidAsync("diagnostics", _errors);
+        if (first is not null) await OpenFileAsync(first);
+        Report("AI 代码已应用，编译通过。");
+        StateHasChanged();
+    }
+
+    private sealed class EditorAiDraft
+    {
+        public string Source { get; set; } = "";
+        public string Selection { get; set; } = "";
+    }
 
     private void RequestNewScript()
     {
-        _newScriptName = "MyActions";
+        ChangeScriptTemplate(StartWithConditionTemplate ? "condition" : "action");
         _newScriptError = "";
         _newScriptOpen = true;
+    }
+
+    private void ChangeScriptTemplate(string template)
+    {
+        _newScriptTemplate = template;
+        if (_newScriptName is "MyActions" or "MyCondition" or "MyAsyncCondition")
+            _newScriptName = template switch { "condition" => "MyCondition", "async-condition" => "MyAsyncCondition", _ => "MyActions" };
+        _newScriptError = "";
     }
 
     private async Task CreateScriptAsync()
@@ -56,6 +111,36 @@ public partial class ScriptWorkbench
                     await Api.Delay(milliseconds);
                     Vars.Set("{{name}}执行次数", Vars.Get<int>("{{name}}执行次数", 0) + 1);
                     Log("动作完成", level: "good");
+                }
+
+            }
+            """;
+        if (_newScriptTemplate == "condition") source = $$"""
+            // 1. 修改下面的判断逻辑，true 表示满足条件，false 表示不满足。
+            // 2. 保存并编译，在卡片的条件 API → 自定义条件中选择此函数。
+            public sealed class {{name}} : StateScript
+            {
+                [StateCondition("{{name}} 条件判断", "自定义")]
+                public bool Check()
+                {
+                    // 示例：全局变量“就绪”为 true 时满足；变量不存在时默认 false。
+                    // 也可使用 Vars.Get<int>("次数", 0) >= 3 等表达式。
+                    return Vars.Get<bool>("就绪", false);
+                }
+            }
+            """;
+        else if (_newScriptTemplate == "async-condition") source = $$"""
+            // 1. 在函数内执行异步操作，再返回判断结果。
+            // 2. 状态机会等待函数执行完毕；true 表示满足，false 表示不满足。
+            // 3. 保存并编译，在条件 API → 自定义条件中选择此函数。
+            public sealed class {{name}} : StateScript
+            {
+                [StateCondition("{{name}} 异步条件判断", "自定义")]
+                public async Task<bool> CheckAsync()
+                {
+                    // 将这里替换为你的异步操作，等待结束后再判断。
+                    await Api.Delay(100);
+                    return Vars.Get<bool>("就绪", false);
                 }
             }
             """;
@@ -91,6 +176,7 @@ public partial class ScriptWorkbench
                 Docs.Select(d => new { d.Title, d.Description, d.Signature, d.Prefix, Insert = d.Example }));
             _ready = true;
             if (_files.Length > 0) await OpenFileAsync(_files[0]);
+            if (StartWithConditionTemplate) RequestNewScript();
         }
         catch (Exception ex) { Report("编辑器加载失败：" + ex.Message); }
         if (!_disposed) StateHasChanged();

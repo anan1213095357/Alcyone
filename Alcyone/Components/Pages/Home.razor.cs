@@ -61,6 +61,7 @@ public partial class Home
 
     private bool _aiDialogOpen;
     private bool _aiBusy;
+    private AiStreamProgress? _aiProgress;
     private string _aiScope = "both";
     private bool _startingRuntime, _steppingRuntime, _resettingRuntime, _stoppingRuntime;
     private bool RuntimeControlsBusy => _session is null || Runtime.Running || _executing
@@ -121,6 +122,7 @@ public partial class Home
             if (restoreDesktop && _configKeys.Contains(DesktopPreferences.ConfigKey)) _configKey = DesktopPreferences.ConfigKey;
             if (File.Exists(GetConfigFilePath(_configKey))) await LoadConfigAsync();
             else AttachSession();
+            if (Machine.Settings.AutoStart && !Runtime.Running) await RunMachineAsync();
             _autoSaveReady = true;
             await SaveConfigAsync();
             await JS.InvokeVoidAsync("industrialStateMachineUi.setZoom", 0.85, false);
@@ -646,7 +648,8 @@ public partial class Home
     private ConditionModel CreateCondition() => new()
     {
         Id = Uid("condition"),
-        Left = Machine.Variables.FirstOrDefault()?.Name ?? string.Empty,
+        Kind = "",
+        Left = string.Empty,
         Operator = "==",
         RightMode = "literal",
         RightType = "boolean",
@@ -678,41 +681,11 @@ public partial class Home
 
     private void CreateDemo()
     {
-        Machine = new MachineModel();
-        var region = CreateRegion("桌面自动化");
-        Machine.Regions.Add(region);
-        SelectedRegionId = region.Id;
-        Machine.Variables.Add(CreateVariable("Enabled", "boolean", JsonValue.Create(true)));
-        Machine.Variables.Add(CreateVariable("ExecutionCount", "number", JsonValue.Create(0)));
-        var target = new RecognitionItem { Name = "TargetVisible" };
-        Machine.Recognitions.Add(target);
-        RecognitionLibrary.NormalizeFolders(Machine.Recognitions);
-
-        var waiting = CreateState(region.Id, 140, 150);
-        waiting.Name = "等待目标特征";
-        waiting.IsStart = true;
-        waiting.Outputs[0].Name = "存在且已启用";
-        waiting.Outputs[0].Conditions = new()
-        {
-            NewCondition("Enabled", "==", "literal", "boolean", JsonValue.Create(true)),
-            new ConditionModel { Id = Uid("condition"), Kind = "recognition", RecognitionId = target.Id, ExpectedSuccess = true }
-        };
-        var execute = CreateState(region.Id, 760, 150);
-        execute.Name = "执行热更脚本";
-        execute.BeforeLeaveAction.ActionMethod = "DesktopActions.RecordFeature";
-        execute.Outputs[0].Name = "执行完成";
-        execute.Outputs[0].MatchMode = "always";
-        var gone = CreateState(region.Id, 760, 640);
-        gone.Name = "等待目标消失";
-        gone.Outputs[0].Name = "不存在";
-        gone.Outputs[0].Conditions = new()
-        {
-            new ConditionModel { Id = Uid("condition"), Kind = "recognition", RecognitionId = target.Id, ExpectedSuccess = false }
-        };
-        Machine.States.AddRange(new[] { waiting, execute, gone });
-        ConnectRaw(waiting, waiting.Outputs[0], execute, execute.Inputs[0]);
-        ConnectRaw(execute, execute.Outputs[0], gone, gone.Inputs[0]);
-        ConnectRaw(gone, gone.Outputs[0], waiting, waiting.Inputs[0]);
+        using var stream = typeof(Home).Assembly.GetManifestResourceStream("Alcyone.DefaultMachine.json")
+            ?? throw new InvalidOperationException("缺少默认星际配置。");
+        Machine = JsonSerializer.Deserialize<MachineModel>(stream, _jsonOptions)
+            ?? throw new InvalidOperationException("默认星际配置无效。");
+        SelectedRegionId = Machine.Regions.FirstOrDefault()?.Id;
     }
 
     private ConditionModel NewCondition(string left, string op, string rightMode, string rightType, JsonNode? rightValue) => new()
@@ -1831,6 +1804,7 @@ public partial class Home
     {
         await base.DisposeAsync();
         _disposed = true;
+        _desktopCliCancellation?.Cancel();
         Desktop.Changed -= OnDesktopChanged;
         if (_session is not null)
         {
@@ -1916,6 +1890,7 @@ public partial class Home
 
     private void OpenAiDialog()
     {
+        _scriptAiContext = null;
         _aiDialogOpen = true;
         _aiError = string.Empty;
     }
@@ -1953,6 +1928,7 @@ public partial class Home
         }
 
         _aiBusy = true;
+        _aiProgress = new("", "", "正在连接 AI 服务…");
         _aiError = string.Empty;
         _pendingAiPlan = null;
 
@@ -1966,25 +1942,10 @@ public partial class Home
 
         try
         {
-            var apiKey = Configuration["AI:ApiKey"];
-
-            if (string.IsNullOrWhiteSpace(apiKey))
-            {
-                apiKey = Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
-            }
-
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new InvalidOperationException(
-                    "没有配置 AI:ApiKey 或 DASHSCOPE_API_KEY。");
-
-            var endpoint =
-                Configuration["AI:Endpoint"]
-                ?? "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-
-            var model =
-                Configuration["AI:Model"]
-                ?? "qwen3.8-max";
-
+            var apiKey = AiSettings.ApiKey;
+            if (string.IsNullOrWhiteSpace(apiKey)) throw new InvalidOperationException("请在设置 → AI 连接中填写 API Key。");
+            var endpoint = AiSettings.Endpoint;
+            var model = AiSettings.Model;
             var actionCatalog = ActionMethods
                 .Select(action => new
                 {
@@ -2290,6 +2251,19 @@ reply 尽量简短。
                 ? "\nWrite user-facing explanations in English. Preserve existing user-defined names, recognition search text, identifiers and JSON field names."
                 : "\n使用简体中文说明方案。保留已有的用户命名、识别查找文字、标识符和 JSON 字段名。";
 
+            if (_aiScope == "script" && _scriptAiContext is not null)
+                systemPrompt += $$"""
+
+本次从脚本编辑器发起，请按以下上下文完成用户需求，不要求用户再描述特性、类结构或脚本类型。
+选定类型：{{ScriptAiKindLabel(_scriptAiContext.Kind)}}。
+{{(_scriptAiContext.Kind == "action" ? "生成 StateScript 类，用 [StateAction] 标注动作，返回 void 或 Task。" : _scriptAiContext.Kind is "condition" or "async-condition" ? "生成 StateScript 类，用 [StateCondition(显示名称, 分类)] 标注 public 无参数方法。该函数表示是否触发条件，不是生命周期动作，不使用 [StateAction]。" : "优先保留当前代码类型；新脚本根据用户意图判断：执行操作用 [StateAction]，判断是否满足/触发用 [StateCondition]。")}}
+条件函数只能返回 bool、Task<bool> 或 ValueTask<bool>；true 表示满足，false 表示不满足；异步条件必须等待工作完成后返回结果。同步条件返回 bool，异步条件使用 async Task<bool>。
+StateCondition 已由宿主导入，不需要额外 using。条件可用 Vars.Get<T> 读取已有变量，可用 Api 和 System.IO 等实际接口判断，异常不应伪装成满足条件。
+applyMachine 必须为 false。已有文件优先修改当前文件并保留其他功能；新建时使用下方文件名（如为空或非法则取有效英文名）。返回完整可编译代码并添加简短中文注释。
+以下 source 是编辑器最新内容，包含未保存修改，优先于磁盘脚本。selection 是用户选中的片段，errors 是最近编译错误；修复需求结合它们处理。
+编辑上下文：{{JsonSerializer.Serialize(_scriptAiContext, _jsonOptions)}}
+""";
+
             var aiConversation = _aiMessages
                 .Select(message => (object)new
                 {
@@ -2309,7 +2283,8 @@ reply 尽量简短。
             {
                 model,
                 messages = aiConversation,
-                temperature = 0.1
+                temperature = 0.1,
+                stream = true
             };
             var requestJson = JsonSerializer.Serialize(requestBody, _jsonOptions);
 
@@ -2321,26 +2296,11 @@ reply 尽量简短。
             request.Content =
                 new StringContent(requestJson, Encoding.UTF8, "application/json");
 
-            using var response = await AiHttpClient.SendAsync(request);
-            var responseText = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
+            var content = await AiStreaming.ReadAsync(AiHttpClient, request, progress => InvokeAsync(() =>
             {
-                throw new InvalidOperationException(
-                    $"AI请求失败 {(int)response.StatusCode}：{LimitText(responseText, 1500)}");
-            }
-
-            using var document = JsonDocument.Parse(responseText);
-            var choice = document.RootElement.GetProperty("choices")[0];
-
-
-            var content = choice
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString();
-
-            if (string.IsNullOrWhiteSpace(content))
-                throw new InvalidOperationException("AI没有返回任何数据。");
+                _aiProgress = progress;
+                StateHasChanged();
+            }));
 
             var json = ExtractAiJson(content);
 
@@ -2367,6 +2327,7 @@ reply 尽量简短。
             _aiMessages.Add(new AiChatItem
             {
                 Role = "assistant",
+                Reasoning = _aiProgress?.Reasoning ?? "",
                 Text = BuildAiPlanPreview(plan)
             });
         }
@@ -2377,6 +2338,7 @@ reply 尽量简短。
             _aiMessages.Add(new AiChatItem
             {
                 Role = "assistant",
+                Reasoning = _aiProgress?.Reasoning ?? "",
                 Text = $"生成失败：{_aiError}"
             });
         }
@@ -2395,6 +2357,7 @@ reply 尽量简短。
         _aiError = string.Empty;
 
         var plan = _pendingAiPlan;
+        _aiProgress = new("", "", "正在编译并应用方案…");
         List<AiScriptBackup>? scriptBackups = null;
 
         try
@@ -2440,6 +2403,9 @@ reply 尽量简短。
 
             _pendingAiPlan = null;
             _aiDialogOpen = false;
+
+            if (_scriptEditorOpen && _scriptWorkbench is not null && plan.Scripts.Count > 0)
+                await _scriptWorkbench.AcceptAiChangesAsync(plan.Scripts.Where(s => s.Operation == "upsert").Select(s => s.FileName));
 
             await InvokeAsync(StateHasChanged);
             await Task.Delay(80);
@@ -3033,6 +2999,7 @@ reply 尽量简短。
     }
     private sealed class AiChatItem
     {
+        public string Reasoning { get; set; } = "";
         public string Role { get; set; } =
             string.Empty;
 
@@ -3696,3 +3663,4 @@ reply 尽量简短。
     // MODELS
     // =========================================================
 }
+

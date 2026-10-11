@@ -77,6 +77,7 @@ internal static class Program
         builder.Services.AddSingleton<MachineRuntimeService>();
         builder.Services.AddSingleton<DesktopWallpaperService>();
         builder.Services.AddSingleton<DesktopPreferences>();
+        builder.Services.AddSingleton<AiConnectionSettings>();
         var app = builder.Build();
         app.UseExceptionHandler("/Error", createScopeForErrors: true);
         app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);

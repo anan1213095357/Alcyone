@@ -11,6 +11,8 @@ namespace StateMachine;
 public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpaperService> logger, DesktopPreferences preferences) : IDisposable
 {
     private const uint TrayMessage = 0x8001;
+    private const uint AiWheelMessage = 0x8002;
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(nint Window, double X, double Y, int Delta)> _aiWheels = new();
     private const int HotkeyId = 0x414c;
     private PhotinoWindow? _window;
     private nint _helper, _host;
@@ -29,6 +31,8 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     private nint _editorHandle;
     private bool _lastEditorHidden;
     private DesktopPointerRouter? _pointerRouter;
+    private DesktopIconAvoidance? _iconAvoidance;
+    public DesktopTextInput TextInput { get; } = new();
     public bool AnimationsPaused { get; private set; }
     [DllImport("user32.dll", EntryPoint = "LoadImageW",
     CharSet = CharSet.Unicode, SetLastError = true)]
@@ -241,6 +245,13 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         if (host == 0) throw new InvalidOperationException(text["无法找到 Windows 桌面层，请重启资源管理器后重试。"]);
         _host = host;
         _pointerRouter ??= new DesktopPointerRouter { Paused = AnimationsPaused };
+        _iconAvoidance ??= new DesktopIconAvoidance();
+        _pointerRouter.PointerReleased = _iconAvoidance.Invalidate;
+        _pointerRouter.AiWheel = (window, x, y, delta) =>
+        {
+            _aiWheels.Enqueue((window, x, y, delta));
+            PostMessageW(_helper, AiWheelMessage, 0, 0);
+        };
         ReconcileDisplays(force: true);
         if (_surfaces.Count == 0) throw new InvalidOperationException(text["没有检测到可用显示器。"]);
         IsDesktop = true;
@@ -263,9 +274,22 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             .Load(_url + "/desktop/" + _viewToken);
         surface.RegisterWebMessageReceivedHandler((_, message) =>
         {
+            const string input = "alcyone:desktop:text-input:";
+            if (!_disposed && message.StartsWith(input, StringComparison.Ordinal))
+            {
+                try { TextInput.Open(surface.WindowHandle, message[input.Length..]); }
+                catch (Exception ex) { logger.LogError(ex, "Desktop text input failed"); }
+                return;
+            }
             const string prefix = "alcyone:desktop:hitregions:";
             if (!_disposed && message.StartsWith(prefix, StringComparison.Ordinal))
+            {
                 _pointerRouter?.Update(surface.WindowHandle, message[prefix.Length..]);
+                _iconAvoidance?.Update(surface.WindowHandle, message[prefix.Length..]);
+            }
+            const string moving = "alcyone:desktop:avoid:";
+            if (!_disposed && message.StartsWith(moving, StringComparison.Ordinal))
+                _iconAvoidance?.Update(surface.WindowHandle, message[moving.Length..], moving: true);
         });
         try
         {
@@ -290,6 +314,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
 
     private void RestoreEditor()
     {
+        TextInput.Close();
         var handle = _window!.WindowHandle;
         ShowWindow(handle, IsZoomed(handle) ? 3u : 9u);
         // An unplugged monitor must not leave the settings window off-screen.
@@ -362,7 +387,9 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
 
     private void CloseSurface(PhotinoWindow surface)
     {
+        TextInput.Close(surface.WindowHandle);
         _pointerRouter?.Remove(surface.WindowHandle);
+        _iconAvoidance?.Remove(surface.WindowHandle);
         if (IsWindow(surface.WindowHandle)) surface.Close();
     }
 
@@ -370,6 +397,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     {
         IsDesktop = false;
         _pointerRouter?.Dispose(); _pointerRouter = null;
+        _iconAvoidance?.Dispose(); _iconAvoidance = null;
         if (_helper != 0) KillTimer(_helper, 1);
         foreach (var surface in _surfaces.Values) CloseSurface(surface);
         _surfaces.Clear();
@@ -405,6 +433,17 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         try
         {
             if (_disposed) return DefWindowProcW(hwnd, message, wParam, lParam);
+            // Deliver on the native UI message loop, never from the mouse hook or a timer.
+            if (message == AiWheelMessage)
+            {
+                while (_aiWheels.TryDequeue(out var wheel))
+                {
+                    var surface = _surfaces.Values.FirstOrDefault(s => s.WindowHandle == wheel.Window);
+                    if (surface is not null && IsWindow(wheel.Window))
+                        surface.SendWebMessage("alcyone:ai:wheel:" + System.Text.Json.JsonSerializer.Serialize(new { x = wheel.X, y = wheel.Y, delta = wheel.Delta }));
+                }
+                return 0;
+            }
             if (message == 0x0312 && wParam == HotkeyId)
             {
                 RestoreEditor(); Changed?.Invoke(); return 0;
@@ -479,6 +518,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     {
         if (_disposed) return;
         _disposed = true;
+        TextInput.Dispose();
         Volatile.Write(ref _editorHandle, 0);
         _animationMonitor?.Dispose();
         _animationMonitor = null;

@@ -179,6 +179,7 @@ public sealed class StateScriptHost : IDisposable
         global using System.Threading;
         global using System.Threading.Tasks;
         global using StateMachine.Scripting;
+        global using StateCondition = StateMachine.Scripting.Metadata.StateConditionAttribute;
         global using StateAction = StateMachine.Scripting.Metadata.StateActionAttribute;
         global using StateParameter = StateMachine.Scripting.Metadata.StateParameterAttribute;
         """;

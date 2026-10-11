@@ -19,7 +19,8 @@
             <button disabled="@(_busy || !_ready)" @onclick="RequestReload">↻ 重新读取</button>
             <span class="studio-title-spacer"></span>
             <button class="@(_docsOpen ? "toolbar-active" : "")" @onclick="() => _docsOpen = !_docsOpen">▤ API 文档</button>
-            <button class="studio-ai" @onclick="OnAi">✧ AI 开发</button>
+            <select class="studio-ai-kind" aria-label="AI 脚本类型" @bind="_aiScriptKind"><option value="auto">AI 自动识别类型</option><option value="action">动作脚本</option><option value="condition">条件函数</option><option value="async-condition">异步条件函数</option></select>
+            <button class="studio-ai" disabled="@(_busy || !_ready)" @onclick="RequestAiAsync">✧ AI 编写</button>
         </nav>
         <div class="studio-body @(_docsOpen ? "with-docs" : "")">
             <aside class="studio-explorer">
@@ -47,11 +48,12 @@
                     <div class="studio-monaco" @ref="_editorElement"></div>
                     @if (!_ready || _active is null)
                     {
-                        <div class="studio-editor-empty"><span class="studio-empty-glyph">{ }</span><h2>@(_ready ? "从一个动作开始" : "正在准备编辑器")</h2><p>@(_ready ? "打开左侧脚本，或让 AI 帮你编写新的自动化动作。" : "加载本地 C# 编辑环境…")</p>@if (_ready) { <button class="studio-build" @onclick="OnAi">✧ AI 开发</button> }</div>
+                        <div class="studio-editor-empty"><span class="studio-empty-glyph">{ }</span><h2>@(_ready ? "从一个脚本开始" : "正在准备编辑器")</h2><p>@(_ready ? "选择动作或条件模板，也可以直接告诉 AI 你想做什么。" : "加载本地 C# 编辑环境…")</p>@if (_ready) { <button class="studio-build" @onclick="RequestAiAsync">✧ AI 编写</button> }</div>
                     }
                 </div>
                 <section class="studio-output" aria-label="编译结果">
                     <div class="studio-output-header"><strong>输出</strong><span class="studio-problems">问题 <b>@_errors.Count</b></span><span class="studio-title-spacer"></span><span>Roslyn · C#</span></div>
+                    @if (_errors.Count > 0) { <button class="studio-ai" disabled="@(_busy || !_ready)" @onclick="RequestAiAsync">✧ AI 协助修复 · 自动附带错误</button> }
                     <div class="studio-output-content" role="status">
                         <div class="studio-output-line @(_errors.Count > 0 ? "output-error" : "")"><span class="studio-output-time">@_outputTime</span><span>@_status</span></div>
                         @foreach (var error in _errors)
@@ -93,11 +95,13 @@
         @if (_newScriptOpen)
         {
             <div class="studio-confirm-overlay"><section class="studio-confirm" role="dialog" aria-modal="true" aria-label="新建热重载脚本">
-                <h3>新建热重载脚本</h3><p>创建包含动作特性、参数、日志、等待和变量的模板，自动保存并编译。</p>
-                <label class="studio-search"><input aria-label="脚本类名" placeholder="MyActions" @bind="_newScriptName" /></label>
+                <h3>新建热重载脚本</h3>
+                <label class="studio-search">模板<select aria-label="脚本模板" value="@_newScriptTemplate" @onchange='e => ChangeScriptTemplate(e.Value?.ToString() ?? "action")'><option value="action">动作：执行操作</option><option value="condition">条件函数：直接返回判断结果</option><option value="async-condition">异步条件函数：执行完再判断</option></select></label>
+                <p>@(_newScriptTemplate == "action" ? "生成带参数、日志和变量示例的动作，在状态生命周期中调用。" : "生成完整条件函数和中文注释。只需修改判断逻辑：true 满足条件，false 不满足；编译后在“自定义条件”中选择。")</p>
+                <label class="studio-search"><input aria-label="脚本类名" placeholder="输入英文类名，例如 MyCondition" @bind="_newScriptName" /></label>
                 <p>文件：@(_newScriptName.Trim().EndsWith(".csx", StringComparison.OrdinalIgnoreCase) ? _newScriptName.Trim() : _newScriptName.Trim() + ".csx")</p>
                 @if (_newScriptError.Length > 0) { <p role="alert" class="output-error">@_newScriptError</p> }
-                <div><button disabled="@_busy" @onclick="() => _newScriptOpen = false">取消</button><button class="studio-build" disabled="@_busy" @onclick="CreateScriptAsync">创建并编译</button></div>
+                <div><button disabled="@_busy" @onclick="() => _newScriptOpen = false">取消</button><button class="studio-ai" disabled="@_busy" @onclick="RequestAiAsync">✧ AI 按此模板编写</button><button class="studio-build" disabled="@_busy" @onclick="CreateScriptAsync">创建并编译</button></div>
             </section></div>
         }
     </section>

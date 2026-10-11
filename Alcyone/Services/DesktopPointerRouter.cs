@@ -9,7 +9,7 @@ internal sealed class DesktopPointerRouter : IDisposable
 {
     private delegate nint MouseProcedure(int code, nuint message, nint data);
     [StructLayout(LayoutKind.Sequential)] private struct MouseData { public NativePoint Point; public uint Data, Flags, Time; public nuint Extra; }
-    public sealed record HitRegion(double Left, double Top, double Right, double Bottom);
+    public sealed record HitRegion(double Left, double Top, double Right, double Bottom, bool Focus = false, bool Avoid = false, bool Hit = true, bool Route = false);
     public sealed record HitRegions(double Ratio, HitRegion[] Rectangles);
     private readonly Dictionary<nint, HitRegions> _windows = new();
     private readonly MouseProcedure _procedure;
@@ -19,6 +19,8 @@ internal sealed class DesktopPointerRouter : IDisposable
     private uint _lastDown;
     private NativePoint _lastPoint;
     private nint _lastTarget;
+    public Action? PointerReleased { get; set; }
+    public Action<nint, double, double, int>? AiWheel { get; set; }
     public bool Paused { get => _paused; set { _paused = value; if (value) { _captured = 0; _lastTarget = 0; } } }
     public DesktopPointerRouter()
     {
@@ -40,21 +42,39 @@ internal sealed class DesktopPointerRouter : IDisposable
             var mouse = Marshal.PtrToStructure<MouseData>(data);
             var point = mouse.Point;
             var target = _captured;
+                if (message == 0x0202 && target == 0)
+            {
+                var root = GetAncestor(WindowFromPoint(point), 2);
+                var name = new System.Text.StringBuilder(64); GetClassNameW(root, name, name.Capacity);
+                if (name.ToString() is "Progman" or "WorkerW") PointerReleased?.Invoke();
+                return CallNextHookEx(_hook, code, message, data);
+            }
             // Idle mouse movement needs no wallpaper routing or global hit testing.
             if (message == 0x0200 && target == 0) return CallNextHookEx(_hook, code, message, data);
             if (target == 0)
             {
                 var underMouse = WindowFromPoint(point);
                 GetWindowThreadProcessId(underMouse, out var process);
-                if (process == Environment.ProcessId) return CallNextHookEx(_hook, code, message, data);
+                if (process == Environment.ProcessId && message != 0x020a)
+                {
+                    return CallNextHookEx(_hook, code, message, data);
+                }
                 var root = GetAncestor(underMouse, 2);
                 var name = new System.Text.StringBuilder(256); GetClassNameW(root, name, name.Capacity);
-                if (name.ToString() is not ("Progman" or "WorkerW")) return CallNextHookEx(_hook, code, message, data);
+                if (process != Environment.ProcessId && name.ToString() is not ("Progman" or "WorkerW")) return CallNextHookEx(_hook, code, message, data);
+                if (message == 0x0201 && DesktopIconHitTest.IsIcon(underMouse, point))
+                    return CallNextHookEx(_hook, code, message, data);
                 foreach (var (window, regions) in _windows)
                 {
                     if (!IsWindow(window) || !GetWindowRect(window, out var bounds)) continue;
                     var x = (point.X - bounds.Left) / regions.Ratio; var y = (point.Y - bounds.Top) / regions.Ratio;
-                    var hit = regions.Rectangles.Any(r => x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom);
+                    var region = regions.Rectangles.FirstOrDefault(r => r.Hit && x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom);
+                    var hit = region is not null;
+                    if (message == 0x020a && region?.Focus == true && AiWheel is not null)
+                    {
+                        AiWheel(window, x, y, unchecked((short)(mouse.Data >> 16)));
+                        return 1;
+                    }
                     var inside = point.X >= bounds.Left && point.X < bounds.Right && point.Y >= bounds.Top && point.Y < bounds.Bottom;
                     if (hit || (inside && message is 0x0201 or 0x020a))
                     {
@@ -90,7 +110,7 @@ internal sealed class DesktopPointerRouter : IDisposable
             var buttons = message == 0x0201 || (message == 0x0200 && _captured != 0) ? 1u : 0u;
             PostMessageW(child, routedMessage, message == 0x020a ? mouse.Data & 0xffff0000u : buttons, (nint)((point.Y << 16) | (point.X & 0xffff)));
             var passThrough = message == 0x0200 || (_backgroundCapture && message is 0x0201 or 0x0202);
-            if (message == 0x0202) { _captured = 0; _backgroundCapture = false; }
+            if (message == 0x0202) { _captured = 0; _backgroundCapture = false; PointerReleased?.Invoke(); }
             // WH_MOUSE_LL runs before Windows updates the cursor position. Forwarding
             // WM_MOUSEMOVE must never suppress the physical pointer movement.
             return passThrough ? CallNextHookEx(_hook, code, message, data) : 1;
@@ -106,4 +126,8 @@ internal sealed class DesktopPointerRouter : IDisposable
     [DllImport("user32.dll")] private static extern nint ChildWindowFromPointEx(nint window, NativePoint point, uint flags);
     [DllImport("user32.dll")] private static extern uint GetDoubleClickTime();
     [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+    [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint from, uint to, bool attach);
+    [DllImport("user32.dll")] private static extern nint SetFocus(nint window);
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint window);
 }

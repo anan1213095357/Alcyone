@@ -12,6 +12,7 @@ public partial class Home
     private bool _desktopMode => IsWallpaperView;
     private bool _desktopBusy, _desktopLayoutPending;
     private bool _toolbarMenuOpen;
+    private bool _appSettingsOpen;
     private bool? _lastAnimationPause;
 
     private async Task SyncAnimationPauseAsync()
