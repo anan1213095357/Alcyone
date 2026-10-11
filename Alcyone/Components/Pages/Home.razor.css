@@ -2117,3 +2117,15 @@
 .nebula-aurora{animation-delay:-40s}
 @keyframes nebula-colors{0%,100%{opacity:.08}35%,55%{opacity:.85}80%{opacity:.08}}
 @media(prefers-reduced-motion:reduce){.nebula-layer{animation:none;opacity:.22}.nebula-aurora{opacity:.12}}
+
+.milky-way-layer{position:absolute;top:0;left:0;pointer-events:none;transform-origin:50% 50%;will-change:transform;animation:galactic-drift 48s linear infinite alternate}
+.distant-galaxy{position:absolute;pointer-events:none;will-change:transform;animation:galaxy-drift 28s linear infinite alternate}
+.galaxy-projection{transform-origin:center}.distant-galaxy canvas{display:block;will-change:transform;animation:galaxy-spin 55s linear infinite}
+.distant-galaxy:nth-of-type(2){animation-duration:34s;animation-delay:-9s}.distant-galaxy:nth-of-type(2) canvas{animation-duration:72s;animation-direction:reverse}
+.distant-galaxy:nth-of-type(3){animation-duration:31s;animation-delay:-17s}.distant-galaxy:nth-of-type(3) canvas{animation-duration:64s}
+@keyframes galaxy-spin{to{transform:rotate(360deg)}}
+@keyframes galaxy-drift{0%{transform:translate(-65px,30px)}50%{transform:translate(35px,-45px)}100%{transform:translate(95px,55px)}}
+@keyframes galactic-drift{0%{transform:translate(-4%,-3%) rotate(-9deg) scale(1.3)}100%{transform:translate(4%,3%) rotate(11deg) scale(1.3)}}
+@media(prefers-reduced-motion:reduce){.milky-way-layer,.distant-galaxy,.distant-galaxy canvas{animation:none}}
+
+#worldScale{overflow:clip}

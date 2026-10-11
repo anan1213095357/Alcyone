@@ -203,7 +203,7 @@
         }
         <main id="workspace" class="workspace">
             @if (IsWallpaperView) { <DesktopAiConsole Submit="SendDesktopAiAsync" Reply="@_desktopAiReply" Progress="_desktopAiProgress" CliPreview="@DesktopCliPreview" CliOutput="@_desktopCliOutput" CliStatus="@_desktopCliStatus" CliBusy="_desktopCliBusy" ExecuteCli="ExecuteDesktopCliAsync" CancelCli="CancelDesktopCli" StateNames="@Machine.States.Select(s => s.Name)" VariableNames="@Machine.Variables.Select(v => v.Name)" /> }
-            <div class="starfield-anchor" aria-hidden="true"><canvas id="workspaceBackdrop"></canvas><canvas class="nebula-layer nebula-violet"></canvas><canvas class="nebula-layer nebula-aurora"></canvas><canvas id="workspaceStarfield"></canvas></div>
+            <div class="starfield-anchor" aria-hidden="true"><canvas id="workspaceBackdrop"></canvas><canvas class="nebula-layer nebula-violet"></canvas><canvas class="nebula-layer nebula-aurora"></canvas><canvas class="milky-way-layer"></canvas><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><canvas id="workspaceStarfield"></canvas></div>
             <div id="worldScale">
                 <div id="world">
                     <div id="alcyoneGroupLayer"></div>
@@ -1175,10 +1175,17 @@
         let initialized = false;
         let desktopView = false, desktopResize = null;
 
-        const clampZoom = value => Math.min(MAX_ZOOM, Math.max(desktopView ? .01 : MIN_ZOOM, value));
+        const editorMinZoom = () => Math.max(.01, Math.min(
+            (workspace?.offsetWidth || 1) / WORLD_WIDTH,
+            (workspace?.offsetHeight || 1) / WORLD_HEIGHT));
+        const clampZoom = value => Math.min(MAX_ZOOM, Math.max(desktopView ? .01 : editorMinZoom(), value));
 
         function fitDesktop() {
-            if (!desktopView || !workspace || !scaleBox) return;
+            if (!workspace || !scaleBox) return;
+            if (!desktopView) {
+                setZoom(canvasZoom, true);
+                return;
+            }
             workspace.style.setProperty('--desktop-taskbar-inset', `${Math.max(0, screen.height - screen.availHeight)}px`);
             const zoom = Math.min(workspace.clientWidth / WORLD_WIDTH, workspace.clientHeight / WORLD_HEIGHT);
             setZoom(zoom, false);
@@ -1397,6 +1404,16 @@
             tempEdge.setAttribute("d", bezierPath(start.x, start.y, x, y));
         }
 
+        function constrainCanvasScroll() {
+            if (desktopView || !workspace) return;
+            if (canvasZoom <= editorMinZoom() + .0001) { workspace.scrollLeft = workspace.scrollTop = 0; return; }
+            const maxX = Math.max(0, WORLD_WIDTH * canvasZoom - workspace.clientWidth);
+            const maxY = Math.max(0, WORLD_HEIGHT * canvasZoom - workspace.clientHeight);
+            workspace.scrollLeft = Math.max(0, Math.min(maxX, workspace.scrollLeft));
+            workspace.scrollTop = Math.max(0, Math.min(maxY, workspace.scrollTop));
+        }
+        function onWorkspaceScroll() { constrainCanvasScroll(); drawEdges(); }
+
         function setZoom(value, keepCenter = false) {
             if (!workspace || !world || !scaleBox) return;
             const oldZoom = canvasZoom;
@@ -1407,6 +1424,12 @@
                 centerWorldY = (workspace.scrollTop + workspace.clientHeight / 2) / oldZoom;
             }
             canvasZoom = clampZoom(Number(value));
+            if (!desktopView) {
+                const fitted = canvasZoom <= editorMinZoom() + .0001;
+                workspace.style.overflow = fitted ? "hidden" : "auto";
+                scaleBox.style.marginLeft = fitted ? `${Math.max(0,(workspace.clientWidth-WORLD_WIDTH*canvasZoom)/2)}px` : "0";
+                scaleBox.style.marginTop = fitted ? `${Math.max(0,(workspace.clientHeight-WORLD_HEIGHT*canvasZoom)/2)}px` : "0";
+            }
             world.style.transform = `scale(${canvasZoom})`;
             scaleBox.style.width = `${WORLD_WIDTH * canvasZoom}px`;
             scaleBox.style.height = `${WORLD_HEIGHT * canvasZoom}px`;
@@ -1416,6 +1439,7 @@
                 workspace.scrollLeft = centerWorldX * canvasZoom - workspace.clientWidth / 2;
                 workspace.scrollTop = centerWorldY * canvasZoom - workspace.clientHeight / 2;
             }
+            constrainCanvasScroll();
             scheduleDrawEdges();
         }
 
@@ -1494,8 +1518,8 @@
                 const dx = event.clientX - pan.mouseX;
                 const dy = event.clientY - pan.mouseY;
                 if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true;
-                workspace.scrollLeft = pan.scrollLeft - dx;
-                workspace.scrollTop = pan.scrollTop - dy;
+                workspace.scrollLeft = Math.max(0, Math.min(WORLD_WIDTH * canvasZoom - workspace.clientWidth, pan.scrollLeft - dx));
+                workspace.scrollTop = Math.max(0, Math.min(WORLD_HEIGHT * canvasZoom - workspace.clientHeight, pan.scrollTop - dy));
             }
             if (drag) {
                 const dx = (event.clientX - drag.mouseX) / canvasZoom;
@@ -1560,11 +1584,12 @@
             const worldY = (event.clientY - worldRect.top) / canvasZoom;
             const factor = event.deltaY < 0 ? 1.1 : 0.9;
             const newZoom = clampZoom(canvasZoom * factor);
+            if (Math.abs(newZoom - canvasZoom) < .000001) return;
             setZoom(newZoom, false);
             if (desktopView) {
                 scaleBox.style.left = `${mouseX - worldX * newZoom}px`;
                 scaleBox.style.top = `${mouseY - worldY * newZoom}px`;
-            } else {
+            } else if (newZoom > editorMinZoom() + .0001) {
                 workspace.scrollLeft = worldX * newZoom - mouseX;
                 workspace.scrollTop = worldY * newZoom - mouseY;
             }
@@ -1591,7 +1616,10 @@
             let width = 1, height = 1, stars = [], frame = 0, last = 0, stopped = false;
             const backdrop = document.getElementById("workspaceBackdrop");
             if (!backdrop) return;
+            let meteor = null, meteorWait = 1.5 + Math.random() * 1.5;
             const nebulaLayers = [...host.querySelectorAll(".nebula-layer")];
+            const milkyCanvas = host.querySelector(".milky-way-layer");
+            const galaxyLayers = [...host.querySelectorAll(".distant-galaxy")];
             const gpuStars = window.alcyoneGpu?.stars();
             function buildBackdrop() {
                 backdrop.width = width; backdrop.height = height;
@@ -1634,6 +1662,58 @@
                         sky.fillStyle = halo; sky.fillRect(x - 9, y - 9, 18, 18);
                     }
                 }
+                // Cached textures animate independently through compositor transforms.
+                milkyCanvas.width = width; milkyCanvas.height = height;
+                const milky = milkyCanvas.getContext("2d");
+                const dustCount = Math.min(8500, Math.round(width * height / 230));
+                for (let i = 0; i < dustCount; i++) {
+                    const t = random(), spread = (random() + random() + random() - 1.5);
+                    const x = width * t;
+                    const center = height * (.8 - t * .55 + Math.sin(t * 9) * .025);
+                    const y = center + spread * height * (.035 + .045 * Math.sin(t * Math.PI));
+                    const gap = .5 + .5 * Math.sin(t * 29 + spread * 8);
+                    milky.fillStyle = `rgba(${i % 5 ? "164,185,230" : "230,200,176"},${.16 + gap * .38})`;
+                    milky.fillRect(x, y,  .7 + random() * 1.1, .7 + random() * 1.1);
+                }
+                const galaxies = [[.18,.23,140,-.45],[.78,.32,180,.35],[.63,.8,105,-.8]];
+                galaxies.forEach(([gx,gy,size,tilt], index) => {
+                    const layer = galaxyLayers[index], disc = layer.querySelector("canvas");
+                    const radius = size * Math.min(width / 1500, 1.4), extent = Math.ceil(radius * 2.4);
+                    layer.style.left = `${width * gx - extent / 2}px`; layer.style.top = `${height * gy - extent / 2}px`;
+                    layer.querySelector(".galaxy-projection").style.transform = `rotate(${tilt}rad) scaleY(.48)`;
+                    disc.width = extent; disc.height = extent;
+                    const disk = disc.getContext("2d"); disk.translate(extent / 2, extent / 2);
+                    const glow = disk.createRadialGradient(0,0,0,0,0,radius);
+                    glow.addColorStop(0,"#eee5ffc0"); glow.addColorStop(.12,"#b6bce970");
+                    glow.addColorStop(.5,"#958ad52c"); glow.addColorStop(1,"#626da000");
+                    disk.fillStyle = glow; disk.fillRect(-radius,-radius,radius*2,radius*2);
+                    // A mottled stellar disk: broad, broken arms blend into the surrounding stars.
+                    const gaussian = () => Math.sqrt(-2 * Math.log(Math.max(.0001,random()))) * Math.cos(random()*Math.PI*2);
+                    for (let i = 0; i < 95; i++) {
+                        const t = .12 + random() * .78, angle = (i % 3) * Math.PI * 2 / 3 + t * 6 + gaussian() * .2;
+                        const r = radius * t, x = Math.cos(angle)*r, y = Math.sin(angle)*r;
+                        const cloudRadius = radius * (.035 + random()*.09);
+                        const patch = disk.createRadialGradient(x,y,0,x,y,cloudRadius);
+                        const color = i % 4 ? "137,166,212" : "206,170,153";
+                        patch.addColorStop(0,`rgba(${color},${.05 + (1-t)*.055})`);
+                        patch.addColorStop(1,`rgba(${color},0)`);
+                        disk.fillStyle = patch; disk.fillRect(x-cloudRadius,y-cloudRadius,cloudRadius*2,cloudRadius*2);
+                    }
+                    for (let i = 0; i < 6500; i++) {
+                        const t = Math.pow(random(),.75), r = radius * t;
+                        const angle = random() < .42 ? random()*Math.PI*2
+                            : (i % 3)*Math.PI*2/3 + t*6 + gaussian()*(.18 + t*.36);
+                        const jitter = gaussian()*radius*.018;
+                        const x = Math.cos(angle)*r+jitter, y = Math.sin(angle)*r+jitter;
+                        const opacity = (.06 + random()*.26) * (1-t*.85);
+                        disk.fillStyle = `rgba(${i%5 ? "177,193,223" : "238,210,175"},${opacity})`;
+                        const dot = .35 + random()*.75;
+                        disk.fillRect(x,y,dot,dot);
+                    }
+                    const core = disk.createRadialGradient(0,0,0,0,0,radius*.22);
+                    core.addColorStop(0,"#fff0d8b0"); core.addColorStop(.22,"#efdccf55"); core.addColorStop(1,"#e7d4cb00");
+                    disk.fillStyle=core; disk.fillRect(-radius*.22,-radius*.22,radius*.44,radius*.44);
+                });
                 const shade = sky.createRadialGradient(width * .5, height * .5, height * .15, width * .5, height * .5, Math.max(width, height) * .7);
                 shade.addColorStop(0, "#02050a08"); shade.addColorStop(1, "#01020899");
                 sky.fillStyle = shade; sky.fillRect(0, 0, width, height);
@@ -1689,6 +1769,28 @@
                     ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
                 }
                 if (useGpu) gpuStars.end(ctx, width, height);
+                // A single occasional meteor shares the existing paused animation clock.
+                if (dt > 0 && !reduced.matches) {
+                    meteorWait -= dt;
+                    if (!meteor && meteorWait <= 0) {
+                        meteor = { x: width * (.12 + Math.random() * .65), y: height * (.06 + Math.random() * .35), age: 0 };
+                        meteorWait = 8 + Math.random() * 10;
+                    }
+                }
+                if (meteor) {
+                    meteor.age += dt;
+                    if (meteor.age > 1.1) meteor = null;
+                    else {
+                        const t = meteor.age, speed = Math.min(width, height) * .48;
+                        const x = meteor.x + t * speed, y = meteor.y + t * speed * .48;
+                        const length = Math.min(210, speed * .4), alpha = Math.sin(Math.PI * t / 1.1) * .95;
+                        const tail = ctx.createLinearGradient(x-length,y-length*.48,x,y);
+                        tail.addColorStop(0,"rgba(137,192,255,0)"); tail.addColorStop(1,`rgba(208,231,255,${alpha})`);
+                        ctx.strokeStyle = tail; ctx.lineWidth = 1.4;
+                        ctx.beginPath(); ctx.moveTo(x-length,y-length*.48); ctx.lineTo(x,y); ctx.stroke();
+                        ctx.fillStyle = `rgba(239,248,255,${alpha})`; ctx.beginPath(); ctx.arc(x,y,1.6,0,Math.PI*2); ctx.fill();
+                    }
+                }
             }
             function tick(time) {
                 if (stopped) return;
@@ -1730,7 +1832,7 @@
                 workspace?.addEventListener("contextmenu", onCanvasContextMenu);
                 workspace?.addEventListener("click", onClick);
                 workspace?.addEventListener("wheel", onWheel, { passive: false });
-                workspace?.addEventListener("scroll", drawEdges);
+                workspace?.addEventListener("scroll", onWorkspaceScroll);
                 window.addEventListener("pointermove", onPointerMove);
                 window.addEventListener("pointerup", onPointerUp);
                 window.addEventListener("keydown", onKeyDown);
@@ -1747,7 +1849,7 @@
                 workspace?.removeEventListener("click", onClick);
                 workspace?.removeEventListener("wheel", onWheel);
                 window.alcyoneAnimation.cancelFrame(edgeFrame); edgeFrame = 0;
-                workspace?.removeEventListener("scroll", drawEdges);
+                workspace?.removeEventListener("scroll", onWorkspaceScroll);
                 window.removeEventListener("pointermove", onPointerMove);
                 window.removeEventListener("pointerup", onPointerUp);
                 window.removeEventListener("keydown", onKeyDown);
