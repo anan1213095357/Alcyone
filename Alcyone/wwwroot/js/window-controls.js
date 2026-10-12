@@ -1,4 +1,20 @@
 (() => {
+    // A selection/drag ending outside a dialog produces a click on its backdrop.
+    // Dismiss only a stationary press that also began on that exact backdrop.
+    let dismissPress;
+    document.addEventListener('pointerdown', event => {
+        if (event.isPrimary !== false) dismissPress = { target: event.target, x: event.clientX, y: event.clientY };
+    }, true);
+    document.addEventListener('pointercancel', () => dismissPress = null, true);
+    document.addEventListener('click', event => {
+        if (!(event.target instanceof Element) || !event.target.matches('[data-overlay-dismiss]')) return;
+        const press = dismissPress;
+        dismissPress = null;
+        if (event.detail !== 0 && (!press || press.target !== event.target || Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    }, true);
     const send = command => window.external?.sendMessage?.(`alcyone:window:${command}`);
     const dragArea = target => target instanceof Element && target.closest('.topbar') &&
         !target.closest('button,input,select,textarea,a,label,[role="button"],.config-menu,.app-settings-menu,[data-no-window-drag]');

@@ -2,6 +2,11 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using StateMachine.Localization;
 
+Check(StateMachine.AiConnectionSettings.NormalizeEndpoint("https://example.com/v1/") == "https://example.com/v1/chat/completions", "AI base URL appends completion suffix");
+Check(StateMachine.AiConnectionSettings.NormalizeEndpoint("https://example.com/custom/api") == "https://example.com/custom/api/chat/completions", "Custom provider paths append completion suffix");
+Check(StateMachine.AiConnectionSettings.NormalizeEndpoint("https://example.com/v1/chat/completions/") == "https://example.com/v1/chat/completions", "Full completion URL is not duplicated");
+Check(StateMachine.AiConnectionSettings.ToBaseEndpoint("https://example.com/v1/chat/completions") == "https://example.com/v1", "Settings field omits fixed suffix");
+Check(StateMachine.AiConnectionSettings.NormalizeEndpoint("https://example.com/v1?api-version=1") == "https://example.com/v1/chat/completions?api-version=1", "Provider query parameters are preserved");
 var directory = Path.Combine(Path.GetTempPath(), "Alcyone-language-checks-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(directory);
 try

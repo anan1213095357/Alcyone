@@ -7,6 +7,13 @@ public sealed class AiConnectionSettings
 {
     private readonly string _path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Alcyone", "ai.json");
     public string Endpoint { get; private set; }
+    public string BaseEndpoint => ToBaseEndpoint(Endpoint);
+    public static string ToBaseEndpoint(string endpoint)
+    {
+        var builder = new UriBuilder(NormalizeEndpoint(endpoint));
+        builder.Path = builder.Path[..^"/chat/completions".Length];
+        return builder.Uri.AbsoluteUri.TrimEnd('/');
+    }
     public string ApiKey { get; private set; }
     public string Model { get; private set; }
     public AiConnectionSettings(IConfiguration configuration)
@@ -40,8 +47,8 @@ public sealed class AiConnectionSettings
             throw new InvalidOperationException("请输入有效的 HTTP / HTTPS 接口地址。");
         var builder = new UriBuilder(uri);
         var path = uri.AbsolutePath.TrimEnd('/');
-        if (path.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)) path += "/chat/completions";
-        else if (path.Length == 0) path = "/v1/chat/completions";
+        if (path.Length == 0) path = "/v1";
+        if (!path.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)) path += "/chat/completions";
         builder.Path = path;
         return builder.Uri.AbsoluteUri;
     }

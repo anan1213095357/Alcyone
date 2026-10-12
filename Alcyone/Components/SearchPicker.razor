@@ -3,7 +3,7 @@
     <button type="button" class="picker-trigger" aria-haspopup="dialog" aria-expanded="@_open" @onclick="Open"><span><small>@Selected?.Group</small>@(Selected?.Label ?? (string.IsNullOrEmpty(Value) ? Placeholder : Value))</span><span class="chevron">⌕</span></button>
     @if (_open)
     {
-        <div class="picker-dismiss" @onclick="Close"></div>
+        <div class="picker-dismiss" data-overlay-dismiss @onclick="Close"></div>
         <div class="picker-menu" role="dialog" aria-label="@Placeholder">
             <div class="search-line"><span>⌕</span><input @ref="_input" value="@_query" @oninput="Search" @onkeydown="KeyDown" placeholder="@SearchHint" aria-label="搜索选项" autocomplete="off" /><button type="button" @onclick="Close" aria-label="关闭">×</button></div>
             <div class="breadcrumb"><div class="category-location"><small>当前分类</small><strong>@(_path.Length == 0 ? "全部 API" : _path.Replace("/", " / "))</strong></div><div class="category-navigation"><button type="button" @onclick='() => Navigate("")'>全部</button>@if (_path.Length > 0) { <button type="button" @onclick="Back">返回上级</button> }</div></div>

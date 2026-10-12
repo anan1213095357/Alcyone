@@ -3,7 +3,7 @@
     @if (!string.IsNullOrWhiteSpace(Value)) { <div class="target-preview"><span>已选目标</span><strong>@Value</strong></div> }
     @if (_open)
     {
-        <div class="path-dismiss" @onclick="() => _open = false"></div>
+        <div class="path-dismiss" data-overlay-dismiss @onclick="() => _open = false"></div>
         <div class="path-browser" role="dialog" aria-label="@(FileOnly ? "选择文件" : "选择文件夹")">
             <header><strong>@(FileOnly ? "选择文件" : "选择文件夹")</strong><button type="button" @onclick="() => _open = false">关闭</button></header>
             <label class="location-label">当前浏览位置</label>

@@ -1,18 +1,20 @@
+@inherits LocalizedComponent
 @inject AiConnectionSettings Settings
-<button type="button" class="settings-entry" @onclick="Open"><span>AI 连接</span><small>地址、密钥与模型</small><span>›</span></button>
+<button type="button" class="settings-entry" @onclick="Open"><span>@L["AI 连接"]</span><small>@L["地址、密钥与模型"]</small><span>›</span></button>
 @if (_open)
 {
-    <div class="ai-settings-backdrop" @onclick="() => _open=false"><section class="ai-settings-dialog" role="dialog" aria-modal="true" aria-label="AI 连接设置" @onclick:stopPropagation="true">
-        <header><div><h2>AI 连接</h2><p>桌面对话与 AI 开发共用此配置</p></div><button type="button" @onclick="() => _open=false" aria-label="关闭">×</button></header>
-        <label>接口 URL<input type="url" @bind="_url" placeholder="https://…/compatible-mode/v1" /></label><small>支持以 /v1 结尾的基础地址，也支持完整 /chat/completions 地址；基础地址会自动补全。</small>
-        <label>API Key<div class="key-field"><input type="@(_showKey?"text":"password")" @bind="_key" autocomplete="new-password" placeholder="输入服务商提供的密钥" /><button type="button" @onclick="() => _showKey=!_showKey">@(_showKey?"隐藏":"显示")</button></div></label>
-        <label>模型名<input @bind="_model" placeholder="例如 qwen3.8-max" /></label><small>使用服务商支持的准确模型标识。</small>
-        @if (_error is not null){<p class="error" role="alert">@_error</p>}
-        <footer><span>保存后立即生效</span><button type="button" @onclick="Save">保存设置</button></footer>
+    <div class="ai-settings-backdrop" data-overlay-dismiss @onclick="() => _open=false"><section class="ai-settings-dialog" role="dialog" aria-modal="true" aria-label="@L["AI 连接设置"]" @onclick:stopPropagation="true">
+        <header><div><h2>@L["AI 连接"]</h2><p>@L["桌面对话与 AI 开发共用此配置"]</p></div><button type="button" @onclick="() => _open=false" aria-label="@L["关闭"]">×</button></header>
+        <label for="ai-base-url">@L["接口 URL"]</label><div class="endpoint-field"><input id="ai-base-url" type="url" @bind="_url" @bind:after="NormalizeUrlField" placeholder="https://…/compatible-mode/v1" /><span class="endpoint-suffix">/chat/completions</span></div><small>@L["填写基础地址，后缀自动添加；粘贴完整地址也会自动识别。"]</small>
+        <label>API Key<div class="key-field"><input type="@(_showKey?"text":"password")" @bind="_key" autocomplete="new-password" placeholder="@L["输入服务商提供的密钥"]" /><button type="button" @onclick="() => _showKey=!_showKey">@L[_showKey?"隐藏":"显示"]</button></div></label>
+        <label>@L["模型名"]<input @bind="_model" placeholder="@L["例如 qwen3.8-max"]" /></label><small>@L["使用服务商支持的准确模型标识。"]</small>
+        @if (_error is not null){<p class="error" role="alert">@L[_error]</p>}
+        <footer><span>@L["保存后立即生效"]</span><button type="button" @onclick="Save">@L["保存设置"]</button></footer>
     </section></div>
 }
 @code{
     private bool _open,_showKey;private string _url="",_key="",_model="";private string? _error;
-    private void Open(){_url=Settings.Endpoint;_key=Settings.ApiKey;_model=Settings.Model;_showKey=false;_error=null;_open=true;}
+    private void Open(){_url=Settings.BaseEndpoint;_key=Settings.ApiKey;_model=Settings.Model;_showKey=false;_error=null;_open=true;}
+    private void NormalizeUrlField(){try{_url=AiConnectionSettings.ToBaseEndpoint(_url);}catch(InvalidOperationException){}}
     private void Save(){try{Settings.Save(_url,_key,_model);_open=false;}catch(Exception ex){_error=ex.Message;}}
 }

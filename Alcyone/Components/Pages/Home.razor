@@ -48,7 +48,7 @@
             <button class="app-settings-toggle" title="设置" aria-label="设置" aria-expanded="@_appSettingsOpen" @onclick="() => _appSettingsOpen=!_appSettingsOpen"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3"/><path d="M8 2h4l.6 2 1.7 1 2-.5 2 3.5-1.5 1.5v2l1.5 1.5-2 3.5-2-.5-1.7 1-.6 2H8l-.6-2-1.7-1-2 .5-2-3.5 1.5-1.5v-2L1.7 7.5l2-3.5 2 .5 1.7-1z"/></svg></button>
             @if (_appSettingsOpen)
             {
-                <div class="app-settings-dismiss" @onclick="() => _appSettingsOpen=false"></div>
+                <div class="app-settings-dismiss" data-overlay-dismiss @onclick="() => _appSettingsOpen=false"></div>
                 <section class="app-settings-menu" aria-label="应用设置">
                     <div class="app-menu-heading">设置</div>
                     <div class="app-language-row"><span>界面语言</span><LanguagePicker /></div>
@@ -98,7 +98,7 @@
             </button>
             @if (_configMenuOpen)
             {
-                <div class="config-dismiss" @onclick="() => _configMenuOpen = false"></div>
+                <div class="config-dismiss" data-overlay-dismiss @onclick="() => _configMenuOpen = false"></div>
                 <section class="config-menu" aria-label="@L["配置管理"]">
                     <div class="config-menu-title">@L["切换配置"]</div>
                     <div class="config-options">
@@ -899,7 +899,7 @@
 
 @if (_aiDialogOpen)
 {
-    <div class="ai-overlay" @onclick="CloseAiDialog">
+    <div class="ai-overlay" data-overlay-dismiss @onclick="CloseAiDialog">
 
         <div class="ai-dialog" @onclick:stopPropagation="true">
 

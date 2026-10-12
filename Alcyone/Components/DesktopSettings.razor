@@ -3,7 +3,7 @@
 <button class="desktop-settings-entry" @onclick="() => _open = true"><span>桌面与启动</span><small>开机自启与桌面恢复</small><span>›</span></button>
 @if (_open)
 {
-    <div class="desktop-settings-backdrop" @onclick="() => _open = false">
+    <div class="desktop-settings-backdrop" data-overlay-dismiss @onclick="() => _open = false">
         <section class="desktop-settings-dialog" role="dialog" aria-modal="true" aria-label="桌面设置" @onclick:stopPropagation="true">
             <h2>桌面设置</h2>
             <label><input type="checkbox" checked="@Preferences.AutoStart" disabled="@(!Desktop.Available)" @onchange="SetAutoStart" />登录 Windows 后自动启动</label>
