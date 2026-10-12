@@ -6,7 +6,7 @@
     <div class="ai-settings-backdrop" data-overlay-dismiss @onclick="() => _open=false"><section class="ai-settings-dialog" role="dialog" aria-modal="true" aria-label="@L["AI 连接设置"]" @onclick:stopPropagation="true">
         <header><div><h2>@L["AI 连接"]</h2><p>@L["桌面对话与 AI 开发共用此配置"]</p></div><button type="button" @onclick="() => _open=false" aria-label="@L["关闭"]">×</button></header>
         <label for="ai-base-url">@L["接口 URL"]</label><div class="endpoint-field"><input id="ai-base-url" type="url" @bind="_url" @bind:after="NormalizeUrlField" placeholder="https://…/compatible-mode/v1" /><span class="endpoint-suffix">/chat/completions</span></div><small>@L["填写基础地址，后缀自动添加；粘贴完整地址也会自动识别。"]</small>
-        <label>API Key<div class="key-field"><input type="@(_showKey?"text":"password")" @bind="_key" autocomplete="new-password" placeholder="@L["输入服务商提供的密钥"]" /><button type="button" @onclick="() => _showKey=!_showKey">@L[_showKey?"隐藏":"显示"]</button></div></label>
+        <label>API Key<div class="key-field"><input type="@(_showKey?"text":"password")" @bind="_key" autocomplete="new-password" placeholder="@L["输入服务商提供的密钥"]" /><button type="button" @onclick="() => _showKey=!_showKey">@L[_showKey?L["隐藏"]:L["显示"]]</button></div></label>
         <label>@L["模型名"]<input @bind="_model" placeholder="@L["例如 qwen3.8-max"]" /></label><small>@L["使用服务商支持的准确模型标识。"]</small>
         @if (_error is not null){<p class="error" role="alert">@L[_error]</p>}
         <footer><span>@L["保存后立即生效"]</span><button type="button" @onclick="Save">@L["保存设置"]</button></footer>

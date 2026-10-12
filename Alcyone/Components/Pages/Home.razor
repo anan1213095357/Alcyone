@@ -44,31 +44,31 @@
         <div class="application-controls">
             <button class="about-mark" title="@L["关于"]" aria-label="@L["关于"]" @onclick="() => _aboutOpen = true"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.2"/><ellipse cx="10" cy="10" rx="8" ry="3.6" transform="rotate(-30 10 10)"/></svg><span>@L["关于"]</span></button>
             <span class="application-divider" aria-hidden="true"></span>
-            <button class="desktop-launch" disabled="@(!Desktop.Available || !_autoSaveReady || _desktopBusy)" title="@(Desktop.Available ? DesktopSummary : L["请在 Windows 桌面程序中使用此功能。"])" @onclick="SetAsDesktopAsync"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="10" rx="2"/><path d="M7 17h6 M10 13.5V17"/></svg><span>@(_desktopBusy ? "切换中…" : Desktop.IsDesktop ? "更新桌面" : "启用桌面")</span></button>
-            <button class="app-settings-toggle" title="设置" aria-label="设置" aria-expanded="@_appSettingsOpen" @onclick="() => _appSettingsOpen=!_appSettingsOpen"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3"/><path d="M8 2h4l.6 2 1.7 1 2-.5 2 3.5-1.5 1.5v2l1.5 1.5-2 3.5-2-.5-1.7 1-.6 2H8l-.6-2-1.7-1-2 .5-2-3.5 1.5-1.5v-2L1.7 7.5l2-3.5 2 .5 1.7-1z"/></svg></button>
+            <button class="desktop-launch" disabled="@(!Desktop.Available || !_autoSaveReady || _desktopBusy)" title="@(Desktop.Available ? DesktopSummary : L["请在 Windows 桌面程序中使用此功能。"])" @onclick="SetAsDesktopAsync"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="10" rx="2"/><path d="M7 17h6 M10 13.5V17"/></svg><span>@(_desktopBusy ? L["切换中…"] : Desktop.IsDesktop ? L["更新桌面"] : L["启用桌面"])</span></button>
+            <button class="app-settings-toggle" title="@L["设置"]" aria-label="@L["设置"]" aria-expanded="@_appSettingsOpen" @onclick="() => _appSettingsOpen=!_appSettingsOpen"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3"/><path d="M8 2h4l.6 2 1.7 1 2-.5 2 3.5-1.5 1.5v2l1.5 1.5-2 3.5-2-.5-1.7 1-.6 2H8l-.6-2-1.7-1-2 .5-2-3.5 1.5-1.5v-2L1.7 7.5l2-3.5 2 .5 1.7-1z"/></svg></button>
             @if (_appSettingsOpen)
             {
                 <div class="app-settings-dismiss" data-overlay-dismiss @onclick="() => _appSettingsOpen=false"></div>
-                <section class="app-settings-menu" aria-label="应用设置">
-                    <div class="app-menu-heading">设置</div>
-                    <div class="app-language-row"><span>界面语言</span><LanguagePicker /></div>
+                <section class="app-settings-menu" aria-label="@L["应用设置"]">
+                    <div class="app-menu-heading">@L["设置"]</div>
+                    <div class="app-language-row"><span>@L["界面语言"]</span><LanguagePicker /></div>
                     <AiConnectionDialog />
                     <DesktopSettings />
-                    <button class="starship-settings-entry" @onclick="() => { _appSettingsOpen = false; _starshipSettingsOpen = true; }"><span>星舰外观</span><small>选择航线上的飞行形象</small><span>›</span></button>
+                    <button class="starship-settings-entry" @onclick="() => { _appSettingsOpen = false; _starshipSettingsOpen = true; }"><span>@L["星舰外观"]</span><small>@L["选择航线上的飞行形象"]</small><span>›</span></button>
                     @if (Desktop.IsDesktop)
                     {
                         <div class="app-menu-divider"></div>
-                        <button class="close-desktop-entry" disabled="@_desktopBusy" @onclick="async () => { _appSettingsOpen=false; await StopDesktopAsync(); }"><span>关闭桌面</span><small>停止所有屏幕的桌面显示</small></button>
+                        <button class="close-desktop-entry" disabled="@_desktopBusy" @onclick="async () => { _appSettingsOpen=false; await StopDesktopAsync(); }"><span>@L["关闭桌面"]</span><small>@L["停止所有屏幕的桌面显示"]</small></button>
                     }
                 </section>
             }
         </div>
         @if (Desktop.Available)
         {
-            <div class="window-controls" role="group" aria-label="窗口控制">
-                <button type="button" data-window-command="minimize" title="最小化" aria-label="最小化"><svg viewBox="0 0 16 16"><path d="M3 8h10" /></svg></button>
-                <button type="button" data-window-command="maximize" title="@(Desktop.IsMaximized ? "还原" : "最大化")" aria-label="@(Desktop.IsMaximized ? "还原" : "最大化")"><svg viewBox="0 0 16 16">@if (Desktop.IsMaximized) { <path d="M5 5V3h8v8h-2 M3 5h8v8H3z" /> } else { <path d="M3 3h10v10H3z" /> }</svg></button>
-                <button type="button" class="window-close" data-window-command="close" title="关闭" aria-label="关闭"><svg viewBox="0 0 16 16"><path d="m4 4 8 8 M12 4l-8 8" /></svg></button>
+            <div class="window-controls" role="group" aria-label="@L["窗口控制"]">
+                <button type="button" data-window-command="minimize" title="@L["最小化"]" aria-label="@L["最小化"]"><svg viewBox="0 0 16 16"><path d="M3 8h10" /></svg></button>
+                <button type="button" data-window-command="maximize" title="@(Desktop.IsMaximized ? L["还原"] : L["最大化"])" aria-label="@(Desktop.IsMaximized ? L["还原"] : L["最大化"])"><svg viewBox="0 0 16 16">@if (Desktop.IsMaximized) { <path d="M5 5V3h8v8h-2 M3 5h8v8H3z" /> } else { <path d="M3 3h10v10H3z" /> }</svg></button>
+                <button type="button" class="window-close" data-window-command="close" title="@L["关闭"]" aria-label="@L["关闭"]"><svg viewBox="0 0 16 16"><path d="m4 4 8 8 M12 4l-8 8" /></svg></button>
             </div>
         }
     </div>
@@ -84,7 +84,7 @@
     @if (_aboutOpen && !IsWallpaperView) { <AboutPanel OnClose="() => _aboutOpen = false" /> }
     @if (!string.IsNullOrEmpty(_desktopError))
     {
-        <div class="desktop-error" role="alert">@_desktopError <button @onclick="() => _desktopError = null" aria-label="@L["关闭"]">×</button></div>
+        <div class="desktop-error" role="alert">@L[_desktopError] <button @onclick="() => _desktopError = null" aria-label="@L["关闭"]">×</button></div>
     }
     <div class="main">
         @if (!IsWallpaperView)
@@ -202,7 +202,7 @@
         <main id="workspace" class="workspace">
             @if (!IsWallpaperView)
             {
-                <nav class="canvas-workbench-bar" aria-label="画布开发工具"><div class="workbench-context"><i></i><span>状态画布</span></div>
+                <nav class="canvas-workbench-bar" aria-label="@L["画布开发工具"]"><div class="workbench-context"><i></i><span>@L["状态画布"]</span></div>
         <div class="workspace-edit-tools">
             <button class="btn" @onclick="OpenScriptEditorAsync">@L["脚本编译器"]</button>
             <button class="btn add-state-control" @onclick="AddStateAsync"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M10 6v8 M6 10h8"/></svg><span>@L["添加状态"]</span></button>
@@ -309,7 +309,7 @@
                                                                 var rightText = rightVariable ? "$" + NodeString(condition.RightValue) : DisplayNode(condition.RightValue, condition.RightType);
                                                                 <div class="condition-mini @rowClass" @key="condition.Id">
                                                                     @if (string.IsNullOrEmpty(condition.Kind))
-                                                                    { <span>请选择判断 API</span> }
+                                                                    { <span>@L["请选择判断 API"]</span> }
                                                                     else if (condition.Kind == "script")
                                                                     { <span>@(ScriptConditionOptions.FirstOrDefault(o => o.Value == "script:" + condition.ScriptMethod)?.Label ?? condition.ScriptMethod)</span> }
                                                                     else if (condition.Kind == "windows")
@@ -671,16 +671,16 @@
                                                     </div>
                                                     @if (string.IsNullOrEmpty(condition.Kind))
                                                     {
-                                                        <div class="hint">请选择判断 API，再配置条件。</div>
+                                                        <div class="hint">@L["请选择判断 API，再配置条件。"]</div>
                                                     }
                                                     else if (condition.Kind == "script")
                                                     {
                                                         <div class="recognition-filter-row">
-                                                            <label>函数返回</label>
-                                                            <select class="select" value="@(condition.ExpectedSuccess ? "true" : "false")" @onchange='e => { condition.ExpectedSuccess = e.Value?.ToString() == "true"; RefreshCurrentConditionResults(); }'><option value="true">true 时触发</option><option value="false">false 时触发</option></select>
-                                                            <button class="btn" @onclick="() => TestRecognitionConditionAsync(condition)">测试条件</button>
+                                                            <label>@L["函数返回"]</label>
+                                                            <select class="select" value="@(condition.ExpectedSuccess ? "true" : "false")" @onchange='e => { condition.ExpectedSuccess = e.Value?.ToString() == "true"; RefreshCurrentConditionResults(); }'><option value="true">@L["true 时触发"]</option><option value="false">@L["false 时触发"]</option></select>
+                                                            <button class="btn" @onclick="() => TestRecognitionConditionAsync(condition)">@L["测试条件"]</button>
                                                         </div>
-                                                        <div class="hint">等待函数执行完毕后判断。通过 Vars 读取变量；异常时不会触发，详情见日志。</div>
+                                                        <div class="hint">@L["等待函数执行完毕后判断。通过 Vars 读取变量；异常时不会触发，详情见日志。"]</div>
                                                     }
                                                     else if (condition.Kind == "windows")
                                                     {
@@ -783,9 +783,9 @@
                                                         @if (condition.RightMode == "literal")
                                                         {
                                                             <select class="select" value="@condition.RightType" @onchange='e => ChangeConditionRightType(state.Id, output.Id, condition.Id, e.Value?.ToString() ?? "string")'>
-                                                                <option value="number">数值</option>
-                                                                <option value="string">文本</option>
-                                                                <option value="boolean">是 / 否</option>
+                                                                <option value="number">@L["数值"]</option>
+                                                                <option value="string">@L["文本"]</option>
+                                                                <option value="boolean">@L["是 / 否"]</option>
                                                             </select>
                                                         }
                                                         else
@@ -849,7 +849,7 @@
                     <div @key="log.Id">
                         <span class="log-time">@log.Time</span>
                         <span class="log-@log.Level">[@log.Type]</span>
-                        <span class="log-@log.Level">@log.Message</span>
+                        <span class="log-@log.Level">@L[log.Message]</span>
                     </div>
                 }
             </div>
@@ -949,7 +949,7 @@
             <!-- 对话主体 -->
             @if (_aiScope == "script" && _scriptAiContext is not null)
             {
-                <div class="script-ai-context">正在编写：@ScriptAiKindLabel(_scriptAiContext.Kind) · @_scriptAiContext.File<br />已附带当前代码、所选片段和编译错误。直接描述需求即可。</div>
+                <div class="script-ai-context">@L["正在编写："]@L[ScriptAiKindLabel(_scriptAiContext.Kind)] · @_scriptAiContext.File<br />@L["已附带当前代码、所选片段和编译错误。直接描述需求即可。"]</div>
             }
             <div class="ai-body">
 
@@ -1406,7 +1406,7 @@
     </path>`;
                 const delay = Math.max(0, Number(edge.delayMilliseconds) || 0);
                 if (delay > 0) {
-                    const waitLabel = document.documentElement.lang === "en" ? "Wait" : "等待";
+                    const waitLabel = document.documentElement.lang === "en" ? "Wait" : L["等待"];
                     const label = delay >= 1000 ? `${waitLabel} ${+(delay / 1000).toFixed(3)} s` : `${waitLabel} ${delay} ms`;
                     const curve = metric;
                     const length = curve.getTotalLength();
@@ -1420,7 +1420,7 @@
                     const sleeve = points.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
                     const pathId = `delay-sleeve-${edge.id}`;
                     html += `<g data-edge-id="${edge.id}" style="opacity:${edgeOpacity};cursor:pointer;pointer-events:${edgeOpacity < .5 ? 'none' : 'all'}">
-                        <title>${document.documentElement.lang === "en" ? "Click to set the transition delay" : "点击设置切换前等待"}</title>
+                        <title>${document.documentElement.lang === "en" ? "Click to set the transition delay" : L["点击设置切换前等待"]}</title>
                         <path d="${sleeve}" fill="none" stroke="${stroke}" stroke-width="27" stroke-linecap="round" />
                         <path id="${pathId}" d="${sleeve}" fill="none" stroke="#182438" stroke-width="23" stroke-linecap="round" />
                         <text fill="#e4efff" font-size="11" font-weight="600" dy="4" text-anchor="middle" style="pointer-events:all"><textPath href="#${pathId}" startOffset="50%">${label}</textPath></text>

@@ -1,16 +1,17 @@
+@inherits LocalizedComponent
 @inject DesktopPreferences Preferences
 @inject DesktopWallpaperService Desktop
-<button class="desktop-settings-entry" @onclick="() => _open = true"><span>桌面与启动</span><small>开机自启与桌面恢复</small><span>›</span></button>
+<button class="desktop-settings-entry" @onclick="() => _open = true"><span>@L["桌面与启动"]</span><small>@L["开机自启与桌面恢复"]</small><span>›</span></button>
 @if (_open)
 {
     <div class="desktop-settings-backdrop" data-overlay-dismiss @onclick="() => _open = false">
-        <section class="desktop-settings-dialog" role="dialog" aria-modal="true" aria-label="桌面设置" @onclick:stopPropagation="true">
-            <h2>桌面设置</h2>
-            <label><input type="checkbox" checked="@Preferences.AutoStart" disabled="@(!Desktop.Available)" @onchange="SetAutoStart" />登录 Windows 后自动启动</label>
-            <label><input type="checkbox" checked="@Preferences.RestoreDesktop" @onchange="SetRestore" />启动时恢复上次启用的桌面</label>
-            <p>桌面卡片和星球可拖动，选中卡片可折叠，双击星球可展开。位置与折叠状态自动保存。</p>
-            @if (_error is not null) { <p role="alert">@_error</p> }
-            <button class="btn" @onclick="() => _open = false">完成</button>
+        <section class="desktop-settings-dialog" role="dialog" aria-modal="true" aria-label="@L["桌面设置"]" @onclick:stopPropagation="true">
+            <h2>@L["桌面设置"]</h2>
+            <label><input type="checkbox" checked="@Preferences.AutoStart" disabled="@(!Desktop.Available)" @onchange="SetAutoStart" />@L["登录 Windows 后自动启动"]</label>
+            <label><input type="checkbox" checked="@Preferences.RestoreDesktop" @onchange="SetRestore" />@L["启动时恢复上次启用的桌面"]</label>
+            <p>@L["桌面卡片和星球可拖动，选中卡片可折叠，双击星球可展开。位置与折叠状态自动保存。"]</p>
+            @if (_error is not null) { <p role="alert">@L[_error]</p> }
+            <button class="btn" @onclick="() => _open = false">@L["完成"]</button>
         </section>
     </div>
 }

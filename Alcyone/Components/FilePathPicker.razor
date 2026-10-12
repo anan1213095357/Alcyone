@@ -1,25 +1,26 @@
+@inherits LocalizedComponent
 <div class="path-picker">
-    <div class="target-path"><input aria-label="目标完整路径" placeholder="输入完整路径，或点击浏览选择" value="@Value" @onchange="EnterPath" /><button type="button" @onclick="Open">浏览…</button></div>
-    @if (!string.IsNullOrWhiteSpace(Value)) { <div class="target-preview"><span>已选目标</span><strong>@Value</strong></div> }
+    <div class="target-path"><input aria-label="@L["目标完整路径"]" placeholder="@L["输入完整路径，或点击浏览选择"]" value="@Value" @onchange="EnterPath" /><button type="button" @onclick="Open">@L["浏览…"]</button></div>
+    @if (!string.IsNullOrWhiteSpace(Value)) { <div class="target-preview"><span>@L["已选目标"]</span><strong>@Value</strong></div> }
     @if (_open)
     {
         <div class="path-dismiss" data-overlay-dismiss @onclick="() => _open = false"></div>
-        <div class="path-browser" role="dialog" aria-label="@(FileOnly ? "选择文件" : "选择文件夹")">
-            <header><strong>@(FileOnly ? "选择文件" : "选择文件夹")</strong><button type="button" @onclick="() => _open = false">关闭</button></header>
-            <label class="location-label">当前浏览位置</label>
-            <div class="location"><input aria-label="浏览文件夹路径" placeholder="输入文件夹路径" @bind="_location" /><button type="button" @onclick="() => Navigate(_location)">前往</button></div>
-            <nav><button type="button" @onclick='() => Navigate("")'>此电脑</button><button type="button" disabled="@string.IsNullOrEmpty(_directory)" @onclick="Up">上一级</button>@if (!FileOnly && _directory.Length > 0) { <button type="button" @onclick="() => Select(_directory)">选择此文件夹</button> }</nav>
-            <input class="path-search" aria-label="搜索当前文件夹" placeholder="搜索当前文件夹中的名称…" @bind="_search" @bind:event="oninput" />
-            @if (_error is not null) { <p class="path-error" role="alert">@_error</p> }
+        <div class="path-browser" role="dialog" aria-label="@(FileOnly ? L["选择文件"] : L["选择文件夹"])">
+            <header><strong>@(FileOnly ? L["选择文件"] : L["选择文件夹"])</strong><button type="button" @onclick="() => _open = false">@L["关闭"]</button></header>
+            <label class="location-label">@L["当前浏览位置"]</label>
+            <div class="location"><input aria-label="@L["浏览文件夹路径"]" placeholder="@L["输入文件夹路径"]" @bind="_location" /><button type="button" @onclick="() => Navigate(_location)">@L["前往"]</button></div>
+            <nav><button type="button" @onclick='() => Navigate("")'>@L["此电脑"]</button><button type="button" disabled="@string.IsNullOrEmpty(_directory)" @onclick="Up">@L["上一级"]</button>@if (!FileOnly && _directory.Length > 0) { <button type="button" @onclick="() => Select(_directory)">@L["选择此文件夹"]</button> }</nav>
+            <input class="path-search" aria-label="@L["搜索当前文件夹"]" placeholder="@L["搜索当前文件夹中的名称…"]" @bind="_search" @bind:event="oninput" />
+            @if (_error is not null) { <p class="path-error" role="alert">@L[_error]</p> }
             <div class="path-entries">
                 @foreach (var entry in Filtered.Take(_visible))
                 {
-                    <button type="button" class="path-entry" title="@entry.Path" @onclick="() => Pick(entry)"><span>@(entry.Directory ? "▣" : "▤")</span><span><strong>@entry.Name</strong><small>@entry.Path</small></span><span>@(entry.Directory ? "进入 ›" : "选择")</span></button>
+                    <button type="button" class="path-entry" title="@entry.Path" @onclick="() => Pick(entry)"><span>@(entry.Directory ? "▣" : "▤")</span><span><strong>@entry.Name</strong><small>@entry.Path</small></span><span>@(entry.Directory ? L["进入 ›"] : L["选择"])</span></button>
                 }
-                @if (_error is null && !Filtered.Any()) { <p>@(FileOnly ? "没有匹配的文件或文件夹。也可在上方直接输入目标完整路径。" : "没有匹配的文件夹。")</p> }
-                @if (Filtered.Skip(_visible).Any()) { <button type="button" @onclick="() => _visible += 100">显示更多</button> }
+                @if (_error is null && !Filtered.Any()) { <p>@(FileOnly ? L["没有匹配的文件或文件夹。也可在上方直接输入目标完整路径。"] : L["没有匹配的文件夹。"])</p> }
+                @if (Filtered.Skip(_visible).Any()) { <button type="button" @onclick="() => _visible += 100">@L["显示更多"]</button> }
             </div>
-            <footer>点击文件夹继续浏览，@(FileOnly ? "点击文件完成选择。不存在的文件可直接输入完整路径。" : "点击“选择此文件夹”完成选择。")</footer>
+            <footer>@L["点击文件夹继续浏览，"]@(FileOnly ? L["点击文件完成选择。不存在的文件可直接输入完整路径。"] : L["点击“选择此文件夹”完成选择。"])</footer>
         </div>
     }
 </div>

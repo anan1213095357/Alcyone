@@ -1,31 +1,32 @@
+@inherits LocalizedComponent
 @using Microsoft.AspNetCore.Components.Web
 @implements IDisposable
 @inject DesktopWallpaperService Desktop
 @inject IJSRuntime JS
 @inject StateMachine.Localization.UiText Text
-<section class="desktop-ai-console" aria-label="桌面 AI 对话">
+<section class="desktop-ai-console" aria-label="@Text["桌面 AI 对话"]">
     @if (_hasReply || _busy || CliBusy || !string.IsNullOrEmpty(CliPreview))
     {
         <div class="ai-response" aria-live="polite">
             <span class="response-dot"></span><div class="ai-response-body">
-            <div class="ai-reply"><AiMarkdown Text="@(_busy ? "星际通讯中…" : Reply)" /></div><AiStreamView Progress="Progress" Busy="_busy" JsonReply="true" />
+            <div class="ai-reply"><AiMarkdown Text="@(_busy ? Text["星际通讯中…"] : Text[Reply])" /></div><AiStreamView Progress="Progress" Busy="_busy" JsonReply="true" />
             @if (!string.IsNullOrEmpty(CliPreview))
             {
-                <section class="cli-review"><strong>待执行 · PowerShell</strong><pre>@CliPreview</pre><div><button type="button" @onclick="CancelCli">取消</button><button type="button" class="cli-run" @onclick="ExecuteCli">执行命令</button></div></section>
+                <section class="cli-review"><strong>@Text["待执行 · PowerShell"]</strong><pre>@CliPreview</pre><div><button type="button" @onclick="CancelCli">@Text["取消"]</button><button type="button" class="cli-run" @onclick="ExecuteCli">@Text["执行命令"]</button></div></section>
             }
             @if (!string.IsNullOrEmpty(CliStatus))
             {
-                <section class="cli-result"><strong>@CliStatus</strong>@if (CliBusy) {
-                    <button type="button" @onclick="CancelCli">停止</button>
+                <section class="cli-result"><strong>@Text[CliStatus]</strong>@if (CliBusy) {
+                    <button type="button" @onclick="CancelCli">@Text["停止"]</button>
                 }
                 <pre>@CliOutput</pre></section>
             }
-        </div><div class="ai-response-actions"><button type="button" @onpointerdown:preventDefault="true" @onclick="CopyReply" title="@Text["复制"]" aria-label="@Text["复制"]">⧉</button><button type="button" @onclick="() => _hasReply = false" aria-label="收起回复">×</button></div>
+        </div><div class="ai-response-actions"><button type="button" @onpointerdown:preventDefault="true" @onclick="CopyReply" title="@Text["复制"]" aria-label="@Text["复制"]">⧉</button><button type="button" @onclick="() => _hasReply = false" aria-label="@Text["收起回复"]">×</button></div>
     </div>
 }
 @if (_focused && !_busy && Suggestions.Any())
 {
-    <div class="ai-suggestions" role="listbox" aria-label="指令联想">
+    <div class="ai-suggestions" role="listbox" aria-label="@Text["指令联想"]">
         @{
             var matches = Suggestions.ToList();
         }
@@ -38,8 +39,8 @@
 }
 <form class="ai-input-bar" @onsubmit="Send" @onsubmit:preventDefault="true">
     <img class="ai-spark ai-brand" src="images/planet-logo-transparent.png" alt="Alcyone" />
-    <textarea rows="1" data-auto-grow @ref="_field" data-native-input="@_inputId" value="@_input" readonly placeholder="描述电脑操作，或输入 /cli 命令…" aria-label="桌面 AI 指令" autocomplete="off" title="Enter 发送 · Shift+Enter 换行 · Ctrl+A 全选"></textarea>
-    <button type="submit" class="ai-send @(_busy ? "busy" : "")" disabled="@(_busy || CliBusy || string.IsNullOrWhiteSpace(_input))" aria-label="发送指令">
+    <textarea rows="1" data-auto-grow @ref="_field" data-native-input="@_inputId" value="@_input" readonly placeholder="@Text["描述电脑操作，或输入 /cli 命令…"]" aria-label="@Text["桌面 AI 指令"]" autocomplete="off" title="@Text["Enter 发送 · Shift+Enter 换行 · Ctrl+A 全选"]"></textarea>
+    <button type="submit" class="ai-send @(_busy ? "busy" : "")" disabled="@(_busy || CliBusy || string.IsNullOrWhiteSpace(_input))" aria-label="@Text["发送指令"]">
         @if (_busy)
         {
             <span class="send-loader"></span>
@@ -75,8 +76,9 @@
         _ = InvokeAsync(async () => { _input = update.Text; _focused = update.Active; if (update.Submit) await Send(); StateHasChanged(); });
     }
     public void Dispose() => Desktop.TextInput.Changed -= NativeInputChanged;
+    public override ValueTask DisposeAsync() { Dispose(); return base.DisposeAsync(); }
     private ElementReference _field;
-    private IEnumerable<string> Suggestions => AiWorkflowExamples.All.Select(e => Text[e.Title]).Concat(new[] { "启动状态机", "停止状态机", "执行单步" }).Concat(StateNames.Select(s => "切换到 " + s)).Concat(StateNames.Select(s => "将 " + s + " 设为起始状态")).Concat(VariableNames.Select(v => "把 " + v + " 设为 ")).Where(s => string.IsNullOrWhiteSpace(_input) || s.Contains(_input.Trim(), StringComparison.OrdinalIgnoreCase)).Distinct().Take(6);
+    private IEnumerable<string> Suggestions => AiWorkflowExamples.All.Select(e => Text[e.Title]).Concat(new[] { "启动状态机", "停止状态机", "执行单步" }.Select(s => Text[s])).Concat(StateNames.Select(s => Text.Format("切换到 {0}", s))).Concat(StateNames.Select(s => Text.Format("将 {0} 设为起始状态", s))).Concat(VariableNames.Select(v => Text.Format("把 {0} 设为 ", v))).Where(s => string.IsNullOrWhiteSpace(_input) || s.Contains(_input.Trim(), StringComparison.OrdinalIgnoreCase)).Distinct().Take(6);
     private void InputChanged(ChangeEventArgs e) { _input = e.Value?.ToString() ?? ""; _index = 0; }
     private string? _chosenText;
     private Task Choose(string text) { text = AiWorkflowExamples.All.FirstOrDefault(e => Text[e.Title] == text) is { } example ? Text[example.Prompt] : text; _input = text; _focused = false; _chosenText = text; return Task.CompletedTask; }

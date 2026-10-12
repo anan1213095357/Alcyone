@@ -1,61 +1,62 @@
+@inherits LocalizedComponent
 @using StateMachine.Scripting
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 
 <div class="studio-overlay" @onkeydown:stopPropagation="true">
-    <section class="studio" role="dialog" aria-modal="true" aria-label="Alcyone 脚本工作台">
+    <section class="studio" role="dialog" aria-modal="true" aria-label="@Text["Alcyone 脚本工作台"]">
         <header class="studio-titlebar">
             <span class="studio-mark">A</span><strong>Alcyone <span>Script Studio</span></strong>
-            <span class="studio-title-divider"></span><span class="studio-project">HotScripts 工作区</span>
-            <span class="studio-title-spacer"></span><span class="studio-local"><i></i>本地编辑 · 实时热重载</span>
-            <button class="studio-icon close" title="关闭工作台" aria-label="关闭工作台" disabled="@_busy" @onclick="RequestCloseAsync">×</button>
+            <span class="studio-title-divider"></span><span class="studio-project">@Text["HotScripts 工作区"]</span>
+            <span class="studio-title-spacer"></span><span class="studio-local"><i></i>@Text["本地编辑 · 实时热重载"]</span>
+            <button class="studio-icon close" title="@Text["关闭工作台"]" aria-label="@Text["关闭工作台"]" disabled="@_busy" @onclick="RequestCloseAsync">×</button>
         </header>
-        <nav class="studio-toolbar" aria-label="编辑器工具栏">
-            <button disabled="@(_busy || !_ready)" @onclick="RequestNewScript">＋ 新建脚本</button>
-            <button class="studio-build" disabled="@(_busy || !_ready)" @onclick="CompileAsync"><span>▷</span>@(_busy ? "正在编译…" : "保存并编译")<kbd>F8</kbd></button>
+        <nav class="studio-toolbar" aria-label="@Text["编辑器工具栏"]">
+            <button disabled="@(_busy || !_ready)" @onclick="RequestNewScript">@Text["＋ 新建脚本"]</button>
+            <button class="studio-build" disabled="@(_busy || !_ready)" @onclick="CompileAsync"><span>▷</span>@(_busy ? Text["正在编译…"] : Text["保存并编译"])<kbd>F8</kbd></button>
             <span class="studio-toolbar-divider"></span>
-            <button disabled="@(!_ready)" @onclick='() => EditorActionAsync("actions.find")'><span>⌕</span>查找<kbd>Ctrl F</kbd></button>
-            <button disabled="@(!_ready)" @onclick='() => EditorActionAsync("editor.action.startFindReplaceAction")'>替换</button>
-            <button disabled="@(_busy || !_ready)" @onclick="RequestReload">↻ 重新读取</button>
+            <button disabled="@(!_ready)" @onclick='() => EditorActionAsync("actions.find")'><span>⌕</span>@Text["查找"]<kbd>Ctrl F</kbd></button>
+            <button disabled="@(!_ready)" @onclick='() => EditorActionAsync("editor.action.startFindReplaceAction")'>@Text["替换"]</button>
+            <button disabled="@(_busy || !_ready)" @onclick="RequestReload">@Text["↻ 重新读取"]</button>
             <span class="studio-title-spacer"></span>
-            <button class="@(_docsOpen ? "toolbar-active" : "")" @onclick="() => _docsOpen = !_docsOpen">▤ API 文档</button>
-            <select class="studio-ai-kind" aria-label="AI 脚本类型" @bind="_aiScriptKind"><option value="auto">AI 自动识别类型</option><option value="action">动作脚本</option><option value="condition">条件函数</option><option value="async-condition">异步条件函数</option></select>
-            <button class="studio-ai" disabled="@(_busy || !_ready)" @onclick="RequestAiAsync">✧ AI 编写</button>
+            <button class="@(_docsOpen ? "toolbar-active" : "")" @onclick="() => _docsOpen = !_docsOpen">@Text["▤ API 文档"]</button>
+            <select class="studio-ai-kind" aria-label="@Text["AI 脚本类型"]" @bind="_aiScriptKind"><option value="auto">@Text["AI 自动识别类型"]</option><option value="action">@Text["动作脚本"]</option><option value="condition">@Text["条件函数"]</option><option value="async-condition">@Text["异步条件函数"]</option></select>
+            <button class="studio-ai" disabled="@(_busy || !_ready)" @onclick="RequestAiAsync">@Text["✧ AI 编写"]</button>
         </nav>
         <div class="studio-body @(_docsOpen ? "with-docs" : "")">
             <aside class="studio-explorer">
-                <div class="studio-section-title">资源管理器 <span>@_files.Length</span></div>
+                <div class="studio-section-title">@Text["资源管理器"] <span>@_files.Length</span></div>
                 <div class="studio-workspace-label">⌄ <span>HOT SCRIPTS</span></div>
-                <label class="studio-search"><span>⌕</span><input aria-label="筛选脚本" placeholder="筛选脚本…" @bind="_fileQuery" @bind:event="oninput" /></label>
+                <label class="studio-search"><span>⌕</span><input aria-label="@Text["筛选脚本"]" placeholder="@Text["筛选脚本…"]" @bind="_fileQuery" @bind:event="oninput" /></label>
                 <div class="studio-file-list">
                     @foreach (var file in _files.Where(f => f.Contains(_fileQuery, StringComparison.OrdinalIgnoreCase)))
                     {
                         <div class="studio-file-row"><button class="studio-file @(file == _active ? "selected" : "")" title="@file" disabled="@_busy" @onclick="() => OpenFileAsync(file)"><span class="csharp-icon">C#</span><span>@file</span>@if (_dirty.Contains(file)) { <i class="dirty-dot"></i> }</button><button class="studio-file-delete" title="@Text["删除脚本"]" aria-label="@(Text["删除脚本"] + ": " + file)" disabled="@(_busy || !_ready)" @onclick="() => _deleteFile = file"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12 M8 5V3h4v2 M6 5l1 12h6l1-12 M9 8v6 M11 8v6" /></svg></button></div>
                     }
-                    @if (_files.Length == 0) { <p class="studio-empty-explorer">还没有脚本。点击“新建脚本”从模板创建第一个动作。</p> }
+                    @if (_files.Length == 0) { <p class="studio-empty-explorer">@Text["还没有脚本。点击“新建脚本”从模板创建第一个动作。"]</p> }
                 </div>
-                <div class="studio-explorer-footer"><span class="studio-folder-icon">⌘</span><div>脚本工作区<small>保存后自动编译，下一次动作使用新代码</small></div></div>
+                <div class="studio-explorer-footer"><span class="studio-folder-icon">⌘</span><div>@Text["脚本工作区"]<small>@Text["保存后自动编译，下一次动作使用新代码"]</small></div></div>
             </aside>
             <main class="studio-main">
-                <div class="studio-tabs" role="tablist" aria-label="已打开脚本">
+                <div class="studio-tabs" role="tablist" aria-label="@Text["已打开脚本"]">
                     @foreach (var file in _tabs)
                     {
                         <button role="tab" aria-selected="@(file == _active)" class="studio-tab @(file == _active ? "active" : "")" @onclick="() => OpenFileAsync(file)"><span class="csharp-icon">C#</span>@System.IO.Path.GetFileName(file)@if (_dirty.Contains(file)) { <i class="dirty-dot"></i> }</button>
                     }
                 </div>
-                <div class="studio-breadcrumb"><span>HotScripts</span><b>›</b>@(_active ?? "选择脚本")<span class="studio-title-spacer"></span><span>C# Script</span></div>
+                <div class="studio-breadcrumb"><span>HotScripts</span><b>›</b>@(_active ?? Text["选择脚本"])<span class="studio-title-spacer"></span><span>C# Script</span></div>
                 <div class="studio-editor-area">
                     <div class="studio-monaco" @ref="_editorElement"></div>
                     @if (!_ready || _active is null)
                     {
-                        <div class="studio-editor-empty"><span class="studio-empty-glyph">{ }</span><h2>@(_ready ? "从一个脚本开始" : "正在准备编辑器")</h2><p>@(_ready ? "选择动作或条件模板，也可以直接告诉 AI 你想做什么。" : "加载本地 C# 编辑环境…")</p>@if (_ready) { <button class="studio-build" @onclick="RequestAiAsync">✧ AI 编写</button> }</div>
+                        <div class="studio-editor-empty"><span class="studio-empty-glyph">{ }</span><h2>@(_ready ? Text["从一个脚本开始"] : Text["正在准备编辑器"])</h2><p>@(_ready ? Text["选择动作或条件模板，也可以直接告诉 AI 你想做什么。"] : Text["加载本地 C# 编辑环境…"])</p>@if (_ready) { <button class="studio-build" @onclick="RequestAiAsync">@Text["✧ AI 编写"]</button> }</div>
                     }
                 </div>
-                <section class="studio-output" aria-label="编译结果">
-                    <div class="studio-output-header"><strong>输出</strong><span class="studio-problems">问题 <b>@_errors.Count</b></span><span class="studio-title-spacer"></span><span>Roslyn · C#</span></div>
-                    @if (_errors.Count > 0) { <button class="studio-ai" disabled="@(_busy || !_ready)" @onclick="RequestAiAsync">✧ AI 协助修复 · 自动附带错误</button> }
+                <section class="studio-output" aria-label="@Text["编译结果"]">
+                    <div class="studio-output-header"><strong>@Text["输出"]</strong><span class="studio-problems">@Text["问题"] <b>@_errors.Count</b></span><span class="studio-title-spacer"></span><span>Roslyn · C#</span></div>
+                    @if (_errors.Count > 0) { <button class="studio-ai" disabled="@(_busy || !_ready)" @onclick="RequestAiAsync">@Text["✧ AI 协助修复 · 自动附带错误"]</button> }
                     <div class="studio-output-content" role="status">
-                        <div class="studio-output-line @(_errors.Count > 0 ? "output-error" : "")"><span class="studio-output-time">@_outputTime</span><span>@_status</span></div>
+                        <div class="studio-output-line @(_errors.Count > 0 ? "output-error" : "")"><span class="studio-output-time">@_outputTime</span><span>@Text[_status]</span></div>
                         @foreach (var error in _errors)
                         {
                             <button class="studio-error-row" @onclick="() => GoToErrorAsync(error)"><span>⊗</span><code>@error.Message</code><small>@error.File:@error.Line</small></button>
@@ -66,31 +67,31 @@
             @if (_docsOpen)
             {
                 <aside class="studio-docs">
-                    <div class="studio-section-title">API 参考 <button class="studio-icon" aria-label="关闭 API 文档" @onclick="() => _docsOpen = false">×</button></div>
-                    <div class="studio-docs-intro"><span class="studio-eyebrow">ALCYONE SCRIPTING</span><h2>让代码连接桌面。</h2><p>内置接口、调用示例与动作约定，随写随查。</p></div>
-                    <label class="studio-search"><span>⌕</span><input aria-label="搜索 API" placeholder="搜索 API 或功能…" @bind="_docQuery" @bind:event="oninput" /></label>
+                    <div class="studio-section-title">@Text["API 参考"] <button class="studio-icon" aria-label="@Text["关闭 API 文档"]" @onclick="() => _docsOpen = false">×</button></div>
+                    <div class="studio-docs-intro"><span class="studio-eyebrow">ALCYONE SCRIPTING</span><h2>@Text["让代码连接桌面。"]</h2><p>@Text["内置接口、调用示例与动作约定，随写随查。"]</p></div>
+                    <label class="studio-search"><span>⌕</span><input aria-label="@Text["搜索 API"]" placeholder="@Text["搜索 API 或功能…"]" @bind="_docQuery" @bind:event="oninput" /></label>
                     <div class="studio-doc-categories">
                         @foreach (var category in new[] { "全部", "基础", "键鼠", "识别", "变量" })
-                        { <button class="@(_docCategory == category ? "active" : "")" @onclick="() => _docCategory = category">@category</button> }
+                        { <button class="@(_docCategory == category ? "active" : "")" @onclick="() => _docCategory = category">@Text[category]</button> }
                     </div>
                     <div class="studio-doc-list">
                         @foreach (var doc in FilteredDocs)
                         {
                             <details class="studio-doc" open="@(doc.Title == "StateScript")">
-                                <summary><span><b>@doc.Title</b><small>@doc.Description</small></span><span>⌄</span></summary>
-                                <div class="studio-doc-detail"><code class="studio-signature">@doc.Signature</code><p>@doc.Notes</p><pre>@doc.Example</pre><button disabled="@(!_ready || _active is null || _busy)" @onclick="() => InsertExampleAsync(doc)">插入示例 ↗</button></div>
+                                <summary><span><b>@Text[doc.Title]</b><small>@Text[doc.Description]</small></span><span>⌄</span></summary>
+                                <div class="studio-doc-detail"><code class="studio-signature">@doc.Signature</code><p>@Text[doc.Notes]</p><pre>@doc.Example</pre><button disabled="@(!_ready || _active is null || _busy)" @onclick="() => InsertExampleAsync(doc)">@Text["插入示例 ↗"]</button></div>
                             </details>
                         }
-                        @if (!FilteredDocs.Any()) { <p class="studio-doc-no-results">没有找到匹配的 API。</p> }
+                        @if (!FilteredDocs.Any()) { <p class="studio-doc-no-results">@Text["没有找到匹配的 API。"]</p> }
                     </div>
-                    <div class="studio-docs-footer">示例中的坐标、名称可按当前流程修改。</div>
+                    <div class="studio-docs-footer">@Text["示例中的坐标、名称可按当前流程修改。"]</div>
                 </aside>
             }
         </div>
-        <footer class="studio-statusbar"><span>⌁</span><span>@(_dirty.Count == 0 ? "所有更改已保存" : $"{_dirty.Count} 个文件未保存")</span><span class="studio-title-spacer"></span><span @ref="_cursorElement">行 1，列 1</span><span>空格: 4</span><span>UTF-8</span><span>C#</span></footer>
+        <footer class="studio-statusbar"><span>⌁</span><span>@(_dirty.Count == 0 ? Text["所有更改已保存"] : Text.Format("{0} 个文件未保存", _dirty.Count))</span><span class="studio-title-spacer"></span><span @ref="_cursorElement">@Text["行 1，列 1"]</span><span>@Text["空格: 4"]</span><span>UTF-8</span><span>C#</span></footer>
         @if (_confirm is not null)
         {
-            <div class="studio-confirm-overlay"><section class="studio-confirm" role="alertdialog" aria-label="未保存的修改"><h3>@(_confirm == "reload" ? "重新读取文件？" : "还有未保存的修改")</h3><p>@(_confirm == "reload" ? "这会用磁盘文件替换当前编辑内容。" : "保存并编译后关闭，或放弃这次编辑。")</p><div><button @onclick="() => _confirm = null">继续编辑</button><button @onclick="DiscardAsync">放弃修改</button>@if (_confirm == "close") { <button class="studio-build" @onclick="SaveAndCloseAsync">保存并关闭</button> }</div></section></div>
+            <div class="studio-confirm-overlay"><section class="studio-confirm" role="alertdialog" aria-label="@Text["未保存的修改"]"><h3>@(_confirm == "reload" ? Text["重新读取文件？"] : Text["还有未保存的修改"])</h3><p>@(_confirm == "reload" ? Text["这会用磁盘文件替换当前编辑内容。"] : Text["保存并编译后关闭，或放弃这次编辑。"])</p><div><button @onclick="() => _confirm = null">@Text["继续编辑"]</button><button @onclick="DiscardAsync">@Text["放弃修改"]</button>@if (_confirm == "close") { <button class="studio-build" @onclick="SaveAndCloseAsync">@Text["保存并关闭"]</button> }</div></section></div>
         }
         @if (_deleteFile is not null)
         {
@@ -98,14 +99,14 @@
         }
         @if (_newScriptOpen)
         {
-            <div class="studio-confirm-overlay"><section class="studio-confirm" role="dialog" aria-modal="true" aria-label="新建热重载脚本">
-                <h3>新建热重载脚本</h3>
-                <label class="studio-search">模板<select aria-label="脚本模板" value="@_newScriptTemplate" @onchange='e => ChangeScriptTemplate(e.Value?.ToString() ?? "action")'><option value="action">动作：执行操作</option><option value="condition">条件函数：直接返回判断结果</option><option value="async-condition">异步条件函数：执行完再判断</option></select></label>
-                <p>@(_newScriptTemplate == "action" ? "生成带参数、日志和变量示例的动作，在状态生命周期中调用。" : "生成完整条件函数和中文注释。只需修改判断逻辑：true 满足条件，false 不满足；编译后在“自定义条件”中选择。")</p>
-                <label class="studio-search"><input aria-label="脚本类名" placeholder="输入英文类名，例如 MyCondition" @bind="_newScriptName" /></label>
-                <p>文件：@(_newScriptName.Trim().EndsWith(".csx", StringComparison.OrdinalIgnoreCase) ? _newScriptName.Trim() : _newScriptName.Trim() + ".csx")</p>
-                @if (_newScriptError.Length > 0) { <p role="alert" class="output-error">@_newScriptError</p> }
-                <div><button disabled="@_busy" @onclick="() => _newScriptOpen = false">取消</button><button class="studio-ai" disabled="@_busy" @onclick="RequestAiAsync">✧ AI 按此模板编写</button><button class="studio-build" disabled="@_busy" @onclick="CreateScriptAsync">创建并编译</button></div>
+            <div class="studio-confirm-overlay"><section class="studio-confirm" role="dialog" aria-modal="true" aria-label="@Text["新建热重载脚本"]">
+                <h3>@Text["新建热重载脚本"]</h3>
+                <label class="studio-search">@Text["模板"]<select aria-label="@Text["脚本模板"]" value="@_newScriptTemplate" @onchange='e => ChangeScriptTemplate(e.Value?.ToString() ?? "action")'><option value="action">@Text["动作：执行操作"]</option><option value="condition">@Text["条件函数：直接返回判断结果"]</option><option value="async-condition">@Text["异步条件函数：执行完再判断"]</option></select></label>
+                <p>@(_newScriptTemplate == "action" ? Text["生成带参数、日志和变量示例的动作，在状态生命周期中调用。"] : Text["生成完整条件函数和中文注释。只需修改判断逻辑：true 满足条件，false 不满足；编译后在“自定义条件”中选择。"])</p>
+                <label class="studio-search"><input aria-label="@Text["脚本类名"]" placeholder="@Text["输入英文类名，例如 MyCondition"]" @bind="_newScriptName" /></label>
+                <p>@Text["文件："]@(_newScriptName.Trim().EndsWith(".csx", StringComparison.OrdinalIgnoreCase) ? _newScriptName.Trim() : _newScriptName.Trim() + ".csx")</p>
+                @if (_newScriptError.Length > 0) { <p role="alert" class="output-error">@Text[_newScriptError]</p> }
+                <div><button disabled="@_busy" @onclick="() => _newScriptOpen = false">@Text["取消"]</button><button class="studio-ai" disabled="@_busy" @onclick="RequestAiAsync">@Text["✧ AI 按此模板编写"]</button><button class="studio-build" disabled="@_busy" @onclick="CreateScriptAsync">@Text["创建并编译"]</button></div>
             </section></div>
         }
     </section>

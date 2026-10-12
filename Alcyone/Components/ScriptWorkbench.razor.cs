@@ -167,11 +167,21 @@ public partial class ScriptWorkbench
         catch (Exception ex) { _newScriptError = "新建失败：" + ex.Message; }
     }
     private IEnumerable<ApiDoc> FilteredDocs => Docs.Where(d => (_docCategory == "全部" || d.Category == _docCategory) &&
-        (d.Title + d.Description + d.Signature).Contains(_docQuery, StringComparison.OrdinalIgnoreCase));
+        (d.Title + Text[d.Description] + d.Signature).Contains(_docQuery, StringComparison.OrdinalIgnoreCase));
 
+    private string? _editorLanguage;
+    private object[] LocalizedDocs => Docs.Select(d => (object)new { d.Title, Description = Text[d.Description], d.Signature, d.Prefix, Insert = d.Example }).ToArray();
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
+        if (!firstRender)
+        {
+            if (_ready && _editor is not null && _editorLanguage != Text.Language)
+            {
+                _editorLanguage = Text.Language;
+                await _editor.InvokeVoidAsync("language", Text.Language, LocalizedDocs);
+            }
+            return;
+        }
         try
         {
             _files = Directory.GetFiles(Host.ScriptDirectory, "*.csx", SearchOption.AllDirectories)
@@ -180,7 +190,8 @@ public partial class ScriptWorkbench
             if (_disposed) return;
             _reference = DotNetObjectReference.Create(this);
             _editor = await _module.InvokeAsync<IJSObjectReference>("create", _editorElement, _cursorElement, _reference,
-                Docs.Select(d => new { d.Title, d.Description, d.Signature, d.Prefix, Insert = d.Example }));
+                LocalizedDocs, Text.Language);
+            _editorLanguage = Text.Language;
             _ready = true;
             if (_files.Length > 0) await OpenFileAsync(_files[0]);
             if (StartWithConditionTemplate) RequestNewScript();
@@ -349,7 +360,7 @@ public partial class ScriptWorkbench
         await CompileAsync();
         if (_errors.Count == 0 && _dirty.Count == 0) await OnClose.InvokeAsync();
     }
-    public async ValueTask DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         Host.DependencyProgress -= OnDependencyProgress;
         _disposed = true;
@@ -360,7 +371,7 @@ public partial class ScriptWorkbench
         }
         catch (JSDisconnectedException) { }
         catch (TaskCanceledException) { }
-        finally { _reference?.Dispose(); }
+        finally { _reference?.Dispose(); await base.DisposeAsync(); }
     }
     public sealed record ScriptDraft(string Path, string Source, string Original);
     private sealed record CompileError(string File, int Line, int Column, string Message);

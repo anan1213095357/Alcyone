@@ -19,6 +19,8 @@ try
     preferences.Changed += () => notifications++;
     await preferences.SetAsync("en");
     Check(text["运行"] == "Run" && notifications == 1, "Switch notification and translation");
+    foreach (var key in new[] { "星舰外观", "桌面与启动", "目标文件", "API 参考", "保存并编译", "条件函数", "自定义", "请选择判断 API", "待执行 · PowerShell", "函数返回", "编译时自动下载缺失库" })
+        Check(text[key] != key && !Regex.IsMatch(text[key], "[\u4e00-\u9fff]"), "Remaining UI label translated: " + key);
     Check(new LanguagePreferences(path).Language == "en", "Persists across service restarts");
     await preferences.SetAsync("en");
     Check(notifications == 1, "No duplicate notification");

@@ -32,7 +32,7 @@ monaco.editor.defineTheme('alcyone-studio', {
     colors: { 'editor.background': '#181C24', 'editor.foreground': '#D4D8E2', 'editorLineNumber.foreground': '#596272', 'editorLineNumber.activeForeground': '#B5C6DF', 'editor.lineHighlightBackground': '#222834', 'editor.selectionBackground': '#36557A80', 'editorCursor.foreground': '#91BFFF', 'editorIndentGuide.background1': '#2A303C', 'editorWidget.background': '#222834', 'editorWidget.border': '#3A4454' }
 });
 let completion;
-export function create(host, status, reference, docs) {
+export function create(host, status, reference, docs, locale = 'zh-CN') {
     if (!document.querySelector('link[data-script-editor]')) {
         const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = new URL('./workbench.css', import.meta.url); link.dataset.scriptEditor = ''; document.head.append(link);
     }
@@ -97,11 +97,14 @@ export function create(host, status, reference, docs) {
     });
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => invoke('CompileShortcut'));
     editor.addCommand(monaco.KeyCode.F8, () => invoke('CompileShortcut'));
-    const positionSubscription = editor.onDidChangeCursorPosition(e => { status.textContent = `行 ${e.position.lineNumber}，列 ${e.position.column}`; });
+    const positionText = position => locale === 'en' ? `Ln ${position.lineNumber}, Col ${position.column}` : `行 ${position.lineNumber}，列 ${position.column}`;
+    editor.updateOptions({ ariaLabel: locale === 'en' ? 'C# script editor' : 'C# 脚本编辑器' });
+    const positionSubscription = editor.onDidChangeCursorPosition(e => { status.textContent = positionText(e.position); });
     const stopKeys = e => e.stopPropagation();
     const surface = host.closest('.studio-overlay');
     surface.addEventListener('keydown', stopKeys);
     const instance = {
+        language(value, translatedDocs) { locale = value; docs = translatedDocs; editor.updateOptions({ariaLabel: locale === 'en' ? 'C# script editor' : 'C# 脚本编辑器'}); if (editor.getPosition()) status.textContent = positionText(editor.getPosition()); },
         open(path, source) {
             if (active) models.get(active).view = editor.saveViewState();
             let item = models.get(path);

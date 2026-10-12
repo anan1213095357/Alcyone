@@ -1,27 +1,28 @@
+@inherits LocalizedComponent
 @using StateMachine.Execution
 @using System.Diagnostics
 <div class="windows-condition">
-    <div class="field-caption">@QueryLabel</div>
+    <div class="field-caption">@L[QueryLabel]</div>
     @if (Condition.SystemCheck.StartsWith("file.") || Condition.SystemCheck.StartsWith("directory."))
     {
         <FilePathPicker Value="@Condition.SystemQuery" ValueChanged="ChooseQuery" FileOnly="@Condition.SystemCheck.StartsWith("file.")" />
     }
     else
     {
-        <SearchPicker Options="_options" Value="@Condition.SystemQuery" ValueChanged="ChooseQuery" AllowCustom="true" Placeholder="@QueryLabel" />
+        <SearchPicker Options="_options" Value="@Condition.SystemQuery" ValueChanged="ChooseQuery" AllowCustom="true" Placeholder="@L[QueryLabel]" />
         @if (!string.IsNullOrWhiteSpace(Condition.SystemQuery)) { <div class="selected-target">@Condition.SystemQuery</div> }
     }
-    <small>@QueryHelp</small>
+    <small>@L[QueryHelp]</small>
     @if (WindowsConditions.Numeric(Condition.SystemCheck))
     {
-        <div class="field-caption">比较数值 · @Unit</div>
+        <div class="field-caption">@L["比较数值"] · @L[Unit]</div>
         <div class="numeric"><select @bind="Condition.Operator" @bind:after="NotifyChanged">@foreach(var op in new[]{"==","!=",">",">=","<","<="}){<option>@op</option>}</select><input type="number" step="any" @bind="Condition.SystemValue" @bind:after="NotifyChanged" aria-label="@($"比较数值（{Unit}）")" /></div>
-        <small>例如：@(Condition.SystemCheck == "disk.free" ? "剩余空间 >= 10 GB" : Condition.SystemCheck == "file.size" ? "文件大小 > 1 MB" : "最后修改距今 < 60 秒")</small>
+        <small>@L["例如："]@(Condition.SystemCheck == "disk.free" ? L["剩余空间 >= 10 GB"] : Condition.SystemCheck == "file.size" ? L["文件大小 > 1 MB"] : L["最后修改距今 < 60 秒"])</small>
     }
-    else { <div class="field-caption">期望结果</div><select value="@(Condition.ExpectedSuccess ? "true" : "false")" @onchange="ChangeExpected"><option value="true">满足 / 存在</option><option value="false">不满足 / 不存在</option></select> }
-    <button type="button" @onclick="LoadOptions">刷新可选目标</button>
-    <button type="button" @onclick="Test">测试当前条件</button>
-    @if (_result is not null) { <small>@_result</small> }
+    else { <div class="field-caption">@L["期望结果"]</div><select value="@(Condition.ExpectedSuccess ? "true" : "false")" @onchange="ChangeExpected"><option value="true">@L["满足 / 存在"]</option><option value="false">@L["不满足 / 不存在"]</option></select> }
+    <button type="button" @onclick="LoadOptions">@L["刷新可选目标"]</button>
+    <button type="button" @onclick="Test">@L["测试当前条件"]</button>
+    @if (_result is not null) { <small>@L[_result]</small> }
 </div>
 @code {
     [Parameter, EditorRequired] public ConditionModel Condition { get; set; } = default!;

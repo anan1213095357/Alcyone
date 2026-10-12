@@ -1,27 +1,28 @@
+@inherits LocalizedComponent
 @using Microsoft.AspNetCore.Components.Web
 <div class="search-picker">
-    <button type="button" class="picker-trigger" aria-haspopup="dialog" aria-expanded="@_open" @onclick="Open"><span><small>@Selected?.Group</small>@(Selected?.Label ?? (string.IsNullOrEmpty(Value) ? Placeholder : Value))</span><span class="chevron">⌕</span></button>
+    <button type="button" class="picker-trigger" aria-haspopup="dialog" aria-expanded="@_open" @onclick="Open"><span><small>@L[Selected?.Group]</small>@(Selected?.Label ?? (string.IsNullOrEmpty(Value) ? L[Placeholder] : Value))</span><span class="chevron">⌕</span></button>
     @if (_open)
     {
         <div class="picker-dismiss" data-overlay-dismiss @onclick="Close"></div>
-        <div class="picker-menu" role="dialog" aria-label="@Placeholder">
-            <div class="search-line"><span>⌕</span><input @ref="_input" value="@_query" @oninput="Search" @onkeydown="KeyDown" placeholder="@SearchHint" aria-label="搜索选项" autocomplete="off" /><button type="button" @onclick="Close" aria-label="关闭">×</button></div>
-            <div class="breadcrumb"><div class="category-location"><small>当前分类</small><strong>@(_path.Length == 0 ? "全部 API" : _path.Replace("/", " / "))</strong></div><div class="category-navigation"><button type="button" @onclick='() => Navigate("")'>全部</button>@if (_path.Length > 0) { <button type="button" @onclick="Back">返回上级</button> }</div></div>
+        <div class="picker-menu" role="dialog" aria-label="@L[Placeholder]">
+            <div class="search-line"><span>⌕</span><input @ref="_input" value="@_query" @oninput="Search" @onkeydown="KeyDown" placeholder="@L[SearchHint]" aria-label="@L["搜索选项"]" autocomplete="off" /><button type="button" @onclick="Close" aria-label="@L["关闭"]">×</button></div>
+            <div class="breadcrumb"><div class="category-location"><small>@L["当前分类"]</small><strong>@(_path.Length == 0 ? L["全部 API"] : string.Join(" / ", _path.Split('/').Select(p => L[p])))</strong></div><div class="category-navigation"><button type="button" @onclick='() => Navigate("")'>@L["全部"]</button>@if (_path.Length > 0) { <button type="button" @onclick="Back">@L["返回上级"]</button> }</div></div>
             <div class="picker-results">
                 @if (string.IsNullOrWhiteSpace(_query))
                 {
-                    @foreach (var category in Categories) { <button type="button" class="category" @onclick="() => Navigate(category.Path)"><span>▤ @category.Name</span><span>›</span></button> }
+                    @foreach (var category in Categories) { <button type="button" class="category" @onclick="() => Navigate(category.Path)"><span>▤ @L[category.Name]</span><span>›</span></button> }
                 }
                 @{ var choices = Choices.ToList(); }
                 @for (var i = 0; i < choices.Count; i++)
                 {
                     var item = choices[i]; var index = i;
-                    <button type="button" class="option @(index == _index ? "focused" : "") @(item.Value == Value ? "selected" : "")" @onclick="() => Choose(item.Value)"><span><strong>@item.Label</strong><small>@(string.IsNullOrWhiteSpace(_query) ? item.Description : item.Group + " · " + item.Description)</small></span>@if(item.Value==Value){<span>✓</span>}</button>
+                    <button type="button" class="option @(index == _index ? "focused" : "") @(item.Value == Value ? "selected" : "")" @onclick="() => Choose(item.Value)"><span><strong>@L[item.Label]</strong><small>@(string.IsNullOrWhiteSpace(_query) ? L[item.Description] : L[item.Group] + " · " + L[item.Description])</small></span>@if(item.Value==Value){<span>✓</span>}</button>
                 }
-                @if (!choices.Any() && (!string.IsNullOrWhiteSpace(_query) || !Categories.Any())) { <div class="no-result">@(Options.Any() ? "没有匹配项，试试名称、API 或分类。" : "还没有可选项目，请先创建项目。")</div> }
-                @if (AllowCustom && !string.IsNullOrWhiteSpace(_query) && !Options.Any(o => o.Value == _query.Trim())) { <button type="button" class="custom" @onclick="() => Choose(_query.Trim())">使用输入值：@_query.Trim()</button> }
+                @if (!choices.Any() && (!string.IsNullOrWhiteSpace(_query) || !Categories.Any())) { <div class="no-result">@(Options.Any() ? L["没有匹配项，试试名称、API 或分类。"] : L["还没有可选项目，请先创建项目。"])</div> }
+                @if (AllowCustom && !string.IsNullOrWhiteSpace(_query) && !Options.Any(o => o.Value == _query.Trim())) { <button type="button" class="custom" @onclick="() => Choose(_query.Trim())">@L["使用输入值："]@_query.Trim()</button> }
             </div>
-            <div class="picker-help">@(AllowCustom ? "优先选择已有值，找不到时可使用输入值。" : "输入搜索，或逐级展开分类。↑ ↓ 选择，Enter 确认。")</div>
+            <div class="picker-help">@(AllowCustom ? L["优先选择已有值，找不到时可使用输入值。"] : L["输入搜索，或逐级展开分类。↑ ↓ 选择，Enter 确认。"])</div>
         </div>
     }
 </div>

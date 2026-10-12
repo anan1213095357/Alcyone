@@ -1,28 +1,29 @@
+@inherits LocalizedComponent
 <div class="appearance-backdrop">
-    <section class="appearance-dialog" role="dialog" aria-modal="true" aria-label="星舰外观">
-        <header><div><span class="eyebrow">FLIGHT COLLECTION</span><h2>选择你的星舰</h2><p>给星球之间的每一次启航，换一个新形象。</p></div><button class="close" aria-label="关闭星舰外观" disabled="@_busy" @onclick="OnClose">×</button></header>
+    <section class="appearance-dialog" role="dialog" aria-modal="true" aria-label="@L["星舰外观"]">
+        <header><div><span class="eyebrow">FLIGHT COLLECTION</span><h2>@L["选择你的星舰"]</h2><p>@L["给星球之间的每一次启航，换一个新形象。"]</p></div><button class="close" aria-label="@L["关闭星舰外观"]" disabled="@_busy" @onclick="OnClose">×</button></header>
         <div class="appearance-body">
-            <div class="ship-stage"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><span class="preview-label"><i></i>外观预览</span><div class="hero-ship"><div class="scaled-preview" style="transform:scale(@_scale.ToString(System.Globalization.CultureInfo.InvariantCulture))"><StarshipVisual Appearance="@_choice" CustomImage="@_image" /></div></div><div class="preview-caption"><span>@(_choice == "musk" ? "SPECIAL EDITION" : "ORIGINAL EDITION")</span><strong>@(_choice == "custom" ? "我的星舰" : _choice == "musk" ? "马斯克 · 抱紧星舰" : "Starship SN9")</strong><small>沿航线飞行时，舰首始终朝向前方</small></div></div>
-            <div class="appearance-options"><div class="options-heading">飞行形象 <span>自定义</span></div>
+            <div class="ship-stage"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><span class="preview-label"><i></i>@L["外观预览"]</span><div class="hero-ship"><div class="scaled-preview" style="transform:scale(@_scale.ToString(System.Globalization.CultureInfo.InvariantCulture))"><StarshipVisual Appearance="@_choice" CustomImage="@_image" /></div></div><div class="preview-caption"><span>@(_choice == "musk" ? "SPECIAL EDITION" : "ORIGINAL EDITION")</span><strong>@(_choice == "custom" ? L["我的星舰"] : _choice == "musk" ? L["马斯克 · 抱紧星舰"] : "Starship SN9")</strong><small>@L["沿航线飞行时，舰首始终朝向前方"]</small></div></div>
+            <div class="appearance-options"><div class="options-heading">@L["飞行形象"] <span>@L["自定义"]</span></div>
                 @foreach (var option in new[] { "musk", "sn9" })
                 {
-                    <button class="appearance-card @(_choice == option ? "selected" : "")" aria-pressed="@(_choice == option)" disabled="@_busy" @onclick="() => _choice = option"><div class="card-image"><StarshipVisual Appearance="@option" /></div><div class="card-copy"><span>@(option == "sn9" ? "经典款" : "默认款")</span><strong>@(option == "sn9" ? "原版星舰 SN9" : "马斯克抱星舰")</strong><small>@(option == "sn9" ? "不锈钢舰身 · 原始摄影" : "大头肖像 · 盘腿环抱")</small></div><span class="choice-check">@(_choice == option ? "✓" : "")</span></button>
+                    <button class="appearance-card @(_choice == option ? "selected" : "")" aria-pressed="@(_choice == option)" disabled="@_busy" @onclick="() => _choice = option"><div class="card-image"><StarshipVisual Appearance="@option" /></div><div class="card-copy"><span>@(option == "sn9" ? L["经典款"] : L["默认款"])</span><strong>@(option == "sn9" ? L["原版星舰 SN9"] : L["马斯克抱星舰"])</strong><small>@(option == "sn9" ? L["不锈钢舰身 · 原始摄影"] : L["大头肖像 · 盘腿环抱"])</small></div><span class="choice-check">@(_choice == option ? "✓" : "")</span></button>
                 }
                 <label class="upload-card @(_choice == "custom" ? "selected" : "")">
-                    <span class="upload-icon">＋</span><span><strong>@(string.IsNullOrEmpty(_image) ? "上传自己的图片" : "更换自定义图片")</strong><small>PNG / JPG · 最大 2 MB · 建议舰首朝上</small></span>
-                    <InputFile OnChange="UploadAsync" accept="image/png,image/jpeg" disabled="@_busy" aria-label="上传星舰图片" />
+                    <span class="upload-icon">＋</span><span><strong>@(string.IsNullOrEmpty(_image) ? L["上传自己的图片"] : L["更换自定义图片"])</strong><small>@L["PNG / JPG · 最大 2 MB · 建议舰首朝上"]</small></span>
+                    <InputFile OnChange="UploadAsync" accept="image/png,image/jpeg" disabled="@_busy" aria-label="@L["上传星舰图片"]" />
                 </label>
                 @if (!string.IsNullOrEmpty(_image))
                 {
-                    <button class="custom-selection" disabled="@_busy" @onclick='() => _choice = "custom"'><img src="@_image" alt="自定义图片缩略图" /><span>使用我的图片</span><span>@(_choice == "custom" ? "✓" : "")</span></button>
+                    <button class="custom-selection" disabled="@_busy" @onclick='() => _choice = "custom"'><img src="@_image" alt="@L["自定义图片缩略图"]" /><span>@L["使用我的图片"]</span><span>@(_choice == "custom" ? "✓" : "")</span></button>
                 }
-                <div class="size-control"><div><label for="ship-size">飞行大小</label><output>@Math.Round(_scale * 100)%</output><button disabled="@_busy" @onclick="() => _scale = 1">重置</button></div><input id="ship-size" type="range" min="0.5" max="3" step="0.05" @bind="_scale" @bind:event="oninput" disabled="@_busy" /><small><span>50%</span><span>300%</span></small></div>
-                <div class="appearance-note"><b>跟随当前配置保存</b><p>应用后同步到主画布及桌面模式。切换配置时，自动恢复对应的星舰外观。</p></div>
-                @if (_choice == "musk") { <small class="image-credit">创意合成 · 肖像：The Royal Society / Debbie Rowe · <a href="https://commons.wikimedia.org/wiki/File:Elon_Musk_(cropped).jpg" target="_blank" rel="noopener noreferrer">来源</a> · <a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 3.0</a></small> }
+                <div class="size-control"><div><label for="ship-size">@L["飞行大小"]</label><output>@Math.Round(_scale * 100)%</output><button disabled="@_busy" @onclick="() => _scale = 1">@L["重置"]</button></div><input id="ship-size" type="range" min="0.5" max="3" step="0.05" @bind="_scale" @bind:event="oninput" disabled="@_busy" /><small><span>50%</span><span>300%</span></small></div>
+                <div class="appearance-note"><b>@L["跟随当前配置保存"]</b><p>@L["应用后同步到主画布及桌面模式。切换配置时，自动恢复对应的星舰外观。"]</p></div>
+                @if (_choice == "musk") { <small class="image-credit">@L["创意合成 · 肖像：The Royal Society / Debbie Rowe ·"] <a href="https://commons.wikimedia.org/wiki/File:Elon_Musk_(cropped).jpg" target="_blank" rel="noopener noreferrer">@L["来源"]</a> · <a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 3.0</a></small> }
             </div>
         </div>
-        @if (_error is not null) { <div class="appearance-error" role="alert">@_error</div> }
-        <footer><span>仅改变飞行外观，不影响流程执行</span><button class="cancel" disabled="@_busy" @onclick="OnClose">取消</button><button class="apply" disabled="@_busy" @onclick="ApplyAsync">@(_busy ? "正在保存…" : "应用外观")<span>↗</span></button></footer>
+        @if (_error is not null) { <div class="appearance-error" role="alert">@L[_error]</div> }
+        <footer><span>@L["仅改变飞行外观，不影响流程执行"]</span><button class="cancel" disabled="@_busy" @onclick="OnClose">@L["取消"]</button><button class="apply" disabled="@_busy" @onclick="ApplyAsync">@(_busy ? L["正在保存…"] : L["应用外观"])<span>↗</span></button></footer>
     </section>
 </div>
 @code {
