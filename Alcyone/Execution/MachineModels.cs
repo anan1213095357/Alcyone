@@ -29,6 +29,9 @@ namespace StateMachine.Execution;
     {
         public int CycleDelay { get; set; } = 50;
         public bool AutoStart { get; set; }
+        public string StarshipAppearance { get; set; } = "musk";
+        public string StarshipImage { get; set; } = "";
+        public double StarshipScale { get; set; } = 1;
     }
 
     public sealed class RegionModel

@@ -1,0 +1,20 @@
+@if (Appearance == "custom" && CustomImage.StartsWith("data:image/", StringComparison.Ordinal))
+{
+    <img src="@CustomImage" alt="自定义星舰图片" style="width:100%;height:100%;object-fit:contain" />
+}
+else if (Appearance != "sn9")
+{
+    <img src="images/musk-hugging-starship.png" alt="马斯克盘腿抱着笔直星舰的创意合成图" style="width:100%;height:100%;object-fit:contain" />
+}
+else
+{
+    <svg viewBox="300 65 420 1130" role="img" aria-label="SN9 星舰" style="width:100%;height:100%">
+        <defs><clipPath id="@_clip"><path d="M 480 85 Q 488 84 495 90 Q 530 139 549 195 L 560 205 L 602 291 L 614 363 L 579 369 L 578 841 L 596 877 L 676 1006 L 675 1165 L 340 1165 L 341 1001 L 363 878 L 382 842 L 383 370 L 346 363 L 356 291 L 400 205 L 418 190 Q 445 122 473 89 Z" /></clipPath></defs>
+        <image href="images/starship-sn9-photo.jpg" width="960" height="1440" clip-path="@($"url(#{_clip})")" />
+    </svg>
+}
+@code {
+    [Parameter] public string Appearance { get; set; } = "musk";
+    [Parameter] public string CustomImage { get; set; } = "";
+    private readonly string _clip = "ship-preview-" + Guid.NewGuid().ToString("N");
+}

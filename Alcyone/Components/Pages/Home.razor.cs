@@ -167,6 +167,9 @@ public partial class Home
         {
             edges = Machine.Edges,
             groups = Machine.StateGroups,
+            starshipAppearance = Machine.Settings.StarshipAppearance,
+            starshipImage = _lastStarshipImage == Machine.Settings.StarshipImage ? null : Machine.Settings.StarshipImage,
+            starshipScale = Machine.Settings.StarshipScale,
             configKey = _configKey,
             currentStateIds = Runtime.Running ? Runtime.CurrentStates.Values.ToArray() : Array.Empty<string>(),
             selectedEdgeId = SelectedEdgeId,
@@ -176,6 +179,7 @@ public partial class Home
             pending = PendingConnection,
             language = L.Language
         });
+        _lastStarshipImage = Machine.Settings.StarshipImage;
     }
     private JsonNode? GetRuntimeVariable(string name) =>
         Runtime.Variables.TryGetValue(name, out var value) ? CloneNode(value) : null;
@@ -1973,7 +1977,8 @@ public partial class Home
             var actionJson = JsonSerializer.Serialize(actionCatalog, _jsonOptions);
             var currentMachineJson = JsonSerializer.Serialize(new
             {
-                Machine.Regions, Machine.Variables, Machine.States, Machine.Edges, Machine.Settings,
+                Machine.Regions, Machine.Variables, Machine.States, Machine.Edges,
+                Settings = new { Machine.Settings.CycleDelay, Machine.Settings.AutoStart, Machine.Settings.StarshipAppearance, Machine.Settings.StarshipScale },
                 Recognitions = Machine.Recognitions.Select(item => new
                 {
                     item.Id, item.Name, item.ParentId, item.IsFolder,
@@ -2690,7 +2695,10 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
                         new MachineSettings
                         {
                             CycleDelay =
-                                oldMachine.Settings.CycleDelay
+                                oldMachine.Settings.CycleDelay,
+                            StarshipAppearance = oldMachine.Settings.StarshipAppearance,
+                            StarshipImage = oldMachine.Settings.StarshipImage,
+                            StarshipScale = oldMachine.Settings.StarshipScale
                         }
                 };
 
@@ -3681,4 +3689,3 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
     // MODELS
     // =========================================================
 }
-

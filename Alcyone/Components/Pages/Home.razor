@@ -90,6 +90,7 @@
                     <div class="app-language-row"><span>界面语言</span><LanguagePicker /></div>
                     <AiConnectionDialog />
                     <DesktopSettings />
+                    <button class="starship-settings-entry" @onclick="() => { _appSettingsOpen = false; _starshipSettingsOpen = true; }"><span>星舰外观</span><small>选择航线上的飞行形象</small><span>›</span></button>
                     @if (Desktop.IsDesktop)
                     {
                         <div class="app-menu-divider"></div>
@@ -1295,7 +1296,7 @@
                 if (interplanet && !flights.length) shipFlights.delete(edge.id);
                 const highlighted = interplanet ? flights.length > 0 : running.has(edge.id);
                 for(const started of flights)nextArrival=Math.min(nextArrival,started+flightDuration-now);
-                const signature=JSON.stringify([d,edgeOpacity,interplanet,highlighted,edgeState.selectedEdgeId===edge.id,edge.delayMilliseconds,flights,document.documentElement.lang]);
+                const signature=JSON.stringify([d,edgeOpacity,interplanet,highlighted,edgeState.selectedEdgeId===edge.id,edge.delayMilliseconds,flights,document.documentElement.lang,edgeState.starshipAppearance,edgeState.starshipScale,edgeState.starshipImageVersion]);
                 const saved=edgeMarkup.get(edge.id);
                 if(saved?.signature===signature){html+=saved.html;ships+=saved.ships;continue;}
                 const htmlStart=html.length,shipsStart=ships.length;
@@ -1367,7 +1368,7 @@
             nextArrival = Math.min(nextArrival, duration - elapsed);
             const delay = -elapsed;
             ships += `<g class="star-route-ship" data-flight="${edge.id}:${started}" data-started="${started}" data-duration="${duration}" style="offset-path:path('${d}');animation:none;opacity:${edgeOpacity};pointer-events:none" aria-hidden="true">
-                <g class="star-route-craft" transform="scale(2)">
+                <g class="star-route-craft" transform="scale(${2 * Math.max(.5, Math.min(3, Number(edgeState.starshipScale) || 1))})">
                     <g class="star-route-plumes">
                         <g class="star-route-plume" style="animation-delay:-.08s">
                             <path d="M -43 -6.8 Q -62 -6.5 -86 -5 Q -62 -3.5 -43 -3.2 Z" fill="url(#ship-thrust)"/>
@@ -1382,10 +1383,12 @@
                             <path d="M -43 4.2 L -71 5 L -43 5.8 Z" fill="#e2fcff"/>
                         </g>
                     </g>
-                    <!-- Real SN9 photograph, clipped without repainting; 88-unit hull, nose along +X. -->
-                    <g transform="matrix(0 .08148148 -.08148148 0 50.925926 -39.111111)">
-                        <image href="images/starship-sn9-photo.jpg" width="960" height="1440" clip-path="url(#starship-photo-silhouette)" />
-                    </g>
+                    ${edgeState.starshipAppearance === 'custom' && edgeState.starshipImage
+                        ? `<g transform="rotate(90)"><image href="${edgeState.starshipImage}" x="-40" y="-60" width="80" height="120" preserveAspectRatio="xMidYMid meet" /></g>`
+                        : edgeState.starshipAppearance !== 'sn9'
+                        ? '<g transform="rotate(90)"><image href="images/musk-hugging-starship.png" x="-40" y="-60" width="80" height="120" preserveAspectRatio="xMidYMid meet" /></g>'
+                        : '<g transform="matrix(0 .08148148 -.08148148 0 50.925926 -39.111111)"><image href="images/starship-sn9-photo.jpg" width="960" height="1440" clip-path="url(#starship-photo-silhouette)" /></g>'}
+
                 </g>
             </g>`;
         }
@@ -1958,6 +1961,11 @@
                 dotnet = null;
             },
             sync(state) {
+                if (state) {
+                    if (state.starshipImage != null && !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(state.starshipImage)) state.starshipImage = '';
+                    state.starshipImageVersion = (edgeState.starshipImageVersion || 0) + (state.starshipImage != null && state.starshipImage !== edgeState.starshipImage ? 1 : 0);
+                    state.starshipImage ??= edgeState.starshipImage || '';
+                }
                 if (state && state.configKey === edgeState.configKey) {
                     for (const [id, count] of Object.entries(state.transitionCounts || {})) {
                         if (count > (edgeState.transitionCounts?.[id] || 0)) {
@@ -2041,3 +2049,8 @@
 
 
 
+
+@if (_starshipSettingsOpen)
+{
+    <StarshipAppearancePicker Selected="@Machine.Settings.StarshipAppearance" CustomImage="@Machine.Settings.StarshipImage" Scale="Machine.Settings.StarshipScale" OnApply="ApplyStarshipAppearanceAsync" OnClose="() => _starshipSettingsOpen = false" />
+}
