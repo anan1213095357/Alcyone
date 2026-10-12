@@ -1221,8 +1221,43 @@
             return `M ${x1} ${y1} C ${x1 + distance} ${y1}, ${x2 - distance} ${y2}, ${x2} ${y2}`;
         }
 
-        let edgeFrame = 0;
+        const edgeMarkup = new Map();
+        const routeMetrics = new Map();
+        function measureRoute(id, d) {
+            const cached=routeMetrics.get(id); if(cached?.d===d)return cached;
+            const n=d.match(/[-+]?(?:\d*\.)?\d+(?:e[-+]?\d+)?/gi).map(Number), points=[], lengths=[0];
+            for(let i=0;i<=48;i++) {
+                const t=i/48,u=1-t;
+                points.push({x:u*u*u*n[0]+3*u*u*t*n[2]+3*u*t*t*n[4]+t*t*t*n[6],y:u*u*u*n[1]+3*u*u*t*n[3]+3*u*t*t*n[5]+t*t*t*n[7]});
+                if(i)lengths.push(lengths[i-1]+Math.hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y));
+            }
+            const metric={d,getTotalLength:()=>lengths[48],getPointAtLength(distance){
+                const target=Math.max(0,Math.min(lengths[48],distance));let lo=0,hi=48;
+                while(hi-lo>1){const mid=(lo+hi)>>1;if(lengths[mid]<target)lo=mid;else hi=mid;}
+                const t=(target-lengths[lo])/Math.max(.0001,lengths[hi]-lengths[lo]);
+                return {x:points[lo].x+(points[hi].x-points[lo].x)*t,y:points[lo].y+(points[hi].y-points[lo].y)*t};
+            }};
+            routeMetrics.set(id,metric);return metric;
+        }
+        const shipAnimations = new WeakMap();
+        const edgeTemplate=document.createElementNS("http://www.w3.org/2000/svg","svg");
+        function patchSvg(parent, source) {
+            for(let i=0;i<source.childNodes.length;i++) {
+                const next=source.childNodes[i],old=parent.childNodes[i];
+                if(!old){parent.appendChild(next.cloneNode(true));continue;}
+                if(old.nodeType!==next.nodeType || old.nodeName!==next.nodeName){parent.replaceChild(next.cloneNode(true),old);continue;}
+                if(next.nodeType!==1){if(old.nodeValue!==next.nodeValue)old.nodeValue=next.nodeValue;continue;}
+                for(const attr of [...old.attributes])if(!next.hasAttribute(attr.name))old.removeAttribute(attr.name);
+                if (old.matches('.warp-dust') && old.style.animationDuration===next.style.animationDuration)
+                    next.style.animationDelay=old.style.animationDelay;
+                for(const attr of next.attributes)if(old.getAttribute(attr.name)!==attr.value)old.setAttribute(attr.name,attr.value);
+                patchSvg(old,next);
+            }
+            while(parent.childNodes.length>source.childNodes.length)parent.lastChild.remove();
+        }
+        let edgeFrame = 0, applyingPointer = false;
         function scheduleDrawEdges() {
+            if(applyingPointer && !window.alcyoneAnimation.paused){window.alcyoneAnimation.cancelFrame(edgeFrame);edgeFrame=0;drawEdges();return;}
             // A minimized WebView pauses animation frames. Keep only the latest repaint.
             if (edgeFrame) return;
             edgeFrame = window.alcyoneAnimation.requestFrame(() => { edgeFrame = 0; drawEdges(); });
@@ -1253,15 +1288,17 @@
                 const d = window.alcyoneGroups?.orbitRoute(edge, edgeState.edges || [], start, end) || bezierPath(start.x, start.y, end.x, end.y);
                 const edgeOpacity = window.alcyoneGroups?.edgeOpacity(edge) ?? 1;
                 const interplanet = window.alcyoneGroups?.interplanetEdge(edge);
-                const flightDuration = interplanet ? (() => {
-                    const route = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                    route.setAttribute("d", d);
-                    return Math.max(.8, route.getTotalLength() / STARSHIP_SPEED);
-                })() : 0;
+                const metric = measureRoute(edge.id, d);
+                const flightDuration = interplanet ? Math.max(.8, metric.getTotalLength()/STARSHIP_SPEED) : 0;
                 const now = window.alcyoneAnimation.now() / 1000;
                 const flights = interplanet ? (shipFlights.get(edge.id) || []).filter(started => now < started + flightDuration) : [];
                 if (interplanet && !flights.length) shipFlights.delete(edge.id);
                 const highlighted = interplanet ? flights.length > 0 : running.has(edge.id);
+                for(const started of flights)nextArrival=Math.min(nextArrival,started+flightDuration-now);
+                const signature=JSON.stringify([d,edgeOpacity,interplanet,highlighted,edgeState.selectedEdgeId===edge.id,edge.delayMilliseconds,flights,document.documentElement.lang]);
+                const saved=edgeMarkup.get(edge.id);
+                if(saved?.signature===signature){html+=saved.html;ships+=saved.ships;continue;}
+                const htmlStart=html.length,shipsStart=ships.length;
                 let cls = "edge";
                 if (edgeState.selectedEdgeId === edge.id) cls += " selected";
                 if (highlighted) cls += " running";
@@ -1283,14 +1320,30 @@
     if (interplanet) {
         const dx = end.x-start.x, dy = end.y-start.y, length = Math.max(1,Math.hypot(dx,dy));
         html += `<path class="star-route-halo" d="${d}" fill="none" stroke="${highlighted ? '#35efca' : '#6ba7ed'}" stroke-width="${highlighted ? 34 : 26}" opacity="${edgeOpacity*(highlighted ? .3 : .1)}" />`;
-        for (let lane = -3; lane <= 3; lane++) {
-            const shift = lane * 3.2, tx = -dy/length*shift, ty = dx/length*shift;
+        const sampler = metric;
+        const routeLength = sampler.getTotalLength(), samples = [];
+        for (let i=0;i<=32;i++) {
+            const at=routeLength*i/32, p=sampler.getPointAtLength(at), q=sampler.getPointAtLength(Math.min(routeLength,at+1));
+            const previous=sampler.getPointAtLength(Math.max(0,at-1));
+            const vx=q.x-previous.x, vy=q.y-previous.y, n=Math.max(.001,Math.hypot(vx,vy));
+            samples.push({x:p.x,y:p.y,nx:-vy/n,ny:vx/n});
+        }
+        for (let lane = -4; lane <= 4; lane++) {
+            const points = samples.map((p,i) => {
+                const taper=Math.sin(Math.PI*i/32), fringe=Math.abs(lane)>=3;
+                const jitter=(Math.sin(i*1.73+lane*3.1)+Math.sin(i*.63+lane))*(fringe?3.2:1.2);
+                const shift=(lane*3.2+jitter)*taper;
+                return {x:p.x+p.nx*shift,y:p.y+p.ny*shift};
+            });
+            let dustPath=`M ${points[0].x} ${points[0].y}`;
+            for(let i=1;i<points.length-1;i++) dustPath+=` Q ${points[i].x} ${points[i].y} ${(points[i].x+points[i+1].x)/2} ${(points[i].y+points[i+1].y)/2}`;
+            dustPath+=` T ${points[32].x} ${points[32].y}`;
             const duration = (lane % 2 ? 1.2 : 1.6) * (highlighted ? .6 : 1);
             const delay = -((window.alcyoneAnimation.now()/1000 + (lane+3)*.19) % duration);
             const opacity = edgeOpacity * (highlighted ? (lane === 0 ? 1 : .9) : (lane === 0 ? .85 : .5));
-            html += `<path class="warp-dust ${highlighted ? 'is-outputting' : ''}" d="${d}" transform="translate(${tx} ${ty})" fill="none"
+            html += `<path class="warp-dust ${highlighted ? 'is-outputting' : ''}" d="${dustPath}" fill="none"
                 stroke="${highlighted ? (lane%2 ? '#eefff7' : '#53f5cd') : (lane%2 ? '#d4eaff' : '#88bfff')}" stroke-width="${(lane===0 ? 2.4 : 1.5)*(highlighted ? 1.25 : 1)}" stroke-linecap="round"
-                stroke-dasharray="${lane%2 ? '3 17 1 39' : '1 13 2 44'}"
+                stroke-dasharray="${Math.abs(lane)>=3 ? '1 9 .5 27 1 43 .5 38' : (lane%2 ? '3 17 1 39' : '1 13 2 44')}"
                 style="animation-duration:${duration}s;animation-delay:${delay}s;opacity:${opacity}" />`;
         }
     }
@@ -1313,7 +1366,7 @@
             if (elapsed >= duration) continue;
             nextArrival = Math.min(nextArrival, duration - elapsed);
             const delay = -elapsed;
-            ships += `<g class="star-route-ship" style="offset-path:path('${d}');animation-duration:${duration}s;animation-delay:${delay}s;animation-iteration-count:1;animation-fill-mode:both;opacity:${edgeOpacity};pointer-events:none" aria-hidden="true">
+            ships += `<g class="star-route-ship" data-flight="${edge.id}:${started}" data-started="${started}" data-duration="${duration}" style="offset-path:path('${d}');animation:none;opacity:${edgeOpacity};pointer-events:none" aria-hidden="true">
                 <g class="star-route-craft" transform="scale(2)">
                     <g class="star-route-plumes">
                         <g class="star-route-plume" style="animation-delay:-.08s">
@@ -1366,8 +1419,7 @@
                 if (delay > 0) {
                     const waitLabel = document.documentElement.lang === "en" ? "Wait" : "等待";
                     const label = delay >= 1000 ? `${waitLabel} ${+(delay / 1000).toFixed(3)} s` : `${waitLabel} ${delay} ms`;
-                    const curve = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                    curve.setAttribute("d", d);
+                    const curve = metric;
                     const length = curve.getTotalLength();
                     const span = Math.min(length, Math.max(100, label.length * 9 + 28));
                     const from = (length - span) / 2, to = (length + span) / 2;
@@ -1377,7 +1429,7 @@
                     // Reverse the same sampled curve to keep lettering readable on return wires.
                     if (points[0].x > points[points.length - 1].x) points.reverse();
                     const sleeve = points.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
-                    const pathId = `delay-sleeve-${(edgeState.edges || []).indexOf(edge)}`;
+                    const pathId = `delay-sleeve-${edge.id}`;
                     html += `<g data-edge-id="${edge.id}" style="opacity:${edgeOpacity};cursor:pointer;pointer-events:${edgeOpacity < .5 ? 'none' : 'all'}">
                         <title>${document.documentElement.lang === "en" ? "Click to set the transition delay" : "点击设置切换前等待"}</title>
                         <path d="${sleeve}" fill="none" stroke="${stroke}" stroke-width="27" stroke-linecap="round" />
@@ -1385,8 +1437,27 @@
                         <text fill="#e4efff" font-size="11" font-weight="600" dy="4" text-anchor="middle" style="pointer-events:all"><textPath href="#${pathId}" startOffset="50%">${label}</textPath></text>
                     </g>`;
                 }
+                edgeMarkup.set(edge.id,{signature,html:html.slice(htmlStart),ships:ships.slice(shipsStart)});
             }
-            edgeLayer.innerHTML = html + ships;
+            edgeTemplate.innerHTML = html + ships;
+            patchSvg(edgeLayer,edgeTemplate);
+            for (const ship of edgeLayer.querySelectorAll('.star-route-ship')) {
+                const key=ship.dataset.flight, duration=Number(ship.dataset.duration)*1000;
+                const elapsed=(window.alcyoneAnimation.now()/1000-Number(ship.dataset.started))*1000;
+                let flight=shipAnimations.get(ship);
+                if (!flight || flight.key!==key) {
+                    flight?.animation.cancel();
+                    const animation=ship.animate([{offsetDistance:'0%'},{offsetDistance:'100%'}],{duration,easing:'linear',fill:'both'});
+                    animation.currentTime=Math.max(0,elapsed);
+                    window.alcyoneAnimation.track(animation);
+                    flight={key,duration,animation};shipAnimations.set(ship,flight);
+                } else if (Math.abs(flight.duration-duration)>.1) {
+                    flight.animation.effect.updateTiming({duration});
+                    flight.animation.currentTime=Math.max(0,elapsed);flight.duration=duration;
+                }
+            }
+            const liveIds=new Set((edgeState.edges||[]).map(edge=>edge.id));
+            for(const id of routeMetrics.keys())if(!liveIds.has(id)){routeMetrics.delete(id);edgeMarkup.delete(id);}
             if (Number.isFinite(nextArrival)) flightCleanup = setTimeout(drawEdges, nextArrival * 1000 + 20);
         }
 
@@ -1422,7 +1493,7 @@
             workspace.scrollLeft = Math.max(0, Math.min(maxX, workspace.scrollLeft));
             workspace.scrollTop = Math.max(0, Math.min(maxY, workspace.scrollTop));
         }
-        function onWorkspaceScroll() { constrainCanvasScroll(); drawEdges(); }
+        function onWorkspaceScroll() { constrainCanvasScroll(); }
 
         function setZoom(value, keepCenter = false) {
             if (!workspace || !world || !scaleBox) return;
@@ -1488,6 +1559,8 @@
 
         function onPointerDown(event) {
             if (!workspace) return;
+            if (event.target.closest?.('.state-card,.alcyone-orb') || (isBackground(event.target) && [0,1,2].includes(event.button)))
+                dotnet?.invokeMethodAsync("SetCanvasInteraction",true);
             if (window.alcyoneGroups?.pointerDown(event)) return;
             if (desktopView) return;
             const header = event.target.closest?.(".state-header");
@@ -1522,7 +1595,17 @@
             }
         }
 
+        let pointerFrame = 0, latestPointer = null;
+        function flushPointerMove() {
+            window.alcyoneAnimation.cancelFrame(pointerFrame); pointerFrame=0;
+            const event=latestPointer; latestPointer=null;
+            if(event){applyingPointer=true;try{applyPointerMove(event);}finally{applyingPointer=false;}}
+        }
         function onPointerMove(event) {
+            latestPointer=event;
+            if(!pointerFrame)pointerFrame=window.alcyoneAnimation.requestFrame(flushPointerMove);
+        }
+        function applyPointerMove(event) {
             if (window.alcyoneGroups?.pointerMove(event)) return;
             if (pan && workspace) {
                 const dx = event.clientX - pan.mouseX;
@@ -1538,15 +1621,17 @@
                 drag.y = Math.max(0, drag.startY + dy);
                 if (Math.abs(dx) + Math.abs(dy) > 1) drag.moved = true;
                 if (drag.card?.isConnected) {
-                    drag.card.style.left = `${drag.x}px`;
-                    drag.card.style.top = `${drag.y}px`;
+                    drag.card.style.willChange='transform';
+                    drag.card.style.transform=`translate3d(${drag.x-drag.startX}px,${drag.y-drag.startY}px,0)`;
                 }
-                drawEdges();
+                scheduleDrawEdges();
             }
             updateTempEdge(event.clientX, event.clientY);
         }
 
         function onPointerUp(event) {
+            flushPointerMove();
+            dotnet?.invokeMethodAsync("SetCanvasInteraction",false);
             if (window.alcyoneGroups?.pointerUp(event)) { suppressClickUntil = Date.now() + 180; return; }
             if (pan) {
                 if (pan.moved) suppressClickUntil = Date.now() + 150;
@@ -1555,6 +1640,8 @@
             }
             if (drag) {
                 const finished = drag;
+                finished.card.style.left=`${finished.x}px`;finished.card.style.top=`${finished.y}px`;
+                finished.card.style.transform='';finished.card.style.willChange='';
                 drag = null;
                 if (finished.moved) {
                     suppressClickUntil = Date.now() + 150;
@@ -1845,6 +1932,7 @@
                 workspace?.addEventListener("scroll", onWorkspaceScroll);
                 window.addEventListener("pointermove", onPointerMove);
                 window.addEventListener("pointerup", onPointerUp);
+                window.addEventListener("pointercancel", onPointerUp);
                 window.addEventListener("keydown", onKeyDown);
                 window.addEventListener("resize", drawEdges);
             },
@@ -1860,8 +1948,10 @@
                 workspace?.removeEventListener("wheel", onWheel);
                 window.alcyoneAnimation.cancelFrame(edgeFrame); edgeFrame = 0;
                 workspace?.removeEventListener("scroll", onWorkspaceScroll);
+                window.alcyoneAnimation.cancelFrame(pointerFrame);pointerFrame=0;latestPointer=null;
                 window.removeEventListener("pointermove", onPointerMove);
                 window.removeEventListener("pointerup", onPointerUp);
+                window.removeEventListener("pointercancel", onPointerUp);
                 window.removeEventListener("keydown", onKeyDown);
                 window.removeEventListener("resize", drawEdges);
                 initialized = false;

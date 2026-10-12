@@ -24,7 +24,7 @@ public sealed partial class MachineSession
                 group.StateIds = group.StateIds.Where(id => states.ContainsKey(id) && used.Add(id)).ToList();
                 if (group.StateIds.Count == 0) continue;
                 group.Name = string.IsNullOrWhiteSpace(group.Name) ? "Alcyone" : group.Name.Trim()[..Math.Min(48, group.Name.Trim().Length)];
-                if (!new[] { "ocean", "rust", "ice", "violet", "sand", "jade", "rock", "lava", "blue", "rose", "forest", "silver" }.Contains(group.Appearance)) group.Appearance = "ocean";
+                if (!new[] { "ocean", "rust", "ice", "violet", "sand", "jade", "rock", "lava", "blue", "rose", "forest", "silver", "amber", "pearl", "toxic", "storm", "crimson", "midnight" }.Contains(group.Appearance)) group.Appearance = "ocean";
                 group.X = Math.Clamp(group.X, 0, 3800); group.Y = Math.Clamp(group.Y, 0, 2300);
                 var previous = Machine.StateGroups.FirstOrDefault(g => g.Id == group.Id);
                 if (previous is not { IsCollapsed: true } || !group.IsCollapsed) continue;

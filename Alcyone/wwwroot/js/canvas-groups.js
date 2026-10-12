@@ -326,7 +326,7 @@
         input.setAttribute('aria-label', english() ? 'Planet name' : '星球名称');
         panel.append(input);
         let appearance = group.appearance || 'ocean';
-        const choices = [['ocean','海洋','Ocean'],['rust','赤岩','Rust'],['ice','冰川','Ice'],['violet','紫气','Violet'],['sand','砂环','Sand rings'],['jade','翡翠','Jade'],['rock','岩石','Rock'],['lava','熔岩','Lava'],['blue','深蓝','Blue'],['rose','玫瑰环','Rose rings'],['forest','森林','Forest'],['silver','银环','Silver rings']];
+        const choices = [['ocean','海洋','Ocean'],['rust','赤岩','Rust'],['ice','冰川','Ice'],['violet','紫气','Violet'],['sand','砂环','Sand rings'],['jade','翡翠','Jade'],['rock','岩石','Rock'],['lava','熔岩','Lava'],['blue','深蓝','Blue'],['rose','玫瑰环','Rose rings'],['forest','森林','Forest'],['silver','银环','Silver rings'],['amber','琥珀炽星','Amber'],['pearl','珍珠环','Pearl rings'],['toxic','酸雾','Acid haze'],['storm','雷暴','Storm'],['crimson','绯红荒星','Crimson'],['midnight','暗夜冰环','Midnight rings']];
         const grid = document.createElement('div'); grid.className = 'planet-appearance-grid';
         for (const [key, zh, en] of choices) {
             const button = document.createElement('button'); button.type = 'button';
@@ -442,10 +442,11 @@
     function clearDropTarget() { for (const orb of layer.children) orb.classList.remove('drop-target'); }
     function cancelGesture() {
         if (gesture?.type === 'cards') {
-            for (const item of gesture.items) { item.card.style.left = `${item.x}px`; item.card.style.top = `${item.y}px`; }
+            for (const item of gesture.items) { item.card.style.left = `${item.x}px`; item.card.style.top = `${item.y}px`; item.card.style.transform=''; item.card.style.willChange=''; }
             clearDropTarget(); api.drawEdges();
         }
         if (gesture?.type === 'orb') {
+            gesture.orb.style.transform='';gesture.orb.style.willChange='';
             gesture.group.x = gesture.startX; gesture.group.y = gesture.startY;
             render();
         }
@@ -540,7 +541,10 @@
             const orb = event.target.closest?.('.alcyone-orb');
             if (orb && event.button === 0) {
                 const group = groups.find(g => g.id === orb.dataset.groupId);
-                gesture = { type: 'orb', orb, group, start: point(event), startX: group.x, startY: group.y, moved: false, previous: structuredClone(groups) };
+                const members = group.stateIds.map(cardFor).filter(Boolean);
+                gesture = { type: 'orb', orb, group, start: point(event), startX: group.x, startY: group.y, moved: false, previous: structuredClone(groups),
+                    minX: Math.min(...members.map(c => parseFloat(c.style.left) || 0)), minY: Math.min(...members.map(c => parseFloat(c.style.top) || 0)) };
+                orb.style.willChange = 'transform';
                 event.preventDefault(); return true;
             }
             const background = ['workspace', 'world', 'stateLayer', 'edgeSvg', 'worldScale', 'alcyoneGroupLayer'].includes(event.target.id);
@@ -568,7 +572,7 @@
                 const dy = Math.max(-Math.min(...g.items.map(item => item.y)), p.y - g.start.y);
                 if ((Math.abs(dx) + Math.abs(dy)) * api.zoom() > 4) g.moved = true;
                 if (g.moved) {
-                    for (const item of g.items) { item.card.style.left = `${item.x + dx}px`; item.card.style.top = `${item.y + dy}px`; }
+                    for (const item of g.items) { item.card.style.willChange='transform'; item.card.style.transform=`translate3d(${dx}px,${dy}px,0)`; }
                     g.positions = g.items.map(item => ({ id: item.id, x: item.x + dx, y: item.y + dy }));
                     g.targetId = groups.find(group => collapsed(group) && Math.hypot(p.x - group.x - 90, p.y - group.y - 86) < 100)?.id;
                     clearDropTarget();
@@ -576,19 +580,25 @@
                     api.drawEdges();
                 }
             } else {
-                const members = g.group.stateIds.map(cardFor).filter(Boolean);
-                const minX = Math.min(...members.map(c => parseFloat(c.style.left) || 0)), minY = Math.min(...members.map(c => parseFloat(c.style.top) || 0));
+                const minX = g.minX, minY = g.minY;
                 g.group.x = Math.max(0, g.startX - minX, Math.min(3800, g.startX + p.x - g.start.x));
                 g.group.y = Math.max(0, g.startY - minY, Math.min(2300, g.startY + p.y - g.start.y));
                 if (Math.abs(p.x - g.start.x) + Math.abs(p.y - g.start.y) > 3) g.moved = true;
-                g.orb.style.left = `${g.group.x}px`; g.orb.style.top = `${g.group.y}px`; api.drawEdges();
+                g.orb.style.transform=`translate3d(${g.group.x-g.startX}px,${g.group.y-g.startY}px,0)`; api.drawEdges();
             }
             reportMovingObstacles();
             return true;
         },
         pointerUp(event) {
             if (!gesture) return false;
-            const g = gesture; gesture = null; box?.remove(); box = null;
+            const g = gesture;
+            if(g.type==='cards')for(const item of g.items){
+                const position=g.positions?.find(p=>p.id===item.id);
+                if(position){item.card.style.left=`${position.x}px`;item.card.style.top=`${position.y}px`;}
+                item.card.style.transform='';item.card.style.willChange='';
+            }
+            if(g.type==='orb'){g.orb.style.left=`${g.group.x}px`;g.orb.style.top=`${g.group.y}px`;g.orb.style.transform='';g.orb.style.willChange='';}
+            gesture = null; box?.remove(); box = null;
             reportHitRegions();
             if (g.type === 'box' && g.moved && (selected.size || selectedGroups.size)) {
                 lastSelectionEnd = event ? point(event) : g.start;

@@ -4,7 +4,7 @@
     const records = new Map(), cache = new Map(), projection = [];
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     let frame = 0, observer = null;
-    const appearanceKeys = ['ocean', 'rust', 'ice', 'violet', 'sand', 'jade', 'rock', 'lava', 'blue', 'rose', 'forest', 'silver'];
+    const appearanceKeys = ['ocean', 'rust', 'ice', 'violet', 'sand', 'jade', 'rock', 'lava', 'blue', 'rose', 'forest', 'silver', 'amber', 'pearl', 'toxic', 'storm', 'crimson', 'midnight'];
     const palettes = [
         [[8, 41, 84], [48, 108, 83], [207, 223, 226]], // ocean
         [[105, 40, 22], [212, 126, 67], [241, 192, 137]], // rust
@@ -17,7 +17,13 @@
         [[35, 48, 103], [94, 126, 207], [198, 217, 250]], // blue gas
         [[100, 50, 64], [211, 137, 135], [253, 217, 188]], // rose gas
         [[43, 68, 47], [130, 158, 83], [219, 217, 154]], // forest
-        [[58, 79, 92], [167, 181, 185], [244, 239, 220]] // silver
+        [[58, 79, 92], [167, 181, 185], [244, 239, 220]], // silver
+        [[132, 43, 5], [255, 170, 28], [255, 244, 169]], // amber
+        [[64, 86, 120], [187, 186, 220], [249, 238, 255]], // pearl
+        [[18, 43, 21], [113, 163, 24], [209, 235, 109]], // toxic
+        [[32, 43, 81], [115, 99, 180], [220, 206, 253]], // storm
+        [[65, 11, 26], [172, 36, 55], [243, 133, 90]], // crimson
+        [[3, 8, 27], [20, 34, 81], [118, 171, 233]] // midnight
     ];
     const mix = (a, b, t) => a + (b - a) * t;
     const clamp = value => Math.max(0, Math.min(1, value));
@@ -50,7 +56,7 @@
             return value;
         }
         const data = new Uint8ClampedArray(mapWidth * mapHeight * 3);
-        const gas = [3, 4, 8, 9].includes(kind);
+        const gas = [3, 4, 8, 9, 13, 15].includes(kind);
         for (let y = 0; y < mapHeight; y++) for (let x = 0; x < mapWidth; x++) {
             const latitude = (y / (mapHeight - 1) - .5) * Math.PI, longitude = x / mapWidth * Math.PI * 2;
             const nx = Math.cos(latitude) * Math.cos(longitude), ny = Math.sin(latitude), nz = Math.cos(latitude) * Math.sin(longitude);
@@ -61,6 +67,11 @@
             let clouds = gas ? clamp((cloud - .54) * 3) : clamp((cloud - .5) * 5);
             if ([1, 6, 7].includes(kind)) clouds *= .12;
             if (kind === 2) clouds = Math.max(clouds, clamp((Math.abs(ny) - .55) * 2));
+            if (kind === 12) { blend = clamp(ground*1.5); clouds = clamp((cloud-.35)*2.5); }
+            if (kind === 14) { blend = clamp((ground-.43)*7); clouds *= .25; }
+            if (kind === 15) { blend = clamp(bands*.45+cloud*.65); clouds = clamp((cloud-.58)*6); }
+            if (kind === 16) { blend = clamp((ground-.45)*6); clouds = clamp((cloud-.62)*4); }
+            if (kind === 17) { blend = clamp((ground-.42)*3); clouds = clamp((cloud-.69)*9); }
             const at = (y * mapWidth + x) * 3;
             for (let channel = 0; channel < 3; channel++) {
                 let color = mix(colors[0][channel], colors[1][channel], blend);
@@ -68,7 +79,7 @@
                 data[at + channel] = color * (.9 + noise(nx * 80, ny * 80, nz * 80) * .2);
             }
         }
-        const result = { data, ringed: [4, 9, 11].includes(kind), ring: colors[1], phase: (seed % 1000) / 1000, direction: seed % 5 === 0 ? -1 : 1 };
+        const result = { data, ringed: [4, 9, 11, 13, 17].includes(kind), ring: colors[1], phase: (seed % 1000) / 1000, direction: seed % 5 === 0 ? -1 : 1 };
         cache.set(id, result);
         while (cache.size > 24) cache.delete(cache.keys().next().value);
         return result;

@@ -95,7 +95,7 @@ public partial class Home
             if (group.StateIds.Count == 0) continue;
             group.Name = string.IsNullOrWhiteSpace(group.Name) ? "Alcyone" : group.Name.Trim();
             if (group.Name.Length > 48) group.Name = group.Name[..48];
-            if (!new[] { "ocean", "rust", "ice", "violet", "sand", "jade", "rock", "lava", "blue", "rose", "forest", "silver" }.Contains(group.Appearance)) group.Appearance = "ocean";
+            if (!new[] { "ocean", "rust", "ice", "violet", "sand", "jade", "rock", "lava", "blue", "rose", "forest", "silver", "amber", "pearl", "toxic", "storm", "crimson", "midnight" }.Contains(group.Appearance)) group.Appearance = "ocean";
             group.X = Math.Clamp(group.X, 0, 3800);
             group.Y = Math.Clamp(group.Y, 0, 2300);
             var previous = Machine.StateGroups.FirstOrDefault(g => g.Id == group.Id);

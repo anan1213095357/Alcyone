@@ -217,11 +217,18 @@ public partial class Home
         _colorResults.Clear(); foreach (var pair in snapshot.ColorResults) _colorResults[pair.Key] = pair.Value;
         _recognitionResults.Clear(); foreach (var pair in snapshot.RecognitionResults) _recognitionResults[pair.Key] = pair.Value;
     }
+    private bool _canvasInteraction;
+    [JSInvokable] public Task SetCanvasInteraction(bool active)
+    {
+        _canvasInteraction = active;
+        if (!active) OnRuntimeChanged();
+        return Task.CompletedTask;
+    }
     private int _runtimeRefreshPending;
     private long _canvasRevision = -1;
     private void OnRuntimeChanged()
     {
-        if (_disposed || Desktop.AnimationsPaused || (!IsWallpaperView && Desktop.EditorHidden) ||
+        if (_disposed || _canvasInteraction || Desktop.AnimationsPaused || (!IsWallpaperView && Desktop.EditorHidden) ||
             Interlocked.Exchange(ref _runtimeRefreshPending, 1) != 0) return;
         _ = RefreshRuntimeViewAsync();
     }
@@ -234,7 +241,7 @@ public partial class Home
             await Task.Delay(IsWallpaperView ? 200 : 150);
             await InvokeAsync(() =>
             {
-                if (_disposed || Desktop.AnimationsPaused || (!IsWallpaperView && Desktop.EditorHidden)) return;
+                if (_disposed || _canvasInteraction || Desktop.AnimationsPaused || (!IsWallpaperView && Desktop.EditorHidden)) return;
                 ApplyRuntimeSnapshot();
                 _scrollLog = !IsWallpaperView;
                 StateHasChanged();
@@ -1213,12 +1220,6 @@ public partial class Home
                 PendingConnection = null;
                 return;
             }
-            if (fromState.RegionId != toState.RegionId)
-            {
-                AddLog("CONNECT", "不同状态域不能直接连接，请通过全局变量通信。", "error");
-                PendingConnection = null;
-                return;
-            }
             if (fromState.Id == toState.Id)
             {
                 AddLog("CONNECT", "当前版本不允许状态直接连接自己。", "warn");
@@ -1246,6 +1247,7 @@ public partial class Home
                 ToStateId = stateId,
                 ToPortId = portId
             });
+            MachineRegions.Normalize(Machine);
             AddLog("CONNECT", $"{fromState.Name} → {toState.Name}", "good");
             PendingConnection = null;
             RefreshCurrentConditionResults();
@@ -1715,6 +1717,7 @@ public partial class Home
             if (string.IsNullOrWhiteSpace(edge.Id))
                 edge.Id = Uid("edge");
         }
+        MachineRegions.Normalize(Machine);
     }
 
     private static ActionArgumentModel CloneActionArgument(ActionArgumentModel source) => new()
