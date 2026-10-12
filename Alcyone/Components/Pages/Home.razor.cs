@@ -100,6 +100,7 @@ public partial class Home
         {
             _jsBridge = new JsBridge(StateMoved, SelectStateFromJs, SelectEdgeFromJs, ClearSelectionFromJs, EscapeFromJs, DeleteSelectionFromJs);
             _jsBridge.SaveGroups = SaveGroupsFromJs;
+            _jsBridge.CanvasInteraction = SetCanvasInteraction;
             _jsBridge.EditSelection = EditSelectionFromJs;
             _dotNetRef = DotNetObjectReference.Create(_jsBridge);
             if (IsWallpaperView)
@@ -1821,6 +1822,8 @@ public partial class Home
 
     public sealed class JsBridge
     {
+        public Func<bool, Task>? CanvasInteraction { get; set; }
+        [JSInvokable] public Task SetCanvasInteraction(bool active) => CanvasInteraction?.Invoke(active) ?? Task.CompletedTask;
         public Func<string, List<StateGroupModel>, List<CanvasStatePosition>, Task>? SaveGroups { get; set; }
         public Func<string, string, List<string>, List<CanvasStatePosition>, Task<CanvasEditResult>>? EditSelection { get; set; }
         [JSInvokable] public Task SaveGroupsFromJs(string configKey, List<StateGroupModel> groups, List<CanvasStatePosition> positions) => SaveGroups?.Invoke(configKey, groups, positions) ?? Task.CompletedTask;

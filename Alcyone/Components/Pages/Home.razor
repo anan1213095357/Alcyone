@@ -1406,7 +1406,7 @@
     </path>`;
                 const delay = Math.max(0, Number(edge.delayMilliseconds) || 0);
                 if (delay > 0) {
-                    const waitLabel = document.documentElement.lang === "en" ? "Wait" : L["等待"];
+                    const waitLabel = document.documentElement.lang === "en" ? "Wait" : "等待";
                     const label = delay >= 1000 ? `${waitLabel} ${+(delay / 1000).toFixed(3)} s` : `${waitLabel} ${delay} ms`;
                     const curve = metric;
                     const length = curve.getTotalLength();
@@ -1420,7 +1420,7 @@
                     const sleeve = points.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
                     const pathId = `delay-sleeve-${edge.id}`;
                     html += `<g data-edge-id="${edge.id}" style="opacity:${edgeOpacity};cursor:pointer;pointer-events:${edgeOpacity < .5 ? 'none' : 'all'}">
-                        <title>${document.documentElement.lang === "en" ? "Click to set the transition delay" : L["点击设置切换前等待"]}</title>
+                        <title>${document.documentElement.lang === "en" ? "Click to set the transition delay" : "点击设置切换前等待"}</title>
                         <path d="${sleeve}" fill="none" stroke="${stroke}" stroke-width="27" stroke-linecap="round" />
                         <path id="${pathId}" d="${sleeve}" fill="none" stroke="#182438" stroke-width="23" stroke-linecap="round" />
                         <text fill="#e4efff" font-size="11" font-weight="600" dy="4" text-anchor="middle" style="pointer-events:all"><textPath href="#${pathId}" startOffset="50%">${label}</textPath></text>

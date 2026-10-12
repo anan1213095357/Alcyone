@@ -7,6 +7,16 @@ Check(StateMachine.AiConnectionSettings.NormalizeEndpoint("https://example.com/c
 Check(StateMachine.AiConnectionSettings.NormalizeEndpoint("https://example.com/v1/chat/completions/") == "https://example.com/v1/chat/completions", "Full completion URL is not duplicated");
 Check(StateMachine.AiConnectionSettings.ToBaseEndpoint("https://example.com/v1/chat/completions") == "https://example.com/v1", "Settings field omits fixed suffix");
 Check(StateMachine.AiConnectionSettings.NormalizeEndpoint("https://example.com/v1?api-version=1") == "https://example.com/v1/chat/completions?api-version=1", "Provider query parameters are preserved");
+// Razor localizers are server objects and must not leak into browser scripts.
+var sourceRoot = new DirectoryInfo(Directory.GetCurrentDirectory());
+while (sourceRoot is not null && !File.Exists(Path.Combine(sourceRoot.FullName, "Alcyone", "Components", "Pages", "Home.razor"))) sourceRoot = sourceRoot.Parent;
+if (sourceRoot is not null)
+{
+    var pageSource = File.ReadAllText(Path.Combine(sourceRoot.FullName, "Alcyone", "Components", "Pages", "Home.razor"));
+    foreach (Match script in Regex.Matches(pageSource, @"<script[^>]*>(.*?)</script>", RegexOptions.Singleline))
+        Check(!Regex.IsMatch(script.Groups[1].Value, @"(?<!@)\b(?:L|Text)\["""), "Canvas scripts cannot reference server translation objects");
+}
+
 var directory = Path.Combine(Path.GetTempPath(), "Alcyone-language-checks-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(directory);
 try

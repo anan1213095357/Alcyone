@@ -8,3 +8,6 @@ Desktop/
 /release-exe
 
 node_modules/
+
+# .NET publish output (build artifacts)
+output/desktop-fixed/
