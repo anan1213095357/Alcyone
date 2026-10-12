@@ -109,6 +109,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             Changed?.Invoke();
         });
         Volatile.Write(ref _displays, DesktopDisplays.Enumerate());
+        EnsureControls(); // Tray exists even when desktop presentation has never been enabled.
         _animationMonitor = new Timer(_ => PollFullscreenWindow(), null, 500, 500);
     }
 
@@ -501,8 +502,15 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             else if (command == 3) { preferences.RememberDesktop(false); StopDesktop(); RestoreEditor(); Changed?.Invoke(); }
             else if (command == 2)
             {
-                RestoreEditor();
-                PostMessageW(_window!.WindowHandle, 0x0010, 0, 0);
+                if (AppShutdown.Requested) return;
+                AppShutdown.Begin();
+                var window = _window;
+                try { Dispose(); }
+                catch (Exception ex) { logger.LogError(ex,"Application exit cleanup failed"); }
+                finally
+                {
+                    if (window is not null && IsWindow(window.WindowHandle)) window.Close();
+                }
             }
         }
         finally { DestroyMenu(menu); }
@@ -525,6 +533,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     {
         if (_disposed) return;
         _disposed = true;
+        if (_trayAdded) { Shell_NotifyIconW(2, ref _tray); _trayAdded=false; }
         TextInput.Dispose();
         Volatile.Write(ref _editorHandle, 0);
         _animationMonitor?.Dispose();

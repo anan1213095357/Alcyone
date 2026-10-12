@@ -14,6 +14,23 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Photino uses SW_SHOWDEFAULT for its first ShowWindow. STARTUPINFO's SW_HIDE
+        // makes that first show hidden, without briefly displaying/minimizing the editor.
+        if (OperatingSystem.IsWindows() && !args.Any(a=>a is "--tray-host" or "--check-host" or "--browser-host"))
+        {
+            var executable=Environment.ProcessPath ?? throw new InvalidOperationException("无法确定程序路径。");
+            var start=new System.Diagnostics.ProcessStartInfo(executable)
+            {
+                UseShellExecute=false,CreateNoWindow=true,WindowStyle=System.Diagnostics.ProcessWindowStyle.Hidden,
+                WorkingDirectory=AppContext.BaseDirectory
+            };
+            if(string.Equals(Path.GetFileNameWithoutExtension(executable),"dotnet",StringComparison.OrdinalIgnoreCase))
+                start.ArgumentList.Add(typeof(Program).Assembly.Location);
+            foreach(var argument in args)start.ArgumentList.Add(argument);
+            start.ArgumentList.Add("--tray-host");
+            using var child=System.Diagnostics.Process.Start(start) ?? throw new InvalidOperationException("无法启动托盘程序。");
+            return;
+        }
         DesktopInput.InitializeDpiAwareness();
         // Single-file assemblies are extracted elsewhere; editable files stay beside the exe.
         var desktopDirectory = string.Equals(Path.GetFileNameWithoutExtension(Environment.ProcessPath),
@@ -50,7 +67,7 @@ internal static class Program
         }
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
-            Args = args.Where(argument => argument is not ("--check-host" or "--browser-host" or "--startup")).ToArray(),
+            Args = args.Where(argument => argument is not ("--check-host" or "--browser-host" or "--startup" or "--tray-host")).ToArray(),
             ContentRootPath = desktopDirectory,
             WebRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot")
         });
@@ -122,7 +139,8 @@ internal static class Program
                 return;
             }
             var primaryDisplay = DesktopDisplays.Enumerate().FirstOrDefault();
-            const int initialWidth = 1366, initialHeight = 768;
+            var initialWidth = primaryDisplay is null ? 1366 : Math.Max(640, (int)Math.Round(primaryDisplay.Width * .8));
+            var initialHeight = primaryDisplay is null ? 768 : Math.Max(480, (int)Math.Round(primaryDisplay.Height * .8));
             var initialLeft = primaryDisplay is null ? 0 : primaryDisplay.X + Math.Max(0, (primaryDisplay.Width - initialWidth) / 2);
             var initialTop = primaryDisplay is null ? 0 : primaryDisplay.Y + Math.Max(0, (primaryDisplay.Height - initialHeight) / 2);
             var window = new PhotinoWindow()
@@ -132,7 +150,7 @@ internal static class Program
                 .SetUseOsDefaultLocation(false)
                 .SetSize(initialWidth, initialHeight)
                 .SetLeft(initialLeft).SetTop(initialTop)
-                .SetMaximized(true)
+                .SetMaximized(false)
                 .SetResizable(true)
                 .SetMinSize(640,480)
                 .SetIconFile(Path.Combine(AppContext.BaseDirectory, "wwwroot", "favicon.ico"))
@@ -146,12 +164,16 @@ internal static class Program
             var desktop = app.Services.GetRequiredService<DesktopWallpaperService>();
             desktop.Attach(window, url);
             try { window.Load(url).WaitForClose(); }
-            finally { desktop.Dispose(); }
+            finally { AppShutdown.Begin(); desktop.Dispose(); }
         }
         finally
         {
-            app.StopAsync().GetAwaiter().GetResult();
-            app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            try
+            {
+                app.StopAsync().GetAwaiter().GetResult();
+                app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            finally { if (AppShutdown.Requested) AppShutdown.Complete(); }
         }
     }
 
