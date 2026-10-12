@@ -17,6 +17,9 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     private PhotinoWindow? _window;
     private nint _helper, _host;
     private string _url = "";
+    private bool _startupTray;
+    private int _startupLeft, _startupTop;
+    private nint _editorExtendedStyle;
     private readonly string _viewToken = Guid.NewGuid().ToString("N");
     private readonly Dictionary<string, PhotinoWindow> _surfaces = new(StringComparer.Ordinal);
     private DesktopDisplay[] _displays = [];
@@ -67,6 +70,15 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             Volatile.Write(ref _editorHandle, handle);
             switch (message)
             {
+                case "alcyone:window:ready":
+                    if (_startupTray)
+                    {
+                        _startupTray=false;
+                        ShowWindow(handle,0);
+                        SetWindowPos(handle,0,_startupLeft,_startupTop,0,0,0x0015);
+                    }
+                    ApplyWindowCorners(handle);
+                    break;
                 case "alcyone:window:state":
                     ApplyWindowCorners(handle);
                     break;
@@ -320,10 +332,22 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         }
     }
 
+    public void InitializeTrayWindow(int left,int top)
+    {
+        var handle=_window!.WindowHandle;
+        _startupLeft=left;_startupTop=top;_startupTray=true;
+        Volatile.Write(ref _editorHandle,handle);
+        _editorExtendedStyle=GetWindowLongPtrW(handle,-20);
+        SetStyle(handle,-20,(nint)((_editorExtendedStyle.ToInt64() & ~0x40000L)|0x80));
+        // WebView needs an initially visible HWND. Warm it up off-screen without a taskbar entry.
+        ShowWindow(handle,4);
+    }
     private void RestoreEditor()
     {
         TextInput.Close();
         var handle = _window!.WindowHandle;
+        if(_startupTray){_startupTray=false;SetWindowPos(handle,0,_startupLeft,_startupTop,0,0,0x0015);}
+        SetStyle(handle,-20,_editorExtendedStyle);
         ShowWindow(handle, IsZoomed(handle) ? 3u : 9u);
         // An unplugged monitor must not leave the settings window off-screen.
         if (GetWindowRect(handle, out var rect) && Displays.Count > 0 &&

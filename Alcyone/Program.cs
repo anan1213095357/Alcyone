@@ -149,7 +149,7 @@ internal static class Program
                 .SetUseOsDefaultSize(false)
                 .SetUseOsDefaultLocation(false)
                 .SetSize(initialWidth, initialHeight)
-                .SetLeft(initialLeft).SetTop(initialTop)
+                .SetLeft(-32000).SetTop(-32000)
                 .SetMaximized(false)
                 .SetResizable(true)
                 .SetMinSize(640,480)
@@ -163,6 +163,7 @@ internal static class Program
                 ;
             var desktop = app.Services.GetRequiredService<DesktopWallpaperService>();
             desktop.Attach(window, url);
+            window.RegisterWindowCreatedHandler((_,_)=>desktop.InitializeTrayWindow(initialLeft,initialTop));
             try { window.Load(url).WaitForClose(); }
             finally { AppShutdown.Begin(); desktop.Dispose(); }
         }

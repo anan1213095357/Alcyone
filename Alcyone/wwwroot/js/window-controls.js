@@ -15,6 +15,7 @@
             event.stopImmediatePropagation();
         }
     }, true);
+    document.addEventListener('DOMContentLoaded',()=>window.external?.sendMessage?.('alcyone:window:ready'),{once:true});
     const send = command => window.external?.sendMessage?.(`alcyone:window:${command}`);
     const dragArea = target => target instanceof Element && target.closest('.topbar') &&
         !target.closest('button,input,select,textarea,a,label,[role="button"],.config-menu,.app-settings-menu,[data-no-window-drag]');
