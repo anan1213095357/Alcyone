@@ -2129,3 +2129,9 @@
 @media(prefers-reduced-motion:reduce){.milky-way-layer,.distant-galaxy,.distant-galaxy canvas{animation:none}}
 
 #worldScale{overflow:clip}
+
+::deep .warp-dust{pointer-events:none;animation:warp-current 1.6s linear infinite;filter:drop-shadow(0 0 2px #75baff55)}
+@keyframes warp-current{from{stroke-dashoffset:0}to{stroke-dashoffset:-360}}
+@media(prefers-reduced-motion:reduce){::deep .warp-dust{animation:none}}
+
+::deep .warp-dust.is-outputting{filter:drop-shadow(0 0 5px #4ff3bfcc)}

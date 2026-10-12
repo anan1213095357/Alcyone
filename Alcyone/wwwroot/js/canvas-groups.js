@@ -640,6 +640,27 @@
             const input = api.world.querySelector(`.port[data-port-id="${CSS.escape(portId)}"][data-state-id="${CSS.escape(stateId)}"]`)?.dataset.direction === 'input';
             return { x: group.x + (input ? 24 : 156), y: group.y + 86 };
         },
+        orbitRoute(edge, edges, start, end) {
+            if (transition) return null;
+            const from = groupFor(edge.fromStateId), to = groupFor(edge.toStateId);
+            if (!from && !to) return null;
+            const center = (group, fallback) => group ? { x: group.x + 90, y: group.y + 86 } : fallback;
+            const a = center(from, start), b = center(to, end);
+            function anchor(group, target, fallback, output) {
+                if (!group) return { ...fallback, nx: output ? 1 : -1, ny: 0 };
+                const siblings = edges.filter(e => group.stateIds.includes(e.fromStateId) || group.stateIds.includes(e.toStateId)).sort((a,b) => a.id.localeCompare(b.id));
+                const index = siblings.findIndex(e => e.id === edge.id);
+                const spread = Math.min(.1, .7 / Math.max(1, siblings.length - 1));
+                const angle = Math.atan2(target.y - (group.y + 86), target.x - (group.x + 90)) + (index - (siblings.length - 1) / 2) * spread;
+                const nx = Math.cos(angle), ny = Math.sin(angle);
+                return { x: group.x + 90 + nx * 72, y: group.y + 86 + ny * 72, nx, ny };
+            }
+            const p = anchor(from,b,start,true), q = anchor(to,a,end,false);
+            const distance = Math.hypot(q.x-p.x,q.y-p.y), reach = Math.min(240, Math.max(45,distance*.3));
+            const lane = from && to ? ((edges.findIndex(e => e.id === edge.id) % 3) - 1) * 24 : 0;
+            const dx = (q.x-p.x)/Math.max(1,distance), dy = (q.y-p.y)/Math.max(1,distance);
+            return `M ${p.x} ${p.y} C ${p.x+p.nx*reach-dy*lane} ${p.y+p.ny*reach+dx*lane}, ${q.x+q.nx*reach-dy*lane} ${q.y+q.ny*reach+dx*lane}, ${q.x} ${q.y}`;
+        },
         interplanetEdge(edge) {
             // Wait until folding finishes so ships never appear on internal wires.
             if (transition) return false;

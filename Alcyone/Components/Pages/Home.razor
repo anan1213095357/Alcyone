@@ -1250,7 +1250,7 @@
                 const start = getPortPosition(edge.fromStateId, edge.fromPortId);
                 const end = getPortPosition(edge.toStateId, edge.toPortId);
                 if (!start || !end) continue;
-                const d = bezierPath(start.x, start.y, end.x, end.y);
+                const d = window.alcyoneGroups?.orbitRoute(edge, edgeState.edges || [], start, end) || bezierPath(start.x, start.y, end.x, end.y);
                 const edgeOpacity = window.alcyoneGroups?.edgeOpacity(edge) ?? 1;
                 const interplanet = window.alcyoneGroups?.interplanetEdge(edge);
                 const flightDuration = interplanet ? (() => {
@@ -1281,8 +1281,18 @@
     }
 
     if (interplanet) {
-        html += `<path class="star-route-halo" d="${d}" fill="none" stroke="${stroke}" stroke-width="12" opacity="${edgeOpacity * .12}" />
-            <path class="star-route-guide" d="${d}" fill="none" stroke="#91caff" stroke-width="1" stroke-dasharray="2 12" opacity="${edgeOpacity * .65}" />`;
+        const dx = end.x-start.x, dy = end.y-start.y, length = Math.max(1,Math.hypot(dx,dy));
+        html += `<path class="star-route-halo" d="${d}" fill="none" stroke="${highlighted ? '#35efca' : '#6ba7ed'}" stroke-width="${highlighted ? 34 : 26}" opacity="${edgeOpacity*(highlighted ? .3 : .1)}" />`;
+        for (let lane = -3; lane <= 3; lane++) {
+            const shift = lane * 3.2, tx = -dy/length*shift, ty = dx/length*shift;
+            const duration = (lane % 2 ? 1.2 : 1.6) * (highlighted ? .6 : 1);
+            const delay = -((window.alcyoneAnimation.now()/1000 + (lane+3)*.19) % duration);
+            const opacity = edgeOpacity * (highlighted ? (lane === 0 ? 1 : .9) : (lane === 0 ? .85 : .5));
+            html += `<path class="warp-dust ${highlighted ? 'is-outputting' : ''}" d="${d}" transform="translate(${tx} ${ty})" fill="none"
+                stroke="${highlighted ? (lane%2 ? '#eefff7' : '#53f5cd') : (lane%2 ? '#d4eaff' : '#88bfff')}" stroke-width="${(lane===0 ? 2.4 : 1.5)*(highlighted ? 1.25 : 1)}" stroke-linecap="round"
+                stroke-dasharray="${lane%2 ? '3 17 1 39' : '1 13 2 44'}"
+                style="animation-duration:${duration}s;animation-delay:${delay}s;opacity:${opacity}" />`;
+        }
     }
     html += `
     <path
@@ -1291,7 +1301,7 @@
         fill="none"
         stroke="${stroke}"
         stroke-width="${strokeWidth}"
-        style="${filter}opacity:${edgeOpacity}">
+        style="${filter}opacity:${edgeOpacity * (interplanet ? .18 : 1)}">
     </path>`;
 
     if (interplanet && flights.length) {
