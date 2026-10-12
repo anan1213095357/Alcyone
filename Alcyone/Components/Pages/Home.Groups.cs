@@ -96,8 +96,8 @@ public partial class Home
             group.Name = string.IsNullOrWhiteSpace(group.Name) ? "Alcyone" : group.Name.Trim();
             if (group.Name.Length > 48) group.Name = group.Name[..48];
             if (!new[] { "ocean", "rust", "ice", "violet", "sand", "jade", "rock", "lava", "blue", "rose", "forest", "silver", "amber", "pearl", "toxic", "storm", "crimson", "midnight" }.Contains(group.Appearance)) group.Appearance = "ocean";
-            group.X = Math.Clamp(group.X, 0, 3800);
-            group.Y = Math.Clamp(group.Y, 0, 2300);
+            group.X = Math.Clamp(group.X, 0, 3820);
+            group.Y = Math.Clamp(group.Y, 0, 2280);
             var previous = Machine.StateGroups.FirstOrDefault(g => g.Id == group.Id);
             if (previous is { IsCollapsed: true } && group.IsCollapsed)
             {
@@ -108,7 +108,7 @@ public partial class Home
                 dy = Math.Max(dy, -group.StateIds.Min(id => states[id].Y));
                 group.X = previous.X + dx;
                 group.Y = previous.Y + dy;
-                foreach (var id in group.StateIds) { states[id].X += dx; states[id].Y += dy; }
+                foreach (var id in group.StateIds) { states[id].X = Math.Max(0,states[id].X+dx); states[id].Y = Math.Max(0,states[id].Y+dy); }
             }
             accepted.Add(group);
         }

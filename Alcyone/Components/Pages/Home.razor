@@ -1542,6 +1542,12 @@
             workspace.scrollTop = Math.max(0, (minY - padding) * zoom);
         }
 
+        function dragBounds() {
+            const viewport=workspace.getBoundingClientRect(),rect=world.getBoundingClientRect();
+            return {left:Math.max(0,(viewport.left-rect.left)/canvasZoom),top:Math.max(0,(viewport.top-rect.top)/canvasZoom),
+                right:Math.min(WORLD_WIDTH,(viewport.left+workspace.clientWidth-rect.left)/canvasZoom),
+                bottom:Math.min(WORLD_HEIGHT,(viewport.top+workspace.clientHeight-rect.top)/canvasZoom)};
+        }
         function isBackground(target) {
             return target === workspace || target?.id === "world" || target?.id === "stateLayer" || target?.id === "edgeSvg";
         }
@@ -1557,6 +1563,7 @@
                 const card = header.closest(".state-card");
                 if (!card) return;
                 drag = {
+                    bounds: dragBounds(), width: card.offsetWidth, height: card.offsetHeight,
                     stateId: card.dataset.stateId,
                     card,
                     mouseX: event.clientX,
@@ -1606,8 +1613,8 @@
             if (drag) {
                 const dx = (event.clientX - drag.mouseX) / canvasZoom;
                 const dy = (event.clientY - drag.mouseY) / canvasZoom;
-                drag.x = Math.max(0, drag.startX + dx);
-                drag.y = Math.max(0, drag.startY + dy);
+                drag.x = Math.max(drag.bounds.left,Math.min(drag.bounds.right-drag.width,drag.startX+dx));
+                drag.y = Math.max(drag.bounds.top,Math.min(drag.bounds.bottom-drag.height,drag.startY+dy));
                 if (Math.abs(dx) + Math.abs(dy) > 1) drag.moved = true;
                 if (drag.card?.isConnected) {
                     drag.card.style.willChange='transform';
@@ -1910,7 +1917,7 @@
                 tempEdge = document.getElementById("tempEdge");
                 if (initialized) return;
                 initialized = true;
-                window.alcyoneGroups?.init({ workspace, world, dotnet, drawEdges: scheduleDrawEdges, desktopView, zoom: () => canvasZoom });
+                window.alcyoneGroups?.init({ workspace, world, dotnet, drawEdges: scheduleDrawEdges, desktopView, zoom: () => canvasZoom, dragBounds });
                 startStarfield();
                 desktopResize = new ResizeObserver(fitDesktop);
                 if (workspace) desktopResize.observe(workspace);

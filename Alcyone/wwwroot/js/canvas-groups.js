@@ -534,15 +534,15 @@
                 const id = card.dataset.stateId;
                 if (!selected.has(id)) { selected.clear(); selected.add(id); }
                 selectedGroups.clear();
-                gesture = { type: 'cards', start: point(event), moved: false,
-                    items: [...selected].map(cardFor).filter(c => c && !c.hidden).map(c => ({ card: c, id: c.dataset.stateId, x: parseFloat(c.style.left) || 0, y: parseFloat(c.style.top) || 0 })) };
+                gesture = { type: 'cards', bounds: api.dragBounds(), start: point(event), moved: false,
+                    items: [...selected].map(cardFor).filter(c => c && !c.hidden).map(c => ({ card: c, width:c.offsetWidth, height:c.offsetHeight, id: c.dataset.stateId, x: parseFloat(c.style.left) || 0, y: parseFloat(c.style.top) || 0 })) };
                 controls(); event.preventDefault(); return true;
             }
             const orb = event.target.closest?.('.alcyone-orb');
             if (orb && event.button === 0) {
                 const group = groups.find(g => g.id === orb.dataset.groupId);
                 const members = group.stateIds.map(cardFor).filter(Boolean);
-                gesture = { type: 'orb', orb, group, start: point(event), startX: group.x, startY: group.y, moved: false, previous: structuredClone(groups),
+                gesture = { type: 'orb', bounds:api.dragBounds(), width:orb.offsetWidth, height:orb.offsetHeight, orb, group, start: point(event), startX: group.x, startY: group.y, moved: false, previous: structuredClone(groups),
                     minX: Math.min(...members.map(c => parseFloat(c.style.left) || 0)), minY: Math.min(...members.map(c => parseFloat(c.style.top) || 0)) };
                 orb.style.willChange = 'transform';
                 event.preventDefault(); return true;
@@ -568,8 +568,8 @@
                 for (const group of groups.filter(collapsed)) if (group.x < x + w && group.x + 180 > x && group.y < y + h && group.y + 200 > y) selectedGroups.add(group.id);
                 controls();
             } else if (g.type === 'cards') {
-                const dx = Math.max(-Math.min(...g.items.map(item => item.x)), p.x - g.start.x);
-                const dy = Math.max(-Math.min(...g.items.map(item => item.y)), p.y - g.start.y);
+                const dx = Math.max(g.bounds.left-Math.min(...g.items.map(item=>item.x)),Math.min(g.bounds.right-Math.max(...g.items.map(item=>item.x+item.width)),p.x-g.start.x));
+                const dy = Math.max(g.bounds.top-Math.min(...g.items.map(item=>item.y)),Math.min(g.bounds.bottom-Math.max(...g.items.map(item=>item.y+item.height)),p.y-g.start.y));
                 if ((Math.abs(dx) + Math.abs(dy)) * api.zoom() > 4) g.moved = true;
                 if (g.moved) {
                     for (const item of g.items) { item.card.style.willChange='transform'; item.card.style.transform=`translate3d(${dx}px,${dy}px,0)`; }
@@ -581,8 +581,8 @@
                 }
             } else {
                 const minX = g.minX, minY = g.minY;
-                g.group.x = Math.max(0, g.startX - minX, Math.min(3800, g.startX + p.x - g.start.x));
-                g.group.y = Math.max(0, g.startY - minY, Math.min(2300, g.startY + p.y - g.start.y));
+                g.group.x = Math.max(g.bounds.left,Math.min(g.bounds.right-g.width,g.startX+p.x-g.start.x));
+                g.group.y = Math.max(g.bounds.top,Math.min(g.bounds.bottom-g.height,g.startY+p.y-g.start.y));
                 if (Math.abs(p.x - g.start.x) + Math.abs(p.y - g.start.y) > 3) g.moved = true;
                 g.orb.style.transform=`translate3d(${g.group.x-g.startX}px,${g.group.y-g.startY}px,0)`; api.drawEdges();
             }
@@ -613,7 +613,7 @@
                 g.orb.suppressUntil = performance.now() + 250;
                 for (const id of g.group.stateIds) {
                     const card = cardFor(id);
-                    if (card) { card.style.left = `${parseFloat(card.style.left) + g.group.x - g.startX}px`; card.style.top = `${parseFloat(card.style.top) + g.group.y - g.startY}px`; }
+                    if (card) { card.style.left = `${Math.max(0,parseFloat(card.style.left) + g.group.x - g.startX)}px`; card.style.top = `${Math.max(0,parseFloat(card.style.top) + g.group.y - g.startY)}px`; }
                 }
                 busy = true; controls(); void save(epoch, g.previous);
             }
