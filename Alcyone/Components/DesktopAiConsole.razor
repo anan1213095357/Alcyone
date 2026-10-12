@@ -5,35 +5,51 @@
 <section class="desktop-ai-console" aria-label="桌面 AI 对话">
     @if (_hasReply || _busy || CliBusy || !string.IsNullOrEmpty(CliPreview))
     {
-        <div class="ai-response" aria-live="polite"><span class="response-dot"></span><div class="ai-response-body"><div class="ai-reply"><AiMarkdown Text="@(_busy ? "星际通讯中…" : Reply)" /></div><AiStreamView Progress="Progress" Busy="_busy" JsonReply="true" />
+        <div class="ai-response" aria-live="polite">
+            <span class="response-dot"></span><div class="ai-response-body">
+            <div class="ai-reply"><AiMarkdown Text="@(_busy ? "星际通讯中…" : Reply)" /></div><AiStreamView Progress="Progress" Busy="_busy" JsonReply="true" />
             @if (!string.IsNullOrEmpty(CliPreview))
             {
                 <section class="cli-review"><strong>待执行 · PowerShell</strong><pre>@CliPreview</pre><div><button type="button" @onclick="CancelCli">取消</button><button type="button" class="cli-run" @onclick="ExecuteCli">执行命令</button></div></section>
             }
             @if (!string.IsNullOrEmpty(CliStatus))
             {
-                <section class="cli-result"><strong>@CliStatus</strong>@if (CliBusy) { <button type="button" @onclick="CancelCli">停止</button> }<pre>@CliOutput</pre></section>
+                <section class="cli-result"><strong>@CliStatus</strong>@if (CliBusy) {
+                    <button type="button" @onclick="CancelCli">停止</button>
+                }
+                <pre>@CliOutput</pre></section>
             }
-        </div><button type="button" @onclick="() => _hasReply = false" aria-label="收起回复">×</button></div>
-    }
-    @if (_focused && !_busy && Suggestions.Any())
-    {
-        <div class="ai-suggestions" role="listbox" aria-label="指令联想">
-            @{var matches=Suggestions.ToList();}
-            @for(var i=0;i<matches.Count;i++)
-            {
-                var suggestion=matches[i];var index=i;
-                <button type="button" role="option" aria-selected="@(index==_index)" class="@(index==_index?"active":"")" @onpointerdown:preventDefault="true" @onpointerdown="() => Choose(suggestion)"><span>@suggestion</span><small>↗</small></button>
-            }
-        </div>
-    }
-    <form class="ai-input-bar" @onsubmit="Send" @onsubmit:preventDefault="true">
-        <img class="ai-spark ai-brand" src="images/planet-logo-transparent.png" alt="Alcyone" />
-        <input @ref="_field" data-native-input="@_inputId" value="@_input" readonly placeholder="描述电脑操作，或输入 /cli 命令…" aria-label="桌面 AI 指令" autocomplete="off" />
-        <button type="submit" class="ai-send @(_busy?"busy":"")" disabled="@(_busy || CliBusy || string.IsNullOrWhiteSpace(_input))" aria-label="发送指令">
-            @if(_busy){<span class="send-loader"></span>}else{<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18V6m-5 5 5-5 5 5" /></svg>}
-        </button>
-    </form>
+        </div><button type="button" @onclick="() => _hasReply = false" aria-label="收起回复">×</button>
+    </div>
+}
+@if (_focused && !_busy && Suggestions.Any())
+{
+    <div class="ai-suggestions" role="listbox" aria-label="指令联想">
+        @{
+            var matches = Suggestions.ToList();
+        }
+        @for (var i = 0; i < matches.Count; i++)
+        {
+            var suggestion = matches[i]; var index = i;
+            <button type="button" role="option" aria-selected="@(index == _index)" class="@(index == _index ? "active" : "")" @onpointerdown:preventDefault="true" @onpointerdown="() => Choose(suggestion)"><span>@suggestion</span><small>↗</small></button>
+        }
+    </div>
+}
+<form class="ai-input-bar" @onsubmit="Send" @onsubmit:preventDefault="true">
+    <img class="ai-spark ai-brand" src="images/planet-logo-transparent.png" alt="Alcyone" />
+    <input @ref="_field" data-native-input="@_inputId" value="@_input" readonly placeholder="描述电脑操作，或输入 /cli 命令…" aria-label="桌面 AI 指令" autocomplete="off" />
+    <button type="submit" class="ai-send @(_busy ? "busy" : "")" disabled="@(_busy || CliBusy || string.IsNullOrWhiteSpace(_input))" aria-label="发送指令">
+        @if (_busy)
+        {
+            <span class="send-loader"></span>
+        }
+        else
+        {
+
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18V6m-5 5 5-5 5 5" /></svg>
+        }
+    </button>
+</form>
 </section>
 @code {
     [Parameter] public EventCallback<string> Submit { get; set; }
@@ -47,9 +63,9 @@
     [Parameter] public EventCallback CancelCli { get; set; }
     [Parameter] public IEnumerable<string> StateNames { get; set; } = [];
     [Parameter] public IEnumerable<string> VariableNames { get; set; } = [];
-    private bool _busy,_focused,_hasReply;
+    private bool _busy, _focused, _hasReply;
     private int _index;
-    private string _input="";
+    private string _input = "";
     private readonly string _inputId = Guid.NewGuid().ToString("N");
     protected override void OnInitialized() => Desktop.TextInput.Changed += NativeInputChanged;
     private void NativeInputChanged(DesktopTextInput.Update update)
@@ -59,16 +75,16 @@
     }
     public void Dispose() => Desktop.TextInput.Changed -= NativeInputChanged;
     private ElementReference _field;
-    private IEnumerable<string> Suggestions => new[]{"启动状态机","停止状态机","执行单步"}.Concat(StateNames.Select(s=>"切换到 "+s)).Concat(StateNames.Select(s=>"将 "+s+" 设为起始状态")).Concat(VariableNames.Select(v=>"把 "+v+" 设为 ")).Where(s=>string.IsNullOrWhiteSpace(_input)||s.Contains(_input.Trim(),StringComparison.OrdinalIgnoreCase)).Distinct().Take(6);
-    private void InputChanged(ChangeEventArgs e){_input=e.Value?.ToString()??"";_index=0;}
+    private IEnumerable<string> Suggestions => new[] { "启动状态机", "停止状态机", "执行单步" }.Concat(StateNames.Select(s => "切换到 " + s)).Concat(StateNames.Select(s => "将 " + s + " 设为起始状态")).Concat(VariableNames.Select(v => "把 " + v + " 设为 ")).Where(s => string.IsNullOrWhiteSpace(_input) || s.Contains(_input.Trim(), StringComparison.OrdinalIgnoreCase)).Distinct().Take(6);
+    private void InputChanged(ChangeEventArgs e) { _input = e.Value?.ToString() ?? ""; _index = 0; }
     private string? _chosenText;
-    private Task Choose(string text){_input=text;_focused=false;_chosenText=text;return Task.CompletedTask;}
+    private Task Choose(string text) { _input = text; _focused = false; _chosenText = text; return Task.CompletedTask; }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_chosenText is not { } text) return;
         _chosenText = null;
         await JS.InvokeVoidAsync("alcyoneAiInput.setText", _field, text);
     }
-    private async Task KeyDown(KeyboardEventArgs e){var values=Suggestions.ToList();if(e.Key=="Escape")_focused=false;else if(e.Key=="ArrowDown"){_focused=true;_index=Math.Min(values.Count-1,_index+1);}else if(e.Key=="ArrowUp")_index=Math.Max(0,_index-1);else if(e.Key=="Tab" && _focused && values.Count>0)await Choose(values[Math.Clamp(_index,0,values.Count-1)]);}
-    private async Task Send(){if(_busy||CliBusy||string.IsNullOrWhiteSpace(_input))return;var prompt=_input.Trim();_input="";_focused=false;_busy=true;_hasReply=true;try{await Submit.InvokeAsync(prompt);}finally{_busy=false;}}
+    private async Task KeyDown(KeyboardEventArgs e) { var values = Suggestions.ToList(); if (e.Key == "Escape") _focused = false; else if (e.Key == "ArrowDown") { _focused = true; _index = Math.Min(values.Count - 1, _index + 1); } else if (e.Key == "ArrowUp") _index = Math.Max(0, _index - 1); else if (e.Key == "Tab" && _focused && values.Count > 0) await Choose(values[Math.Clamp(_index, 0, values.Count - 1)]); }
+    private async Task Send() { if (_busy || CliBusy || string.IsNullOrWhiteSpace(_input)) return; var prompt = _input.Trim(); _input = ""; _focused = false; _busy = true; _hasReply = true; try { await Submit.InvokeAsync(prompt); } finally { _busy = false; } }
 }

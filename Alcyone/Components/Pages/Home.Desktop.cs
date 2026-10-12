@@ -11,7 +11,7 @@ public partial class Home
     private bool IsWallpaperView => WallpaperToken is not null;
     private bool _desktopMode => IsWallpaperView;
     private bool _desktopBusy, _desktopLayoutPending;
-    private bool _toolbarMenuOpen;
+    private bool _aboutOpen;
     private bool _appSettingsOpen;
     private bool? _lastAnimationPause;
 

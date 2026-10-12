@@ -1,7 +1,7 @@
 (() => {
     const send = command => window.external?.sendMessage?.(`alcyone:window:${command}`);
     const dragArea = target => target instanceof Element && target.closest('.topbar') &&
-        !target.closest('button,input,select,textarea,a,label,[role="button"],.toolbar-overflow,.config-control,.window-controls');
+        !target.closest('button,input,select,textarea,a,label,[role="button"],.config-menu,.app-settings-menu,[data-no-window-drag]');
     let origin;
     document.addEventListener('pointerdown', event => {
         const edge = event.target instanceof Element && event.target.closest('[data-window-resize]');

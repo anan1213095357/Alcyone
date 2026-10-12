@@ -2,6 +2,11 @@ namespace StateMachine.Execution;
 
 public class DesktopGraphCommand
 {
+    public List<ConditionModel>? Conditions { get; set; }
+    public bool RequiresCondition { get; set; }
+    public string MatchMode { get; set; } = "all";
+    public string OutputName { get; set; } = "输出";
+    public string AfterEnterMethod { get; set; } = "";
     public string Action { get; set; } = "";
     public string StateId { get; set; } = "";
     public string TargetStateId { get; set; } = "";
@@ -47,6 +52,18 @@ public sealed partial class MachineSession
                 {
                     case "createPlanet": case "createState":
                     {
+                        DiscoverActionMethods();
+                        if (command.RequiresCondition && command.Conditions is not { Count: > 0 })
+                            throw new InvalidOperationException("此请求需要条件，不能创建无条件状态。");
+                        if (command.Conditions is { Count: > 0 })
+                        {
+                            if (command.MatchMode is not ("all" or "any")) throw new InvalidOperationException("条件组合必须为 all 或 any。");
+                            foreach (var condition in command.Conditions)
+                                if (condition.Kind != "script" || !_scriptConditions.ContainsKey(condition.ScriptMethod))
+                                    throw new InvalidOperationException("桌面自定义条件必须绑定已编译的 StateCondition 函数：" + condition.ScriptMethod);
+                        }
+                        if (!string.IsNullOrEmpty(command.AfterEnterMethod) && GetActionDescriptor(command.AfterEnterMethod) is null)
+                            throw new InvalidOperationException("进入动作不存在：" + command.AfterEnterMethod);
                         var region=string.IsNullOrEmpty(command.RegionId) ? model.Regions.FirstOrDefault() : Resolve(model.Regions,r=>r.Id==command.RegionId || r.Name==command.RegionId,"分区");
                         if(region is null) { region=new RegionModel { Id=Id("region"),Name="桌面自动化" }; model.Regions.Add(region); }
                         var isPlanet=command.Action=="createPlanet";
@@ -67,6 +84,16 @@ public sealed partial class MachineSession
                         y=Coordinate(command.Y is {} cy ? cy+(item/3)*240 : null,y,2200);
                         var state=new StateModel { Id=Id("state"),Name=Name(isPlanet?"新星球 "+(model.StateGroups.Count+1):"新状态 "+(model.States.Count+1))+(command.Count>1 && !string.IsNullOrWhiteSpace(command.Name)?" "+(item+1):""),RegionId=region.Id,X=x,Y=y,IsStart=!model.States.Any(s=>s.RegionId==region.Id),
                             Inputs=[new InputPortModel { Id=Id("input"),Name="进入" }], Outputs=[new OutputPortModel { Id=Id("output"),Name="输出",MatchMode="always" }] };
+                        state.AfterEnterAction.ActionMethod = command.AfterEnterMethod;
+                        NormalizeActionArguments(state.AfterEnterAction);
+                        if (command.Conditions is { Count: > 0 })
+                        {
+                            var output = state.Outputs[0];
+                            output.Name = command.OutputName;
+                            output.MatchMode = command.MatchMode;
+                            output.Conditions = System.Text.Json.JsonSerializer.Deserialize<List<ConditionModel>>(System.Text.Json.JsonSerializer.Serialize(command.Conditions))!;
+                            foreach (var condition in output.Conditions) condition.Id = Id("condition");
+                        }
                         model.States.Add(state);
                         if(isPlanet)model.StateGroups.Add(new StateGroupModel { Id=Id("group"),Name=state.Name,Appearance=Appearance(),X=x,Y=y,StateIds=[state.Id],IsCollapsed=true });
                         }

@@ -40,6 +40,36 @@ await using (var session = new MachineSession(services, new EnvironmentStub(root
     await session.UpdateCanvasLayoutAsync(path, 2, [new("a", double.NaN, 400), new("b", -5, 200)]);
     Check(session.Snapshot.Machine.States[0].X == 200 && session.Snapshot.Machine.States[1].X == 0, "Invalid positions are ignored and bounds enforced");
 }
+await using (var session = new MachineSession(services, new EnvironmentStub(root), new DesktopColorProbeScanner(), new MachineModel()))
+{
+    var path = Path.Combine(root, "condition-config.json");
+    var compiled = session.ScriptHost.ReloadFromText("""
+        public sealed class DesktopConditions : StateScript
+        {
+            [StateCondition("建表完成", "数据库")]
+            public bool Ready() => System.IO.File.Exists("not-created.db");
+        }
+        """);
+    Check(compiled.Success, "Desktop condition script compiles");
+    await session.EditDesktopGraphAsync(path, new DesktopGraphCommand
+    {
+        Action = "createState", Name = "数据库初始化", RequiresCondition = true,
+        Conditions = [new() { Kind = "script", ScriptMethod = "DesktopConditions.Ready" }]
+    });
+    var state = JsonSerializer.Deserialize<MachineModel>(File.ReadAllText(path), options)!.States.Single();
+    Check(state.Outputs[0].MatchMode == "all" && state.Outputs[0].Conditions.Single().ScriptMethod == "DesktopConditions.Ready", "Created state persists the compiled condition instead of unconditional output");
+    var before = File.ReadAllText(path);
+    foreach (var conditions in new List<ConditionModel>?[] { null, [new() { Kind = "script", ScriptMethod = "Missing.Ready" }] })
+    {
+        try
+        {
+            await session.EditDesktopGraphAsync(path, new DesktopGraphCommand { Action = "createState", RequiresCondition = true, Conditions = conditions });
+            throw new Exception("Invalid condition was accepted");
+        }
+        catch (InvalidOperationException) { }
+        Check(session.Snapshot.Machine.States.Count == 1 && File.ReadAllText(path) == before, "Missing condition or method cannot create an empty state");
+    }
+}
 Console.WriteLine("All desktop preference/layout checks passed.");
 static void Check(bool result, string message) { if (!result) throw new Exception(message); Console.WriteLine("PASS: " + message); }
 sealed class EnvironmentStub(string root) : IWebHostEnvironment

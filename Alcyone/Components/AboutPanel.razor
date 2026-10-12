@@ -1,0 +1,30 @@
+@inherits LocalizedComponent
+<div class="about-backdrop" @onclick="OnClose">
+    <section class="about-panel" role="dialog" aria-modal="true" aria-labelledby="about-title" @onclick:stopPropagation="true" @onkeydown="HandleKey" tabindex="-1">
+        <button class="about-close" aria-label="@L["关闭介绍"]" @onclick="OnClose" @ref="_closeButton">×</button>
+        <div class="about-story">
+            <div class="about-brand"><img src="images/planet-logo-transparent.png" alt="" /><span>ALCYONE <small>@L["桌面自动化 · 开源探索"]</small></span></div>
+            <div class="about-eyebrow">MEET THE CREATOR</div>
+            <h2 id="about-title">@L["你好，我是"]<br /><span>@L["奶茶叔叔。"]</span></h2>
+            <p class="about-description">@L["让桌面自动化，拥有自己的宇宙。"]<br />@L["欢迎交流使用体验、分享想法，一起把 Alcyone 做得更好。"]</p>
+            <div class="about-tags"><span>@L["可视化状态机"]</span><span>@L["C# 热重载"]</span><span>@L["AI 辅助开发"]</span></div>
+            <div class="about-links">
+                <a href="https://github.com/anan1213095357" target="_blank" rel="noopener noreferrer"><span class="link-icon">⌘</span><span><small>GITHUB</small><strong>anan1213095357</strong></span><b>↗</b></a>
+                <a href="https://github.com/anan1213095357/Alcyone" target="_blank" rel="noopener noreferrer"><span class="link-icon">◇</span><span><small>OPEN SOURCE</small><strong>@L["Alcyone 项目源码"]</strong></span><b>↗</b></a>
+                <a href="https://github.com/anan1213095357/Alcyone/issues" target="_blank" rel="noopener noreferrer"><span class="link-icon">✧</span><span><small>FEEDBACK</small><strong>@L["问题反馈与建议"]</strong></span><b>↗</b></a>
+            </div>
+            <footer>Windows · .NET 10 · Blazor <span>Built with curiosity.</span></footer>
+        </div>
+        <aside class="about-contact"><span class="contact-label"><i></i> 保持联系</span><h3>@L["微信聊一聊"]</h3><p>@L["扫码添加作者，交流与反馈"]</p><div class="wechat-image"><img src="images/author-wechat.jpg" alt="@L["作者提供的微信好友二维码"]" /></div><small>@L["打开微信扫一扫，添加我为好友"]</small><span class="contact-footnote">@L["感谢每一个让项目变得更好的想法。"]</span></aside>
+    </section>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+    private ElementReference _closeButton;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await _closeButton.FocusAsync();
+    }
+    private Task HandleKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e) => e.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
+}
