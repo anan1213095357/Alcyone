@@ -4,6 +4,7 @@ public partial class ScriptWorkbench
 {
     private static readonly ApiDoc[] Docs =
     [
+        new("基础", "NuGet 自动依赖", "编译时自动下载缺失库", "using 外部命名空间; / #r \"nuget: 包名, 版本\"", "缺失命名空间会自动匹配 NuGet、恢复间接依赖并重新编译。结果缓存，无需安装 SDK。需要指定版本或自动匹配不明确时可在文件顶部声明 #r。", "#r \"nuget: CsvHelper, 33.1.0\"\nusing CsvHelper;", ""),
         new("基础", "StateCondition", "注册自定义条件函数", "[StateCondition(string displayName, string group = \"自定义\")]", "公开无参数方法返回 bool、Task<bool> 或 ValueTask<bool>。等待执行完成后判断，通过 Vars 读取变量。在条件 API 菜单的自定义条件中选择。", "[StateCondition(\"已就绪\", \"自定义\")]\npublic bool IsReady() => Vars.Get<bool>(\"就绪\", false);", ""),
         new("基础", "StateAction", "将公开方法注册为卡片动作", "[StateAction(string displayName, string group = \"二次开发\")]", "标注继承 StateScript 的类中的公开方法。", "[StateAction(\"我的动作\", \"自定义\")]", ""),
         new("基础", "StateParameter", "设置动作参数的显示名称", "[StateParameter(string displayName)]", "放在方法参数前，显示为卡片参数名称。", "[StateParameter(\"参数名称\")]", ""),

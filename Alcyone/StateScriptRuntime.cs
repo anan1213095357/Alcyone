@@ -186,6 +186,7 @@ public sealed class StateScriptHost : IDisposable
 
     private readonly StateScriptContext _context;
     private readonly object _reloadLock = new();
+    private readonly ScriptNuGet _nuget;
     private readonly FileSystemWatcher _watcher;
     private readonly Timer _reloadTimer;
     private IReadOnlyList<object> _actionTargets = Array.Empty<object>();
@@ -200,6 +201,7 @@ public sealed class StateScriptHost : IDisposable
             ?? Path.Combine(Directory.GetCurrentDirectory(), "HotScripts");
 
         Directory.CreateDirectory(ScriptDirectory);
+        _nuget = new ScriptNuGet(ScriptDirectory,message=>DependencyProgress?.Invoke(message));
         Directory.CreateDirectory(Path.Combine(ScriptDirectory, "lib"));
 
         _reloadTimer = new Timer(_ => ReloadFromWatcher(), null, Timeout.Infinite, Timeout.Infinite);
@@ -221,6 +223,7 @@ public sealed class StateScriptHost : IDisposable
     public string ScriptDirectory { get; }
     public IReadOnlyList<object> ActionTargets => Volatile.Read(ref _actionTargets);
     public event Action<ScriptReloadResult>? Reloaded;
+    public event Action<string>? DependencyProgress;
 
     public ScriptReloadResult Reload()
     {
@@ -251,31 +254,14 @@ public sealed class StateScriptHost : IDisposable
                 return emptyResult;
             }
 
-            var parseOptions = new CSharpParseOptions(LanguageVersion.Latest, kind: SourceCodeKind.Regular);
-            var syntaxTrees = new List<SyntaxTree>
+            CSharpCompilation compilation;
+            ScriptPackageAssets packages;
+            try { (compilation,packages) = PrepareCompilation(sources); }
+            catch(Exception ex)
             {
-                CSharpSyntaxTree.ParseText(
-                    ScriptHeader,
-                    parseOptions,
-                    "__HotScriptGlobals.g.cs",
-                    Encoding.UTF8)
-            };
-
-            syntaxTrees.AddRange(sources.Select(source => CSharpSyntaxTree.ParseText(
-                source.Code,
-                parseOptions,
-                source.Path,
-                Encoding.UTF8)));
-
-            var compilation = CSharpCompilation.Create(
-                $"StateMachine.HotScripts.{Guid.NewGuid():N}",
-                syntaxTrees,
-                BuildReferences(),
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary,
-                    optimizationLevel: OptimizationLevel.Release,
-                    allowUnsafe: false,
-                    nullableContextOptions: NullableContextOptions.Enable));
+                var failed=ScriptReloadResult.Fail(sources.Count,["NuGet 自动恢复失败："+ex.GetBaseException().Message]);
+                Reloaded?.Invoke(failed);return failed;
+            }
 
             using var pe = new MemoryStream();
             using var pdb = new MemoryStream();
@@ -302,7 +288,7 @@ public sealed class StateScriptHost : IDisposable
             ScriptLoadContext? newLoadContext = null;
             try
             {
-                newLoadContext = new ScriptLoadContext(Path.Combine(ScriptDirectory, "lib"));
+                newLoadContext = new ScriptLoadContext(Path.Combine(ScriptDirectory, "lib"),packages);
                 var assembly = newLoadContext.LoadFromStream(pe, pdb);
 
                 var targets = assembly
@@ -319,6 +305,7 @@ public sealed class StateScriptHost : IDisposable
                 foreach (var target in targets)
                     target.Attach(_context);
 
+                _nuget.Remember();
                 Swap(targets.Cast<object>().ToArray(), newLoadContext);
                 newLoadContext = null;
 
@@ -336,7 +323,25 @@ public sealed class StateScriptHost : IDisposable
         }
     }
 
-    private IEnumerable<MetadataReference> BuildReferences()
+    private (CSharpCompilation Compilation,ScriptPackageAssets Assets) PrepareCompilation(IReadOnlyList<ScriptSource> sources)
+    {
+        var options=new CSharpParseOptions(LanguageVersion.Latest,kind:SourceCodeKind.Regular);
+        var roots=new List<ScriptPackage>();
+        var trees=new List<SyntaxTree>{CSharpSyntaxTree.ParseText(ScriptHeader,options,"__HotScriptGlobals.g.cs",Encoding.UTF8)};
+        foreach(var source in sources)trees.Add(CSharpSyntaxTree.ParseText(_nuget.Clean(source.Code,roots),options,source.Path,Encoding.UTF8));
+        _nuget.AddRemembered(trees,roots);
+        var assets=Task.Run(()=>_nuget.RestoreAsync(roots)).GetAwaiter().GetResult();
+        CSharpCompilation Compile() => CSharpCompilation.Create($"StateMachine.HotScripts.{Guid.NewGuid():N}",trees,BuildReferences(assets.References),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,optimizationLevel:OptimizationLevel.Release,allowUnsafe:false,nullableContextOptions:NullableContextOptions.Enable));
+        var compilation=Compile();
+        for(var attempt=0;attempt<3 && compilation.GetDiagnostics().Any(d=>d.Severity==DiagnosticSeverity.Error);attempt++)
+        {
+            if(!Task.Run(()=>_nuget.InferAsync(compilation,roots)).GetAwaiter().GetResult())break;
+            assets=Task.Run(()=>_nuget.RestoreAsync(roots)).GetAwaiter().GetResult();compilation=Compile();
+        }
+        return (compilation,assets);
+    }
+    private IEnumerable<MetadataReference> BuildReferences(IEnumerable<string> packageReferences)
     {
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -348,7 +353,7 @@ public sealed class StateScriptHost : IDisposable
 
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
-            if (assembly.IsDynamic || string.IsNullOrWhiteSpace(assembly.Location)) continue;
+            if (assembly.IsDynamic || string.IsNullOrWhiteSpace(assembly.Location) || AssemblyLoadContext.GetLoadContext(assembly)!=AssemblyLoadContext.Default) continue;
             paths.Add(assembly.Location);
         }
 
@@ -359,9 +364,14 @@ public sealed class StateScriptHost : IDisposable
                 paths.Add(dll);
         }
 
-        return paths
-            .Where(File.Exists)
-            .Select(path => MetadataReference.CreateFromFile(path));
+        // A package can supply a newer version of an assembly already used by the host.
+        var resolved=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        foreach(var path in paths.Concat(packageReferences).Where(File.Exists))
+        {
+            try { resolved[AssemblyName.GetAssemblyName(path).Name!]=path; }
+            catch(BadImageFormatException) { }
+        }
+        return resolved.Values.Select(path=>MetadataReference.CreateFromFile(path));
     }
 
     private static string FormatDiagnostic(Diagnostic diagnostic)
@@ -427,13 +437,31 @@ public sealed class StateScriptHost : IDisposable
     {
         private readonly string _libDirectory;
 
-        public ScriptLoadContext(string libDirectory) : base(isCollectible: true) =>
-            _libDirectory = libDirectory;
+        private readonly Dictionary<string,string> _packages;
+        private readonly Dictionary<string,string> _native;
+        public ScriptLoadContext(string libDirectory,ScriptPackageAssets packages) : base(isCollectible: true)
+        {
+            _libDirectory=libDirectory;
+            _packages=packages.Assemblies.GroupBy(path=> {
+                var name=AssemblyName.GetAssemblyName(path);return name.Name+"|"+name.CultureName;
+            },StringComparer.OrdinalIgnoreCase).ToDictionary(group=>group.Key,group=>group.First(),StringComparer.OrdinalIgnoreCase);
+            _native=packages.Native;
+        }
+        protected override nint LoadUnmanagedDll(string name)
+        {
+            if(_native.TryGetValue(name,out var path)||_native.TryGetValue(name+".dll",out path))return LoadUnmanagedDllFromPath(path);
+            return 0;
+        }
 
         protected override Assembly? Load(AssemblyName assemblyName)
         {
             var shared = AssemblyLoadContext.Default.Assemblies.FirstOrDefault(x =>
                 AssemblyName.ReferenceMatchesDefinition(x.GetName(), assemblyName));
+            if(_packages.TryGetValue(assemblyName.Name+"|"+assemblyName.CultureName,out var package))
+            {
+                if(shared is not null && shared.GetName().Version==AssemblyName.GetAssemblyName(package).Version)return shared;
+                return LoadFromAssemblyPath(package);
+            }
             if (shared is not null) return shared;
 
             var path = Path.Combine(_libDirectory, $"{assemblyName.Name}.dll");

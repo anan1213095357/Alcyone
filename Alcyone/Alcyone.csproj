@@ -8,6 +8,7 @@
         <Content Include="Automation\FastTextSearch.cs" Link="Core\FastTextSearch.cs" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
 	</ItemGroup>
 	<ItemGroup>
+		<PackageReference Include="NuGet.Protocol" Version="7.9.0" />
 		<PackageReference Include="Photino.NET" Version="4.0.16" />
         <PackageReference Include="Markdig" Version="1.1.1" />
 		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
@@ -46,11 +47,8 @@
         <ItemGroup>
             <_DesktopComponentScripts Include="Components/**/*.razor.js" />
         </ItemGroup>
-        <Copy SourceFiles="@(_DesktopComponentScripts)"
-              DestinationFiles="@(_DesktopComponentScripts->'$(OutDir)wwwroot/%(Identity)')" />
-        <Copy SourceFiles="$(IntermediateOutputPath)scopedcss/bundle/$(AssemblyName).styles.css"
-              DestinationFolder="$(OutDir)wwwroot"
-              Condition="Exists('$(IntermediateOutputPath)scopedcss/bundle/$(AssemblyName).styles.css')" />
+        <Copy SourceFiles="@(_DesktopComponentScripts)" DestinationFiles="@(_DesktopComponentScripts->'$(OutDir)wwwroot/%(Identity)')" />
+        <Copy SourceFiles="$(IntermediateOutputPath)scopedcss/bundle/$(AssemblyName).styles.css" DestinationFolder="$(OutDir)wwwroot" Condition="Exists('$(IntermediateOutputPath)scopedcss/bundle/$(AssemblyName).styles.css')" />
     </Target>
     <Target Name="BundleDesktopContent" AfterTargets="PrepareForBundle" DependsOnTargets="CopyStaticWebAssetsToPublishDirectory;CopyStaticWebAssetsEndpointsManifest" Condition="'$(PublishSingleFile)' == 'true'">
         <ItemGroup>

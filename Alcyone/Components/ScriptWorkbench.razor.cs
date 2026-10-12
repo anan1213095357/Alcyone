@@ -27,6 +27,11 @@ public partial class ScriptWorkbench
     private string _newScriptTemplate = "action";
     private string _aiScriptKind = "auto";
 
+    protected override void OnInitialized() => Host.DependencyProgress += OnDependencyProgress;
+    private void OnDependencyProgress(string status)
+    {
+        if(!_disposed)_=InvokeAsync(()=>{Report(status);StateHasChanged();});
+    }
     private async Task RequestAiAsync()
     {
         if (!_ready || _editor is null || _busy) return;
@@ -291,6 +296,7 @@ public partial class ScriptWorkbench
     }
     public async ValueTask DisposeAsync()
     {
+        Host.DependencyProgress -= OnDependencyProgress;
         _disposed = true;
         try
         {
