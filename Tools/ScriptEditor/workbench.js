@@ -76,6 +76,25 @@ export function create(host, status, reference, docs) {
     });
     const models = new Map(); let active; let disposed = false;
     const invoke = (method, ...args) => { if (!disposed) reference.invokeMethodAsync(method, ...args).catch(() => {}); };
+    const dependencyButton = document.createElement('button');
+    dependencyButton.type = 'button';
+    dependencyButton.style.cssText = 'display:none;margin-left:12px;padding:2px 7px;border:1px solid #3a4454;border-radius:4px;background:transparent;color:#9aabc3;font:inherit;cursor:pointer';
+    host.closest('.studio-overlay').querySelector('.studio-breadcrumb').append(dependencyButton);
+    const dependencyLines = model => model.getLinesContent().flatMap((line, index) =>
+        /^\s*(?:#r\s+"nuget:|\/\/\s*nuget:)/i.test(line) ? [{ line: index + 1, text: line.trim() }] : []);
+    const updateDependencies = () => {
+        const item = models.get(active);
+        const dependencies = item ? dependencyLines(item.model) : [];
+        dependencyButton.style.display = dependencies.length ? 'inline-block' : 'none';
+        dependencyButton.textContent = `${item?.dependenciesExpanded ? '▾' : '▸'} NuGet · ${dependencies.length}`;
+        dependencyButton.setAttribute('aria-expanded', String(!!item?.dependenciesExpanded));
+        dependencyButton.title = dependencies.map(d => d.text).join('\n');
+        editor.setHiddenAreas(item?.dependenciesExpanded ? [] : dependencies.map(d => new monaco.Range(d.line, 1, d.line, 1)));
+    };
+    dependencyButton.addEventListener('click', () => {
+        const item = models.get(active);
+        if (item) { item.dependenciesExpanded = !item.dependenciesExpanded; updateDependencies(); editor.focus(); }
+    });
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => invoke('CompileShortcut'));
     editor.addCommand(monaco.KeyCode.F8, () => invoke('CompileShortcut'));
     const positionSubscription = editor.onDidChangeCursorPosition(e => { status.textContent = `行 ${e.position.lineNumber}，列 ${e.position.column}`; });
@@ -89,12 +108,20 @@ export function create(host, status, reference, docs) {
             if (!item) {
                 item = { model: monaco.editor.createModel(source, 'csharp', monaco.Uri.parse('inmemory://scripts/' + path.replaceAll('\\', '/'))), original: source, dirty: false };
                 item.subscription = item.model.onDidChangeContent(() => {
+                    if (active === path) updateDependencies();
                     const dirty = item.model.getValue() !== item.original;
                     if (dirty !== item.dirty) { item.dirty = dirty; invoke('DirtyChanged', path, dirty); }
                 });
                 models.set(path, item);
             }
-            active = path; editor.setModel(item.model); if (item.view) editor.restoreViewState(item.view); editor.focus();
+            active = path; editor.setModel(item.model); if (item.view) editor.restoreViewState(item.view); updateDependencies(); editor.focus();
+        },
+        remove(path) {
+            const item = models.get(path);
+            if (!item) return;
+            if (active === path) { active = null; editor.setModel(null); }
+            item.subscription.dispose(); item.model.dispose(); models.delete(path);
+            updateDependencies();
         },
         dirtyFiles() { return [...models].filter(([,v]) => v.model.getValue() !== v.original).map(([path,v]) => ({path, source:v.model.getValue(), original:v.original})); },
         aiContext() { const model = editor.getModel(); const selection = editor.getSelection(); return {source: model?.getValue() ?? '', selection: model && selection ? model.getValueInRange(selection) : ''}; },
@@ -103,13 +130,13 @@ export function create(host, status, reference, docs) {
         action(id) { editor.getAction(id)?.run(); },
         insert(code) { const selection = editor.getSelection(); if (selection) { editor.executeEdits('api-example', [{range: selection, text: code, forceMoveMarkers:true}]); editor.focus(); } },
         readonly(value) { editor.updateOptions({readOnly:value}); },
-        reveal(line, column) { editor.setPosition({lineNumber:line,column}); editor.revealLineInCenter(line); editor.focus(); },
+        reveal(line, column) { const item = models.get(active); if (item && dependencyLines(item.model).some(d => d.line === line)) { item.dependenciesExpanded = true; updateDependencies(); } editor.setPosition({lineNumber:line,column}); editor.revealLineInCenter(line); editor.focus(); },
         diagnostics(errors) {
             for (const [path,item] of models) {
                 monaco.editor.setModelMarkers(item.model, 'compile', errors.filter(e => e.file === path || e.file === path.split(/[\\/]/).pop()).map(e => ({severity:monaco.MarkerSeverity.Error,message:e.message,startLineNumber:e.line,startColumn:e.column,endLineNumber:e.line,endColumn:e.column+1})));
             }
         },
-        dispose() { disposed = true; positionSubscription.dispose(); surface.removeEventListener('keydown',stopKeys); editor.dispose(); for(const item of models.values()) {item.subscription.dispose();item.model.dispose();} completion?.dispose(); }
+        dispose() { disposed = true; dependencyButton.remove(); positionSubscription.dispose(); surface.removeEventListener('keydown',stopKeys); editor.dispose(); for(const item of models.values()) {item.subscription.dispose();item.model.dispose();} completion?.dispose(); }
     };
     return instance;
 }

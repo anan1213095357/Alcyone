@@ -334,10 +334,19 @@ public sealed class StateScriptHost : IDisposable
         CSharpCompilation Compile() => CSharpCompilation.Create($"StateMachine.HotScripts.{Guid.NewGuid():N}",trees,BuildReferences(assets.References),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,optimizationLevel:OptimizationLevel.Release,allowUnsafe:false,nullableContextOptions:NullableContextOptions.Enable));
         var compilation=Compile();
+        CSharpCompilation ImportAttributes(CSharpCompilation current)
+        {
+            var imports = ScriptAttributeImports.Resolve(current, assets.References);
+            if (imports.Length == 0) return current;
+            trees.Add(CSharpSyntaxTree.ParseText(string.Join("\n", imports), options, $"__HotScriptImports{trees.Count}.g.cs", Encoding.UTF8));
+            DependencyProgress?.Invoke("自动补全 NuGet 属性引用：" + string.Join("、", imports));
+            return Compile();
+        }
+        compilation = ImportAttributes(compilation);
         for(var attempt=0;attempt<3 && compilation.GetDiagnostics().Any(d=>d.Severity==DiagnosticSeverity.Error);attempt++)
         {
             if(!Task.Run(()=>_nuget.InferAsync(compilation,roots)).GetAwaiter().GetResult())break;
-            assets=Task.Run(()=>_nuget.RestoreAsync(roots)).GetAwaiter().GetResult();compilation=Compile();
+            assets=Task.Run(()=>_nuget.RestoreAsync(roots)).GetAwaiter().GetResult();compilation=ImportAttributes(Compile());
         }
         return (compilation,assets);
     }

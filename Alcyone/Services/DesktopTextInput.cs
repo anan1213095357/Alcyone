@@ -32,15 +32,7 @@ public sealed class DesktopTextInput : IDisposable
         var font = CreateFontW(-(int)Math.Round(14 * request.Ratio), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI");
         SendMessageW(_edit, 0x0030, (nuint)font, 1);
         if (_font != 0) DeleteObject(_font); _font = font;
-        // Web inputs center a single text line; Win32 EDIT places it at the top.
-        // Measure the actual font at this DPI and center the EDIT inside its host.
-        var dc = GetDC(_edit);
-        var previousFont = SelectObject(dc, font);
-        var lineHeight = (int)Math.Ceiling(18 * request.Ratio);
-        try { if (GetTextExtentPoint32W(dc, "Hg", 2, out var size)) lineHeight = size.Height; }
-        finally { SelectObject(dc, previousFont); ReleaseDC(_edit, dc); }
-        var top = Math.Max(0, (height - lineHeight) / 2 - 1);
-        SetWindowPos(_edit, 0, 0, top, width, height - top, 0x0014);
+        SetWindowPos(_edit, 0, 0, 0, width, height, 0x0014);
         SetWindowTextW(_edit, request.Text);
         _active = true;
         ShowWindow(_host, 5);
@@ -48,6 +40,16 @@ public sealed class DesktopTextInput : IDisposable
         SetFocus(_edit);
         SendMessageW(_edit, 0x00b1, (nuint)request.Text.Length, request.Text.Length);
         Publish();
+    }
+    public void Resize(nint surface, string json)
+    {
+        var request = JsonSerializer.Deserialize<Request>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (!_active || surface != _surface || request is null || request.Id != _id || request.Ratio is <= 0 or > 8
+            || !double.IsFinite(request.Left + request.Top + request.Width + request.Height) || request.Width is <= 0 or > 2000 || request.Height is <= 0 or > 200 || !GetWindowRect(surface, out var bounds)) return;
+        var width = (int)Math.Ceiling(request.Width * request.Ratio);
+        var height = (int)Math.Ceiling(request.Height * request.Ratio);
+        SetWindowPos(_host, 0, bounds.Left + (int)(request.Left * request.Ratio), bounds.Top + (int)(request.Top * request.Ratio), width, height, 0x0014);
+        SetWindowPos(_edit, 0, 0, 0, width, height, 0x0014);
     }
     public void Close(nint surface = 0)
     {
@@ -67,7 +69,7 @@ public sealed class DesktopTextInput : IDisposable
         if (RegisterClassExW(ref cls) == 0) throw new System.ComponentModel.Win32Exception();
         _registered = true;
         _host = CreateWindowExW(0x80, _class, "Alcyone 输入", 0x80000000, 0, 0, 1, 1, 0, 0, cls.Instance, 0);
-        _edit = CreateWindowExW(0, "EDIT", "", 0x50000080, 0, 0, 1, 1, _host, 0, cls.Instance, 0);
+        _edit = CreateWindowExW(0, "EDIT", "", 0x50001044, 0, 0, 1, 1, _host, 0, cls.Instance, 0);
         if (_host == 0 || _edit == 0) throw new System.ComponentModel.Win32Exception();
         SendMessageW(_edit, 0x00c5, 16000, 0);
         _originalProc = SetWindowLongPtrW(_edit, -4, Marshal.GetFunctionPointerForDelegate(_editProc));
@@ -84,9 +86,12 @@ public sealed class DesktopTextInput : IDisposable
         if (message == 0x010d) _composing = true;
         if (message == 0x010e) { _composing = false; _imeCommitAt = Environment.TickCount64; }
         if (message == 0x0100 && wParam == 13 && Environment.TickCount64 - _imeCommitAt < 80) return 0;
-        if (message == 0x0100 && !_composing && wParam is 13 or 27)
+        if (message == 0x0100 && !_composing && wParam == 65 && (GetKeyState(17) & 0x8000) != 0)
+        { SendMessageW(_edit, 0x00b1, 0, -1); return 0; }
+        if (message == 0x0100 && !_composing && (wParam == 27 || (wParam == 13 && (GetKeyState(16) & 0x8000) == 0)))
         { var submit = wParam == 13; _active = false; ShowWindow(_host, 0); Publish(submit); return 0; }
-        if (message == 0x0102 && wParam is 13 or 27) return 0;
+        if (message == 0x0102 && (wParam == 27 || (wParam == 13 && (GetKeyState(16) & 0x8000) == 0))) return 0;
+        if (message == 0x0102 && wParam == 1 && (GetKeyState(17) & 0x8000) != 0) return 0;
         return CallWindowProcW(_originalProc, hwnd, message, wParam, lParam);
     }
     public void Dispose()
@@ -95,6 +100,7 @@ public sealed class DesktopTextInput : IDisposable
         if (_font != 0) DeleteObject(_font); if (_brush != 0) DeleteObject(_brush);
         if (_registered) UnregisterClassW(_class, GetModuleHandleW(null));
     }
+    [DllImport("user32.dll")] private static extern short GetKeyState(int key);
     [DllImport("user32.dll")] private static extern nint SetFocus(nint hwnd);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool SetWindowTextW(nint hwnd, string text);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextW(nint hwnd, StringBuilder text, int count);

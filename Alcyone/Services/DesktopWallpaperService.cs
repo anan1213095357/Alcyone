@@ -274,6 +274,13 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             .Load(_url + "/desktop/" + _viewToken);
         surface.RegisterWebMessageReceivedHandler((_, message) =>
         {
+            const string resizeInput = "alcyone:desktop:text-resize:";
+            if (!_disposed && message.StartsWith(resizeInput, StringComparison.Ordinal))
+            {
+                try { TextInput.Resize(surface.WindowHandle, message[resizeInput.Length..]); }
+                catch (Exception ex) { logger.LogError(ex, "Desktop text input resize failed"); }
+                return;
+            }
             const string input = "alcyone:desktop:text-input:";
             if (!_disposed && message.StartsWith(input, StringComparison.Ordinal))
             {

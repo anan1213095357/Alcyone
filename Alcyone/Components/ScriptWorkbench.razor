@@ -30,7 +30,7 @@
                 <div class="studio-file-list">
                     @foreach (var file in _files.Where(f => f.Contains(_fileQuery, StringComparison.OrdinalIgnoreCase)))
                     {
-                        <button class="studio-file @(file == _active ? "selected" : "")" title="@file" disabled="@_busy" @onclick="() => OpenFileAsync(file)"><span class="csharp-icon">C#</span><span>@file</span>@if (_dirty.Contains(file)) { <i class="dirty-dot"></i> }</button>
+                        <div class="studio-file-row"><button class="studio-file @(file == _active ? "selected" : "")" title="@file" disabled="@_busy" @onclick="() => OpenFileAsync(file)"><span class="csharp-icon">C#</span><span>@file</span>@if (_dirty.Contains(file)) { <i class="dirty-dot"></i> }</button><button class="studio-file-delete" title="@Text["删除脚本"]" aria-label="@(Text["删除脚本"] + ": " + file)" disabled="@(_busy || !_ready)" @onclick="() => _deleteFile = file"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12 M8 5V3h4v2 M6 5l1 12h6l1-12 M9 8v6 M11 8v6" /></svg></button></div>
                     }
                     @if (_files.Length == 0) { <p class="studio-empty-explorer">还没有脚本。点击“新建脚本”从模板创建第一个动作。</p> }
                 </div>
@@ -91,6 +91,10 @@
         @if (_confirm is not null)
         {
             <div class="studio-confirm-overlay"><section class="studio-confirm" role="alertdialog" aria-label="未保存的修改"><h3>@(_confirm == "reload" ? "重新读取文件？" : "还有未保存的修改")</h3><p>@(_confirm == "reload" ? "这会用磁盘文件替换当前编辑内容。" : "保存并编译后关闭，或放弃这次编辑。")</p><div><button @onclick="() => _confirm = null">继续编辑</button><button @onclick="DiscardAsync">放弃修改</button>@if (_confirm == "close") { <button class="studio-build" @onclick="SaveAndCloseAsync">保存并关闭</button> }</div></section></div>
+        }
+        @if (_deleteFile is not null)
+        {
+            <div class="studio-confirm-overlay"><section class="studio-confirm" role="alertdialog" aria-label="@Text["删除脚本"]"><h3>@Text["删除脚本"]</h3><p><strong>@_deleteFile</strong></p><p>@Text["删除后将重新编译。引用此脚本的卡片需要重新选择动作或条件；未保存修改将被丢弃。"]</p><div><button disabled="@_busy" @onclick="() => _deleteFile = null">@Text["取消"]</button><button class="studio-delete-confirm" disabled="@_busy" @onclick="DeleteScriptAsync">@Text["确认删除"]</button></div></section></div>
         }
         @if (_newScriptOpen)
         {

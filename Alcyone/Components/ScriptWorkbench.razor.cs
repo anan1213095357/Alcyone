@@ -18,6 +18,8 @@ public partial class ScriptWorkbench
     private string[] _files = [];
     private readonly List<string> _tabs = [];
     private readonly HashSet<string> _dirty = new(StringComparer.OrdinalIgnoreCase);
+    [Inject] private StateMachine.Localization.UiText Text { get; set; } = default!;
+    private string? _deleteFile;
     private string? _active, _confirm;
     private string _fileQuery = "", _docQuery = "", _docCategory = "全部";
     private string _status = "编辑器就绪。Ctrl+S / F8 保存全部修改并编译；Ctrl+F 查找。", _outputTime = "READY";
@@ -270,6 +272,59 @@ public partial class ScriptWorkbench
         await OpenFileAsync(file);
         await _editor.InvokeVoidAsync("reveal", error.Line, error.Column);
     }
+    private async Task DeleteScriptAsync()
+    {
+        if (_busy || _editor is null || _deleteFile is null) return;
+        var file = _deleteFile;
+        _busy = true;
+        string? backup = null;
+        string? path = null;
+        try
+        {
+            await _editor.InvokeVoidAsync("readonly", true);
+            path = FilePath(file);
+            var folder = Path.Combine(Host.ScriptDirectory, ".deleted");
+            Directory.CreateDirectory(folder);
+            backup = Path.Combine(folder, Guid.NewGuid().ToString("N") + "-" + Path.GetFileName(file) + ".bak");
+            File.Move(path, backup);
+            var result = await Task.Run(Host.Reload);
+            if (!result.Success)
+            {
+                File.Move(backup, path);
+                backup = null;
+                await Task.Run(Host.Reload);
+                _errors = result.Errors.Select(ParseError).ToList();
+                await _editor.InvokeVoidAsync("diagnostics", _errors);
+                Report(Text["删除会导致其他脚本编译失败，已恢复文件。"]);
+                return;
+            }
+            await _editor.InvokeVoidAsync("remove", file);
+            _files = _files.Where(f => f != file).ToArray();
+            _tabs.Remove(file);
+            _dirty.Remove(file);
+            if (_active == file) _active = null;
+            _errors.Clear();
+            await _editor.InvokeVoidAsync("diagnostics", _errors);
+            Report(Text["已删除脚本并完成热重载："] + file);
+        }
+        catch (Exception ex)
+        {
+            if (backup is not null && path is not null && File.Exists(backup) && !File.Exists(path))
+            {
+                File.Move(backup, path);
+                await Task.Run(Host.Reload);
+            }
+            Report(ex.Message);
+        }
+        finally
+        {
+            _deleteFile = null;
+            _busy = false;
+            if (!_disposed) await _editor.InvokeVoidAsync("readonly", false);
+        }
+        if (_active is null && _files.Length > 0) await OpenFileAsync(_tabs.LastOrDefault() ?? _files[0]);
+    }
+
     private void RequestReload() { if (_active is not null) _confirm = "reload"; }
     private async Task RequestCloseAsync()
     {

@@ -95,6 +95,7 @@ public partial class Home
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await SyncAnimationPauseAsync();
+        if (_aiDialogOpen) await JS.InvokeVoidAsync("alcyoneAiInput.resizeAll");
         if (firstRender)
         {
             _jsBridge = new JsBridge(StateMoved, SelectStateFromJs, SelectEdgeFromJs, ClearSelectionFromJs, EscapeFromJs, DeleteSelectionFromJs);
@@ -259,16 +260,8 @@ public partial class Home
     {
         _ = InvokeAsync(() =>
         {
-            if (result.Success)
-            {
-                DiscoverActionMethods();
-                AddLog("SCRIPT", $"热更完成：{result.ScriptCount} 个脚本，{result.ActionClassCount} 个动作类", "good");
-            }
-            else
-            {
-                AddLog("SCRIPT", string.Join(" | ", result.Errors), "error");
-            }
-
+            if (result.Success) DiscoverActionMethods();
+            // MachineSession records the reload once; views only refresh their catalog.
             StateHasChanged();
         });
     }
@@ -2259,6 +2252,8 @@ reply 尽量简短。
                 ? "\nWrite user-facing explanations in English. Preserve existing user-defined names, recognition search text, identifiers and JSON field names."
                 : "\n使用简体中文说明方案。保留已有的用户命名、识别查找文字、标识符和 JSON 字段名。";
 
+            systemPrompt += ScriptDevelopmentInstructions;
+
             if (_aiScope == "script" && _scriptAiContext is not null)
                 systemPrompt += $$"""
 
@@ -2266,7 +2261,7 @@ reply 尽量简短。
 选定类型：{{ScriptAiKindLabel(_scriptAiContext.Kind)}}。
 {{(_scriptAiContext.Kind == "action" ? "生成 StateScript 类，用 [StateAction] 标注动作，返回 void 或 Task。" : _scriptAiContext.Kind is "condition" or "async-condition" ? "生成 StateScript 类，用 [StateCondition(显示名称, 分类)] 标注 public 无参数方法。该函数表示是否触发条件，不是生命周期动作，不使用 [StateAction]。" : "优先保留当前代码类型；新脚本根据用户意图判断：执行操作用 [StateAction]，判断是否满足/触发用 [StateCondition]。")}}
 条件函数只能返回 bool、Task<bool> 或 ValueTask<bool>；true 表示满足，false 表示不满足；异步条件必须等待工作完成后返回结果。同步条件返回 bool，异步条件使用 async Task<bool>。
-使用外部 NuGet 库时在脚本顶部添加 #r "nuget: 包名, 版本"，宿主会自动下载依赖并编译；不要要求用户手动安装库。StateCondition 已由宿主导入，不需要额外 using。条件可用 Vars.Get<T> 读取已有变量，可用 Api 和 System.IO 等实际接口判断，异常不应伪装成满足条件。
+使用外部 NuGet 库时在脚本顶部添加 #r "nuget: 包名, 版本"，宿主会自动下载依赖并编译；外部库必须带齐对应 using 或使用完整类型名；FreeSql 的 [Table]/[Column] 使用 using FreeSql.DataAnnotations;，不要误用 EF 的同名属性。不要要求用户手动安装库。StateCondition 已由宿主导入，不需要额外 using。条件可用 Vars.Get<T> 读取已有变量，可用 Api 和 System.IO 等实际接口判断，异常不应伪装成满足条件。
 applyMachine 必须为 false。已有文件优先修改当前文件并保留其他功能；新建时使用下方文件名（如为空或非法则取有效英文名）。返回完整可编译代码并添加简短中文注释。
 以下 source 是编辑器最新内容，包含未保存修改，优先于磁盘脚本。selection 是用户选中的片段，errors 是最近编译错误；修复需求结合它们处理。
 编辑上下文：{{JsonSerializer.Serialize(_scriptAiContext, _jsonOptions)}}

@@ -1,8 +1,49 @@
 (() => {
+    function autoGrow(input) {
+        if (!(input instanceof HTMLTextAreaElement)) return;
+        input.style.height = 'auto';
+        const height = Math.min(180, Math.max(34, input.scrollHeight));
+        input.style.height = height + 'px';
+        input.style.overflowY = input.scrollHeight > 180 ? 'auto' : 'hidden';
+    }
+    const pending = new Set();
+    let resizeFrame;
+    const queueResize = input => {
+        pending.add(input);
+        if (resizeFrame) return;
+        resizeFrame = requestAnimationFrame(() => {
+            resizeFrame = null;
+            for (const input of pending) if (input.isConnected) window.alcyoneAiInput.resize(input);
+            pending.clear();
+        });
+    };
+    document.addEventListener('input', event => { if (event.target.matches?.('[data-auto-grow]')) queueResize(event.target); });
+    const observer = new MutationObserver(() => document.querySelectorAll('textarea[data-auto-grow]').forEach(queueResize));
+    observer.observe(document.documentElement, {childList:true,subtree:true,characterData:true});
+    window.addEventListener('resize', () => document.querySelectorAll('textarea[data-auto-grow]').forEach(queueResize));
+    const inputBounds = new WeakMap();
     window.alcyoneAiInput = {
+        resizeAll() { document.querySelectorAll("textarea[data-auto-grow]").forEach(queueResize); },
+        resize(input) {
+            if (!input) return;
+            autoGrow(input);
+            if (!input.dataset.nativeInput || !window.external?.sendMessage) return;
+            const r = input.getBoundingClientRect();
+            const geometry = JSON.stringify({id:input.dataset.nativeInput,left:r.left,top:r.top,width:r.width,height:r.height,ratio:window.devicePixelRatio || 1});
+            if (inputBounds.get(input) === geometry) return;
+            inputBounds.set(input, geometry);
+            window.external.sendMessage('alcyone:desktop:text-resize:' + geometry);
+        },
+        async copyReply(fallback) {
+            const selection = window.getSelection();
+            const node = selection?.anchorNode?.parentElement;
+            const text = node?.closest('.desktop-ai-console .ai-response-body') && selection.toString() ? selection.toString() : fallback;
+            if (text) await navigator.clipboard.writeText(text);
+        },
         setText(input, text) {
             if (!input || !window.external?.sendMessage) return;
             input.value = text;
+            autoGrow(input);
             const r = input.getBoundingClientRect();
             window.external.sendMessage('alcyone:desktop:text-input:' + JSON.stringify({
                 id: input.dataset.nativeInput, text, left: r.left, top: r.top,

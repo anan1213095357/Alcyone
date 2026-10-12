@@ -364,7 +364,7 @@
         popupActions(panel, english() ? 'OK' : '知道了', dismissConfirmation);
     }
     function onOutsidePointerDown(event) {
-        const input = event.target.closest?.('.desktop-ai-console input[data-native-input]');
+        const input = event.target.closest?.('.desktop-ai-console [data-native-input]');
         if (input && api?.desktopView && window.external?.sendMessage) {
             event.preventDefault(); // Native EDIT owns focus; don't focus the shell WebView.
             const r = input.getBoundingClientRect();
@@ -453,7 +453,7 @@
         gesture = null; box?.remove(); box = null;
     }
     function blurDesktopChat() {
-        const input = document.querySelector('.desktop-ai-console input');
+        const input = document.querySelector('.desktop-ai-console textarea');
         if (input && document.activeElement === input) input.blur();
     }
     function hideDesktopSuggestions() {
@@ -466,12 +466,12 @@
     }
     let desktopComposition = false, desktopCommitAt = 0;
     function onDesktopComposition(event) {
-        if (!event.target.closest?.('.desktop-ai-console input')) return;
+        if (!event.target.closest?.('.desktop-ai-console textarea')) return;
         desktopComposition = event.type === 'compositionstart';
         if (!desktopComposition) desktopCommitAt = performance.now();
     }
     function guardDesktopImeKey(event) {
-        if (event.target.closest?.('.desktop-ai-console input') && (desktopComposition || event.isComposing || event.keyCode === 229))
+        if (event.target.closest?.('.desktop-ai-console textarea') && (desktopComposition || event.isComposing || event.keyCode === 229))
             event.stopImmediatePropagation(); // Keep native IME behavior; skip Blazor shortcuts.
     }
     function guardDesktopImeSubmit(event) {

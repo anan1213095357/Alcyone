@@ -69,6 +69,80 @@ await using (var session = new MachineSession(services, new EnvironmentStub(root
         catch (InvalidOperationException) { }
         Check(session.Snapshot.Machine.States.Count == 1 && File.ReadAllText(path) == before, "Missing condition or method cannot create an empty state");
     }
+    await session.EditDesktopGraphBatchAsync(path,
+    [
+        new() { Action = "configureState", StateId = "数据库初始化", RequiresCondition = true, Outputs = [
+            new() { Name = "输出", Conditions = [new() { Kind = "script", ScriptMethod = "DesktopConditions.Ready" }] },
+            new() { Name = "未完成", Conditions = [new() { Kind = "script", ScriptMethod = "DesktopConditions.Ready", ExpectedSuccess = false }] }
+        ] },
+        new() { Action = "createState", Name = "完成" },
+        new() { Action = "createState", Name = "等待" },
+        new() { Action = "connect", StateId = "数据库初始化", TargetStateId = "完成", OutputId = "输出", DelayMilliseconds = 0 },
+        new() { Action = "connect", StateId = "数据库初始化", TargetStateId = "等待", OutputId = "未完成", DelayMilliseconds = 0 }
+    ]);
+    var graph = session.Snapshot.Machine;
+    Check(graph.States.Count == 3 && graph.Edges.Count == 2 && graph.States[0].Outputs.Count == 2 && graph.States[0].Outputs.All(o => o.MatchMode != "always"), "Batch connects named condition branches without bypassing them");
+    await session.StepOnceAsync();
+    Check(session.Snapshot.Runtime.CurrentStates.Values.Contains(graph.States.Single(s => s.Name == "等待").Id), "Runtime follows the false branch instead of unconditional success");
+    before = File.ReadAllText(path);
+    try
+    {
+        await session.EditDesktopGraphBatchAsync(path, [new() { Action = "createState", Name = "不可残留" }, new() { Action = "connect", StateId = "不可残留", TargetStateId = "不存在" }]);
+        throw new Exception("Broken batch was accepted");
+    }
+    catch (InvalidOperationException) { }
+    Check(File.ReadAllText(path) == before && !session.Snapshot.Machine.States.Any(s => s.Name == "不可残留"), "Failed batch leaves no orphaned cards or config changes");
+}
+await using (var session = new MachineSession(services, new EnvironmentStub(root), new DesktopColorProbeScanner(), new MachineModel()))
+{
+    var result = session.ScriptHost.ReloadFromText("""
+        using FreeSql;
+        [Table(Name = "auto_nuget_checks")]
+        public class NuGetEntity
+        {
+            [Column(IsPrimary = true)] public int Id { get; set; }
+        }
+        public sealed class NuGetCondition : StateScript
+        {
+            [StateCondition("FreeSql 条件", "数据库")]
+            public bool Ready() => typeof(NuGetEntity).GetCustomAttributes(false).Any(a => a.GetType().FullName == "FreeSql.DataAnnotations.TableAttribute");
+        }
+        """, "FreeSqlCondition.csx");
+    Check(result.Success, "FreeSql is restored automatically and Table/Column resolve without a manual using: " + string.Join(" | ", result.Errors));
+    var target = session.ScriptHost.ActionTargets.Single();
+    Check((bool)target.GetType().GetMethod("Ready")!.Invoke(target, null)!, "Auto-imported attributes use actual FreeSql types at runtime");
+}
+await using (var session = new MachineSession(services, new EnvironmentStub(root), new DesktopColorProbeScanner(), new MachineModel()))
+{
+    var result = session.ScriptHost.ReloadFromText("""
+        #r "nuget: FreeSql.Provider.Sqlite, 3.2.833"
+        using FreeSql;
+        using FreeSql.DataAnnotations;
+        [Table(Name = "verify_records")]
+        public class VerifyRecord { [Column(IsPrimary = true)] public int Id { get; set; } public string Name { get; set; } = ""; }
+        public sealed class DatabaseCondition : StateScript
+        {
+            [StateCondition("建表成功", "数据库")]
+            public Task<bool> Ready() => Task.Run(() =>
+            {
+                var path = Vars.Get<string>("dbPath");
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+                using var sql = new FreeSqlBuilder().UseConnectionString(DataType.Sqlite, "Data Source=" + path).Build();
+                sql.CodeFirst.SyncStructure<VerifyRecord>();
+                return Convert.ToInt32(sql.Ado.ExecuteScalar("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='verify_records'")) == 1;
+            }, Api.CancellationToken);
+        }
+        """, "DatabaseCondition.csx");
+    Check(result.Success, "SQLite provider restores and async database condition compiles: " + string.Join(" | ", result.Errors));
+    await session.EditDesktopGraphBatchAsync(Path.Combine(root, "database-flow.json"), [
+        new() { Action = "createState", Name = "建表", RequiresCondition = true, Conditions = [new() { Kind = "script", ScriptMethod = "DatabaseCondition.Ready" }] },
+        new() { Action = "createState", Name = "完成" },
+        new() { Action = "connect", StateId = "建表", TargetStateId = "完成", DelayMilliseconds = 0 }
+    ]);
+    var database = Path.Combine(root, "db", "verify.db");
+    await session.SetVariableAsync("dbPath", System.Text.Json.Nodes.JsonValue.Create(database));
+    await session.StepOnceAsync();
+    Check(File.Exists(database) && session.Snapshot.Runtime.CurrentStates.Values.Contains(session.Snapshot.Machine.States.Single(s => s.Name == "完成").Id), "Real FreeSql table creation completes before the connected state advances");
 }
 Console.WriteLine("All desktop preference/layout checks passed.");
 static void Check(bool result, string message) { if (!result) throw new Exception(message); Console.WriteLine("PASS: " + message); }

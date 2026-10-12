@@ -2,6 +2,8 @@ namespace StateMachine.Execution;
 
 public class DesktopGraphCommand
 {
+    public List<OutputPortModel>? Outputs { get; set; }
+    public string OutputId { get; set; } = "";
     public List<ConditionModel>? Conditions { get; set; }
     public bool RequiresCondition { get; set; }
     public string MatchMode { get; set; } = "all";
@@ -25,12 +27,15 @@ public class DesktopGraphCommand
 
 public sealed partial class MachineSession
 {
-    public static readonly string[] DesktopGraphActions = ["createPlanet", "createState", "deletePlanet", "deleteState", "renamePlanet", "movePlanet", "moveState", "setPlanetAppearance", "collapse", "expand", "connect", "disconnect", "setEdgeDelay", "normalizeRegions"];
+    public static readonly string[] DesktopGraphActions = ["createPlanet", "createState", "configureState", "deletePlanet", "deleteState", "renamePlanet", "movePlanet", "moveState", "setPlanetAppearance", "collapse", "expand", "connect", "disconnect", "setEdgeDelay", "normalizeRegions"];
     public static readonly string[] PlanetAppearances = ["ocean", "rust", "ice", "violet", "sand", "jade", "rock", "lava", "blue", "rose", "forest", "silver", "amber", "pearl", "toxic", "storm", "crimson", "midnight"];
-    public async Task EditDesktopGraphAsync(string path, DesktopGraphCommand command)
+    public Task EditDesktopGraphAsync(string path, DesktopGraphCommand command) => EditDesktopGraphBatchAsync(path, [command]);
+    public async Task EditDesktopGraphBatchAsync(string path, IReadOnlyList<DesktopGraphCommand> commands)
     {
-        if (command.Action == "normalizeRegions" && !MachineRegions.Normalize(Clone(Snapshot.Machine))) return;
-        var structural = command.Action is "deletePlanet" or "deleteState" or "connect" or "disconnect" or "setEdgeDelay";
+        if (commands.Count == 0) return;
+        if (commands.Count > 20 || commands.Any(c => !DesktopGraphActions.Contains(c.Action))) throw new InvalidOperationException("桌面流程编辑指令无效。");
+        if (commands.Count == 1 && commands[0].Action == "normalizeRegions" && !MachineRegions.Normalize(Clone(Snapshot.Machine))) return;
+        var structural = commands.Any(c => c.Action is "deletePlanet" or "deleteState" or "connect" or "disconnect" or "setEdgeDelay" or "configureState");
         var resume = Snapshot.Runtime.Running;
         // Even adding a node must wait for a running cycle before publishing a new graph.
         await StopAsync(); if (_runTask is not null) await _runTask;
@@ -41,6 +46,37 @@ public sealed partial class MachineSession
             {
                 if (_executing) throw new InvalidOperationException("请等待当前执行结束。");
                 var model = Clone(Machine);
+                DiscoverActionMethods();
+                void Bind(StateModel state, DesktopGraphCommand command)
+                {
+                    var outputs = command.Outputs ?? (command.Conditions is { Count: > 0 } ? [new OutputPortModel { Name = command.OutputName, MatchMode = command.MatchMode, Conditions = command.Conditions }] : null);
+                    if (command.RequiresCondition && (outputs is null || !outputs.Any(o => o.Conditions.Count > 0))) throw new InvalidOperationException("此请求需要条件，不能创建无条件状态。");
+                    if (outputs is not null)
+                    {
+                        if (outputs.Count == 0 || outputs.Select(o => o.Name).Distinct().Count() != outputs.Count) throw new InvalidOperationException("输出名称不能为空或重复。");
+                        var next = Clone(outputs);
+                        foreach (var output in next)
+                        {
+                            if (string.IsNullOrWhiteSpace(output.Name) || output.MatchMode is not ("all" or "any" or "always") || (output.MatchMode == "always" && output.Conditions.Count > 0) || (output.MatchMode != "always" && output.Conditions.Count == 0)) throw new InvalidOperationException("输出条件与组合方式不匹配。");
+                            foreach (var condition in output.Conditions)
+                            {
+                                if (condition.Kind != "script" || !_scriptConditions.ContainsKey(condition.ScriptMethod)) throw new InvalidOperationException("条件函数不存在：" + condition.ScriptMethod);
+                                condition.Id = Uid("condition");
+                            }
+                            output.Id = state.Outputs.FirstOrDefault(o => o.Name == output.Name)?.Id ?? Uid("output");
+                        }
+                        if (model.Edges.Any(e => e.FromStateId == state.Id && !next.Any(o => o.Id == e.FromPortId))) throw new InvalidOperationException("修改条件不能删除已连接的输出口，请保留原输出名称。");
+                        state.Outputs = next;
+                    }
+                    if (!string.IsNullOrEmpty(command.AfterEnterMethod))
+                    {
+                        if (GetActionDescriptor(command.AfterEnterMethod) is null) throw new InvalidOperationException("进入动作不存在：" + command.AfterEnterMethod);
+                        state.AfterEnterAction.ActionMethod = command.AfterEnterMethod;
+                        NormalizeActionArguments(state.AfterEnterAction);
+                    }
+                }
+                foreach (var command in commands)
+                {
                 string Id(string kind) => kind + "_" + Guid.NewGuid().ToString("N");
                 string Name(string fallback) => string.IsNullOrWhiteSpace(command.Name) ? fallback : command.Name.Trim().Length <= 48 ? command.Name.Trim() : throw new InvalidOperationException("名称最多 48 字。");
                 T Resolve<T>(IEnumerable<T> items, Func<T,bool> match, string label) { var found=items.Where(match).Take(2).ToArray(); return found.Length==1 ? found[0] : throw new InvalidOperationException(label+"不存在或名称不唯一，请指定准确目标。"); }
@@ -52,18 +88,6 @@ public sealed partial class MachineSession
                 {
                     case "createPlanet": case "createState":
                     {
-                        DiscoverActionMethods();
-                        if (command.RequiresCondition && command.Conditions is not { Count: > 0 })
-                            throw new InvalidOperationException("此请求需要条件，不能创建无条件状态。");
-                        if (command.Conditions is { Count: > 0 })
-                        {
-                            if (command.MatchMode is not ("all" or "any")) throw new InvalidOperationException("条件组合必须为 all 或 any。");
-                            foreach (var condition in command.Conditions)
-                                if (condition.Kind != "script" || !_scriptConditions.ContainsKey(condition.ScriptMethod))
-                                    throw new InvalidOperationException("桌面自定义条件必须绑定已编译的 StateCondition 函数：" + condition.ScriptMethod);
-                        }
-                        if (!string.IsNullOrEmpty(command.AfterEnterMethod) && GetActionDescriptor(command.AfterEnterMethod) is null)
-                            throw new InvalidOperationException("进入动作不存在：" + command.AfterEnterMethod);
                         var region=string.IsNullOrEmpty(command.RegionId) ? model.Regions.FirstOrDefault() : Resolve(model.Regions,r=>r.Id==command.RegionId || r.Name==command.RegionId,"分区");
                         if(region is null) { region=new RegionModel { Id=Id("region"),Name="桌面自动化" }; model.Regions.Add(region); }
                         var isPlanet=command.Action=="createPlanet";
@@ -84,21 +108,13 @@ public sealed partial class MachineSession
                         y=Coordinate(command.Y is {} cy ? cy+(item/3)*240 : null,y,2200);
                         var state=new StateModel { Id=Id("state"),Name=Name(isPlanet?"新星球 "+(model.StateGroups.Count+1):"新状态 "+(model.States.Count+1))+(command.Count>1 && !string.IsNullOrWhiteSpace(command.Name)?" "+(item+1):""),RegionId=region.Id,X=x,Y=y,IsStart=!model.States.Any(s=>s.RegionId==region.Id),
                             Inputs=[new InputPortModel { Id=Id("input"),Name="进入" }], Outputs=[new OutputPortModel { Id=Id("output"),Name="输出",MatchMode="always" }] };
-                        state.AfterEnterAction.ActionMethod = command.AfterEnterMethod;
-                        NormalizeActionArguments(state.AfterEnterAction);
-                        if (command.Conditions is { Count: > 0 })
-                        {
-                            var output = state.Outputs[0];
-                            output.Name = command.OutputName;
-                            output.MatchMode = command.MatchMode;
-                            output.Conditions = System.Text.Json.JsonSerializer.Deserialize<List<ConditionModel>>(System.Text.Json.JsonSerializer.Serialize(command.Conditions))!;
-                            foreach (var condition in output.Conditions) condition.Id = Id("condition");
-                        }
+                        Bind(state, command);
                         model.States.Add(state);
                         if(isPlanet)model.StateGroups.Add(new StateGroupModel { Id=Id("group"),Name=state.Name,Appearance=Appearance(),X=x,Y=y,StateIds=[state.Id],IsCollapsed=true });
                         }
                         break;
                     }
+                    case "configureState": Bind(State(command.StateId), command); break;
                     case "renamePlanet": Group().Name=Name("新星球"); break;
                     case "setPlanetAppearance": Group().Appearance=Appearance(); break;
                     case "expand": Group().IsCollapsed=false; break;
@@ -131,9 +147,12 @@ public sealed partial class MachineSession
                     {
                         StateModel Endpoint(string id) { var g=model.StateGroups.FirstOrDefault(g=>g.Id==id || g.Name==id); return g is null ? State(id) : State(g.StateIds[0]); }
                         var from=Endpoint(command.StateId);var to=Endpoint(command.TargetStateId);
-                        
-                        if(model.Edges.Any(e=>e.FromStateId==from.Id && e.ToStateId==to.Id))throw new InvalidOperationException("航线已存在。");
-                        var output=new OutputPortModel {Id=Id("output"),Name="前往 "+to.Name,MatchMode="always"};from.Outputs.Add(output);
+
+
+                        var output = !string.IsNullOrEmpty(command.OutputId)
+                            ? Resolve(from.Outputs, o => o.Id == command.OutputId || o.Name == command.OutputId, "输出口")
+                            : from.Outputs.Count == 1 ? from.Outputs[0] : throw new InvalidOperationException("存在多个条件分支，请用 outputId 指定输出名称或 ID。");
+                        if(model.Edges.Any(e=>e.FromStateId==from.Id && e.FromPortId==output.Id))throw new InvalidOperationException("该输出口已连接，请使用另一条件分支。");
                         var input=to.Inputs.FirstOrDefault();if(input is null){input=new InputPortModel{Id=Id("input"),Name="进入"};to.Inputs.Add(input);}
                         model.Edges.Add(new EdgeModel { Id=Id("edge"),FromStateId=from.Id,FromPortId=output.Id,ToStateId=to.Id,ToPortId=input.Id,DelayMilliseconds=Math.Clamp(command.DelayMilliseconds??4000,0,86400000) });break;
                     }
@@ -145,6 +164,7 @@ public sealed partial class MachineSession
                     }
                     case "normalizeRegions": break;
                     default: throw new InvalidOperationException("不支持的桌面编辑操作。");
+                }
                 }
                 var regionsChanged=MachineRegions.Normalize(model);
                 var temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";

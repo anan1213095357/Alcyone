@@ -53,6 +53,9 @@ internal sealed class ScriptNuGet(string scriptDirectory, Action<string> progres
     });
     public void AddRemembered(IEnumerable<SyntaxTree> trees,List<ScriptPackage> roots)
     {
+        // Explicit packages already resolve their transitive versions. A remembered
+        // core package must not override the version required by a pinned provider.
+        if (roots.Count > 0) return;
         var names=trees.SelectMany(t=>t.GetRoot().DescendantNodes()).Select(n=>n switch {
             UsingDirectiveSyntax u=>u.Name?.ToString(), QualifiedNameSyntax q=>q.ToString(), MemberAccessExpressionSyntax m=>m.ToString(), _=>null
         }).OfType<string>().Select(n=>n.Replace("global::","")).ToHashSet();

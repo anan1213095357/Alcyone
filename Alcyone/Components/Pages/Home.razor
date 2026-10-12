@@ -968,31 +968,10 @@
                         </div>
 
                         <div class="ai-example-grid">
-
-                            <button class="ai-example"
-                                    @onclick='() => SetAiExample(L["使用当前多点色库里的真实记录，持续等待识别成功，进入执行状态，调用脚本点击识别坐标，再等待目标消失后返回等待。不要编造训练数据。"])'>
-                                <strong>@L["找色执行脚本"]</strong>
-                                <span>@L["找到特征后执行脚本"]</span>
-                            </button>
-
-                            <button class="ai-example"
-                                    @onclick='() => SetAiExample(L["使用当前字典做 OCR，当识别文字包含我指定的内容时切换状态，执行键鼠脚本，然后返回等待；保留现有字典和查找范围。"])'>
-                                <strong>@L["OCR 文字判断"]</strong>
-                                <span>@L["识别文字满足条件后执行"]</span>
-                            </button>
-
-                            <button class="ai-example"
-                                    @onclick='() => SetAiExample(L["使用当前字典查找固定文字“确定”，成功后在识别坐标点击一次；找不到时保持等待，不重复点击同一次出现。"])'>
-                                <strong>@L["查找固定文字"]</strong>
-                                <span>@L["找到指定文字并点击"]</span>
-                            </button>
-
-                            <button class="ai-example"
-                                    @onclick='() => SetAiExample(L["生成一个继承 StateScript 的键鼠操作脚本：点击指定坐标，输入指定字符串，按 ENTER，再等待指定毫秒。参数可在卡片里配置，等待要响应停止。"])'>
-                                <strong>@L["键鼠操作脚本"]</strong>
-                                <span>@L["点击、输入、按键和等待"]</span>
-                            </button>
-
+                            @foreach (var example in AiWorkflowExamples.All)
+                            {
+                                <button class="ai-example" @onclick="() => SetAiExample(L[example.Prompt])"><strong>@L[example.Title]</strong><span>@L[example.Description]</span></button>
+                            }
                         </div>
 
                     </div>
@@ -1116,7 +1095,7 @@
 
                 <div class="ai-composer-box">
 
-                    <textarea class="ai-prompt"
+                    <textarea class="ai-prompt" data-auto-grow rows="2"
                               @bind="_aiInput"
                               @bind:event="oninput"
                               disabled="@_aiBusy"
