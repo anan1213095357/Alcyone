@@ -9,5 +9,5 @@ Desktop/
 
 node_modules/
 
-# .NET publish output (build artifacts)
-output/desktop-fixed/
+# Build / publish output and generated assets
+output/
