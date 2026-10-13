@@ -11,6 +11,7 @@ public partial class ScriptWorkbench
     [Parameter] public EventCallback OnClose { get; set; }
     [Parameter] public EventCallback<ScriptAiContext> OnAi { get; set; }
     [Parameter] public bool StartWithConditionTemplate { get; set; }
+    [Parameter] public bool StartWithActionTemplate { get; set; }
     private ElementReference _editorElement, _cursorElement;
     private IJSObjectReference? _module, _editor;
     private DotNetObjectReference<ScriptWorkbench>? _reference;
@@ -194,7 +195,7 @@ public partial class ScriptWorkbench
             _editorLanguage = Text.Language;
             _ready = true;
             if (_files.Length > 0) await OpenFileAsync(_files[0]);
-            if (StartWithConditionTemplate) RequestNewScript();
+            if (StartWithConditionTemplate || StartWithActionTemplate) RequestNewScript();
         }
         catch (Exception ex) { Report("编辑器加载失败：" + ex.Message); }
         if (!_disposed) StateHasChanged();

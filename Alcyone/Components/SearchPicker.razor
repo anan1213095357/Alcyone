@@ -7,11 +7,19 @@
         <div class="picker-dismiss" data-overlay-dismiss @onclick="Close"></div>
         <div class="picker-menu" role="dialog" aria-label="@L[Placeholder]">
             <div class="search-line"><span>⌕</span><input @ref="_input" value="@_query" @oninput="Search" @onkeydown="KeyDown" placeholder="@L[SearchHint]" aria-label="@L["搜索选项"]" autocomplete="off" /><button type="button" @onclick="Close" aria-label="@L["关闭"]">×</button></div>
-            <div class="breadcrumb"><div class="category-location"><small>@L["当前分类"]</small><strong>@(_path.Length == 0 ? L["全部 API"] : string.Join(" / ", _path.Split('/').Select(p => L[p])))</strong></div><div class="category-navigation"><button type="button" @onclick='() => Navigate("")'>@L["全部"]</button>@if (_path.Length > 0) { <button type="button" @onclick="Back">@L["返回上级"]</button> }</div></div>
+            <nav class="breadcrumb category-trail" aria-label="@L["分类路径"]">
+                <button type="button" class="category-block @(_path.Length == 0 ? "current" : "")" @onclick='() => Navigate("")'>@L["全部 API"]</button>
+                @{var segments = _path.Split('/', StringSplitOptions.RemoveEmptyEntries);}
+                @for(var level=0;level<segments.Length;level++)
+                {
+                    var destination=string.Join("/",segments.Take(level+1));var label=segments[level];
+                    <span class="trail-divider" aria-hidden="true">›</span><button type="button" class="category-block @(level == segments.Length-1 ? "current" : "")" @onclick="() => Navigate(destination)">@L[label]</button>
+                }
+            </nav>
             <div class="picker-results">
                 @if (string.IsNullOrWhiteSpace(_query))
                 {
-                    @foreach (var category in Categories) { <button type="button" class="category" @onclick="() => Navigate(category.Path)"><span>▤ @L[category.Name]</span><span>›</span></button> }
+                    <div class="category-tiles">@foreach (var category in Categories) { <button type="button" class="category" @onclick="() => Navigate(category.Path)"><span>@L[category.Name]</span><span>›</span></button> }</div>
                 }
                 @{ var choices = Choices.ToList(); }
                 @for (var i = 0; i < choices.Count; i++)
@@ -44,7 +52,7 @@
     private IEnumerable<(string Path, string Name)> Categories => Options.Select(o => o.Group).Where(g => g.Length > 0 && (_path.Length == 0 || g.StartsWith(_path + "/", StringComparison.Ordinal))).Select(g => { var rest = _path.Length == 0 ? g : g[(_path.Length + 1)..]; var name = rest.Split('/')[0]; return (Path: _path.Length == 0 ? name : _path + "/" + name, Name: name); }).Distinct();
     private void Open() { _open = true; _focus = true; _query = ""; _path = Selected?.Group ?? ""; _index = 0; }
     private void Close() => _open = false;
-    private void Navigate(string path) { _path = path; _index = 0; }
+    private void Navigate(string path) { _path = path; _query = ""; _index = 0; }
     private void Back() { var slash = _path.LastIndexOf('/'); Navigate(slash < 0 ? "" : _path[..slash]); }
     private void Search(ChangeEventArgs args) { _query = args.Value?.ToString() ?? ""; _index = 0; }
     private async Task Choose(string value) { _open = false; await ValueChanged.InvokeAsync(value); }

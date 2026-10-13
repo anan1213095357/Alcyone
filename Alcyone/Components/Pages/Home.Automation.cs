@@ -73,6 +73,7 @@ public partial class Home
         if (target == "script:new")
         {
             _startWithConditionTemplate = true;
+            _startWithActionTemplate = false;
             _scriptEditorOpen = _scriptHost is not null;
             return;
         }

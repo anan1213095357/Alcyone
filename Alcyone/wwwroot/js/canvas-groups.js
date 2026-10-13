@@ -42,6 +42,7 @@
     function rectangle(node) {
         const r = node.getBoundingClientRect();
         return { left:r.left, top:r.top, right:r.right, bottom:r.bottom,
+            id:node.dataset.groupId ? "group:"+node.dataset.groupId : node.dataset.stateId ? "state:"+node.dataset.stateId : null,
             focus:!!node.closest('.desktop-ai-console'),
             avoid:node.matches('.state-card,.alcyone-orb,.desktop-ai-console,.ai-response,.ai-suggestions') };
     }
@@ -49,7 +50,15 @@
         if (!api?.desktopView || !window.external?.sendMessage || !gesture || performance.now()-lastAvoidance < 32) return;
         lastAvoidance = performance.now();
         const nodes = gesture.type === 'cards' ? gesture.items.map(i => i.card) : gesture.type === 'orb' ? [gesture.orb] : [];
-        if(nodes.length) window.external.sendMessage('alcyone:desktop:avoid:' + JSON.stringify({ratio:window.devicePixelRatio||1,rectangles:[...nodes.map(rectangle),...routeObstacles()]}));
+        if(nodes.length) {
+            const rectangles=nodes.map(rectangle), first=rectangles[0], time=performance.now(), previous=gesture.avoidanceSample;
+            const sample={x:first.left,y:first.top,time,vx:0,vy:0};
+            if(previous){const elapsed=Math.max(8,time-previous.time);sample.vx=previous.vx*.55+(sample.x-previous.x)/elapsed*.45;sample.vy=previous.vy*.55+(sample.y-previous.y)/elapsed*.45;}
+            gesture.avoidanceSample=sample;
+            const leadX=Math.max(-70,Math.min(70,sample.vx*90)),leadY=Math.max(-70,Math.min(70,sample.vy*90));
+            for(const rect of rectangles){rect.left+=Math.min(0,leadX);rect.right+=Math.max(0,leadX);rect.top+=Math.min(0,leadY);rect.bottom+=Math.max(0,leadY);}
+            window.external.sendMessage('alcyone:desktop:avoid:'+JSON.stringify({ratio:window.devicePixelRatio||1,rectangles:[...rectangles,...routeObstacles()]}));
+        }
     }
     function reportHitRegions() {
         if (gesture || hitFrame || !api?.desktopView || !window.external?.sendMessage) return;

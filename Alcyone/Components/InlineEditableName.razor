@@ -1,0 +1,23 @@
+@using Microsoft.AspNetCore.Components.Web
+<div class="editable-name">
+    @if(_editing)
+    {
+        <input @ref="_input" value="@_draft" @oninput="e => _draft=e.Value?.ToString()??string.Empty" @onblur="Commit" @onkeydown="KeyDown" @onclick:stopPropagation="true" aria-label="@Label" />
+    }
+    else
+    {
+        <span title="@Text">@Text</span><button type="button" title="@Label" aria-label="@Label" @onclick:stopPropagation="true" @onclick="Begin"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 13-1 4 4-1L16 7l-3-3zM11 6l3 3" /></svg></button>
+    }
+</div>
+@code {
+    [Parameter] public string Text {get;set;}="";
+    [Parameter] public string Label {get;set;}="编辑名称";
+    [Parameter] public EventCallback<string> TextChanged {get;set;}
+    private bool _editing,_focus;
+    private string _draft="";
+    private ElementReference _input;
+    private void Begin(){_draft=Text;_editing=true;_focus=true;}
+    private async Task Commit(){if(!_editing)return;_editing=false;await TextChanged.InvokeAsync(_draft);}
+    private async Task KeyDown(KeyboardEventArgs e){if(e.Key=="Enter")await Commit();else if(e.Key=="Escape")_editing=false;}
+    protected override async Task OnAfterRenderAsync(bool firstRender){if(_focus && _editing){_focus=false;await _input.FocusAsync();}}
+}

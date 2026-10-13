@@ -17,7 +17,17 @@ internal sealed class DesktopIconAvoidance : IDisposable
     private long _retryAfter, _iconCacheAt;
     private nint _iconCacheWindow;
     private List<(int Index, NativeRect Rect)>? _iconCache;
-    private bool _ipcTimedOut;
+    private bool _ipcTimedOut, _highResolution;
+    private long _lastFrame;
+    private nint _motionWindow;
+    private int _motionCount;
+    private readonly Dictionary<int, IconFlight> _motions = new();
+    private sealed record IconFlight(SmoothIconMotion Motion, NativeRect InitialRect, int InitialX, int InitialY)
+    {
+        public NativeRect Rectangle(double x,double y) => new() { Left=InitialRect.Left+(int)Math.Round(x-InitialX),Right=InitialRect.Right+(int)Math.Round(x-InitialX),Top=InitialRect.Top+(int)Math.Round(y-InitialY),Bottom=InitialRect.Bottom+(int)Math.Round(y-InitialY) };
+    }
+    [DllImport("winmm.dll")] private static extern uint timeBeginPeriod(uint period);
+    [DllImport("winmm.dll")] private static extern uint timeEndPeriod(uint period);
     public DesktopIconAvoidance() => _timer = new Timer(_ => Run(), null, Timeout.Infinite, Timeout.Infinite);
     public void Update(nint window, string json, bool moving = false)
     {
@@ -45,9 +55,14 @@ internal sealed class DesktopIconAvoidance : IDisposable
         if (!Monitor.TryEnter(_workGate)) return;
         try
         {
-            if (_disposed || Interlocked.Exchange(ref _dirty, 0) == 0) return;
+            if (_disposed) return;
+            var needsPlan=Interlocked.Exchange(ref _dirty,0)!=0;
             var dpi = SetThreadDpiAwarenessContext(-4);
-            try { _ipcTimedOut = false; if (Environment.TickCount64 >= _retryAfter) Avoid(); else Interlocked.Exchange(ref _dirty, 1); } catch (Exception ex) when (ex is ArgumentException or OverflowException or System.ComponentModel.Win32Exception) { }
+            try {
+                _ipcTimedOut=false;
+                if(Environment.TickCount64>=_retryAfter){if(needsPlan)Avoid();if(!_ipcTimedOut)AnimateIcons();}
+                else Interlocked.Exchange(ref _dirty,1);
+            } catch (Exception ex) when (ex is ArgumentException or OverflowException or System.ComponentModel.Win32Exception) { }
             finally { if (dpi != 0) SetThreadDpiAwarenessContext(dpi); }
         }
         finally
@@ -58,8 +73,11 @@ internal sealed class DesktopIconAvoidance : IDisposable
                 Interlocked.Exchange(ref _iconCacheAt, 0);
                 Interlocked.Exchange(ref _dirty, 1);
             }
+            if(_ipcTimedOut)_motions.Clear();
+            if(_motions.Count==0 && _highResolution){timeEndPeriod(1);_highResolution=false;_lastFrame=0;}
+            var next=_motions.Count>0 || Volatile.Read(ref _dirty)!=0;
             Monitor.Exit(_workGate);
-            lock (_gate) if (!_disposed && Volatile.Read(ref _dirty) != 0) _timer.Change((int)Math.Clamp(_retryAfter - Environment.TickCount64, 16, 2000), Timeout.Infinite);
+            lock(_gate)if(!_disposed && next)_timer.Change((int)Math.Clamp(_retryAfter-Environment.TickCount64,8,2000),Timeout.Infinite);
         }
     }
     private void Avoid()
@@ -71,13 +89,14 @@ internal sealed class DesktopIconAvoidance : IDisposable
             {
                 if (!GetWindowRect(window, out var bounds)) continue;
                 foreach (var regions in new[] { value.Fixed, value.Moving }.OfType<DesktopPointerRouter.HitRegions>())
-                    foreach (var r in regions.Rectangles.Where(r => r.Avoid && !(ReferenceEquals(regions,value.Fixed) && r.Route && value.Moving?.Rectangles.Any(m=>m.Route)==true)))
+                    foreach (var r in regions.Rectangles.Where(r => r.Avoid && !(ReferenceEquals(regions,value.Fixed) && ((r.Route && value.Moving?.Rectangles.Any(m=>m.Route)==true) || (r.Id is not null && value.Moving?.Rectangles.Any(m=>m.Id==r.Id)==true)))))
                         if (double.IsFinite(r.Left) && double.IsFinite(r.Top) && double.IsFinite(r.Right) && double.IsFinite(r.Bottom))
                             obstacles.Add(new NativeRect { Left = bounds.Left + (int)(r.Left * regions.Ratio) - 12, Top = bounds.Top + (int)(r.Top * regions.Ratio) - 12, Right = bounds.Left + (int)(r.Right * regions.Ratio) + 12, Bottom = bounds.Top + (int)(r.Bottom * regions.Ratio) + 12 });
             }
         if (obstacles.Count == 0) return;
         var list = FindIconList();
         if (list == 0 || !Send(list, 0x1004, 0, 0, out var count) || count == 0 || count > 1000) return;
+        if(_motionWindow!=list || _motionCount!=(int)count){_motions.Clear();_motionWindow=list;_motionCount=(int)count;}
         GetWindowThreadProcessId(list, out var pid);
         _ipcTimedOut = false;
         var process = OpenProcess(0x0038, false, pid); // VM_OPERATION | VM_READ | VM_WRITE
@@ -105,9 +124,16 @@ internal sealed class DesktopIconAvoidance : IDisposable
             var workAreas = new List<NativeRect>();
             var moves = new List<(int Index, int FromX, int FromY, int ToX, int ToY)>();
             EnumDisplayMonitors(0, 0, (nint monitor, nint dc, ref NativeRect rect, nint data) => { var info = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() }; if (GetMonitorInfoW(monitor, ref info)) workAreas.Add(info.Work); return true; }, 0);
+            var reserved=_motions.Where(p=>!obstacles.Any(o=>Intersects(p.Value.Rectangle(p.Value.Motion.TargetX,p.Value.Motion.TargetY),o)))
+                .ToDictionary(p=>p.Key,p=>p.Value.Rectangle(p.Value.Motion.TargetX,p.Value.Motion.TargetY));
             for (var i = 0; i < icons.Count; i++)
             {
                 var icon = icons[i];
+                if(_motions.TryGetValue(icon.Index,out var active))
+                {
+                    var destination=active.Rectangle(active.Motion.TargetX,active.Motion.TargetY);
+                    if(!obstacles.Any(o=>Intersects(destination,o))){icons[i]=(icon.Index,destination);continue;}
+                }
                 if (!obstacles.Any(o => Intersects(icon.Rect, o))) continue;
                 var width = Math.Max(32, icon.Rect.Right - icon.Rect.Left); var height = Math.Max(32, icon.Rect.Bottom - icon.Rect.Top);
                 var area = workAreas.FirstOrDefault(a => icon.Rect.Left >= a.Left && icon.Rect.Left < a.Right && icon.Rect.Top >= a.Top && icon.Rect.Top < a.Bottom);
@@ -118,51 +144,35 @@ internal sealed class DesktopIconAvoidance : IDisposable
                 foreach (var point in candidates.OrderBy(p => Math.Pow(p.X - icon.Rect.Left, 2) + Math.Pow(p.Y - icon.Rect.Top, 2)))
                 {
                     var destination = new NativeRect { Left = point.X, Top = point.Y, Right = point.X + width, Bottom = point.Y + height };
-                    if (obstacles.Any(o => Intersects(destination, o)) || icons.Where((_, index) => index != i).Any(other => Intersects(destination, other.Rect))) continue;
+                    if (obstacles.Any(o => Intersects(destination, o)) || icons.Where((_, index) => index != i).Any(other => Intersects(destination, reserved.GetValueOrDefault(other.Index,other.Rect)))) continue;
                     if (!Send(list, 0x1010, (nuint)icon.Index, buffer, out var positioned) || positioned == 0) break;
                     var bytes = new byte[8]; if (!ReadProcessMemory(process, buffer, bytes, 8, out _)) break;
                     var x = BitConverter.ToInt32(bytes, 0) + destination.Left - icon.Rect.Left;
                     var y = BitConverter.ToInt32(bytes, 4) + destination.Top - icon.Rect.Top;
                     moves.Add((icon.Index, BitConverter.ToInt32(bytes,0), BitConverter.ToInt32(bytes,4), x, y));
-                    icons[i] = (icon.Index, destination);
+                    icons[i] = (icon.Index, destination);reserved[icon.Index]=destination;
                     break;
                 }
-                if (clock.ElapsedMilliseconds > 100) { Interlocked.Exchange(ref _dirty, 1); break; }
+                if (clock.ElapsedMilliseconds > 6) { Interlocked.Exchange(ref _dirty, 1); break; }
             }
             if (moves.Count > 0 && !_ipcTimedOut)
             {
                 var style = GetWindowLongPtrW(list, -16).ToInt64();
                 if ((style & 0x100) != 0) { _autoArrangeWindow = list; SetWindowLongPtrW(list, -16, (nint)(style & ~0x100)); }
-                // Refresh destinations during dragging rather than finishing a stale flight.
-                var animation = System.Diagnostics.Stopwatch.StartNew();
-                var bytes = new byte[8];
-                while (!_disposed && !_ipcTimedOut)
+                foreach(var move in moves)
                 {
-                    var frame = animation.ElapsedMilliseconds;
-                    var t = Math.Min(1, frame / 160d); var eased = t;
-                    foreach (var move in moves)
+                    if(move.FromX is <short.MinValue or >short.MaxValue || move.FromY is <short.MinValue or >short.MaxValue || move.ToX is <short.MinValue or >short.MaxValue || move.ToY is <short.MinValue or >short.MaxValue)
                     {
-                        var x = (int)Math.Round(move.FromX + (move.ToX - move.FromX) * eased);
-                        var y = (int)Math.Round(move.FromY + (move.ToY - move.FromY) * eased);
-                        // Standard desktop coordinates fit LVM_SETITEMPOSITION; no cross-process
-                        // pointer or allocation is needed for each animation frame.
-                        bool moved;
-                        if (x is >= short.MinValue and <= short.MaxValue && y is >= short.MinValue and <= short.MaxValue)
-                            moved = Send(list, 0x100f, (nuint)move.Index, (nint)((y << 16) | (x & 0xffff)), out _);
-                        else
-                        {
-                            BitConverter.GetBytes(x).CopyTo(bytes, 0); BitConverter.GetBytes(y).CopyTo(bytes, 4);
-                            moved = WriteProcessMemory(process, buffer, bytes, 8, out _) && Send(list, 0x1031, (nuint)move.Index, buffer, out _);
-                        }
-                        if (!moved) break;
-                        var rect = originalRects[move.Index];
-                        var dx = x - move.FromX; var dy = y - move.FromY;
-                        var index = _iconCache!.FindIndex(icon => icon.Index == move.Index);
-                        if (index >= 0) _iconCache[index] = (move.Index, new NativeRect { Left = rect.Left + dx, Right = rect.Right + dx, Top = rect.Top + dy, Bottom = rect.Bottom + dy });
+                        var position=new byte[8];BitConverter.GetBytes(move.ToX).CopyTo(position,0);BitConverter.GetBytes(move.ToY).CopyTo(position,4);
+                        if(WriteProcessMemory(process,buffer,position,8,out _))Send(list,0x1031,(nuint)move.Index,buffer,out _);
+                        _motions.Remove(move.Index);Interlocked.Exchange(ref _iconCacheAt,0);continue;
                     }
-                    if (t >= 1 || (frame >= 48 && Volatile.Read(ref _dirty) != 0)) break;
-                    Thread.Sleep((int)Math.Max(1, 16 - (animation.ElapsedMilliseconds - frame)));
+                    if(!_motions.TryGetValue(move.Index,out var flight))
+                        _motions[move.Index]=flight=new IconFlight(new SmoothIconMotion(move.FromX,move.FromY),originalRects[move.Index],move.FromX,move.FromY);
+                    flight.Motion.Retarget(move.ToX,move.ToY);
                 }
+                if(!_highResolution){_highResolution=timeBeginPeriod(1)==0;_lastFrame=0;}
+
             }
         }
         finally
@@ -177,6 +187,27 @@ internal sealed class DesktopIconAvoidance : IDisposable
             }
             else VirtualFreeEx(process, buffer, 0, 0x8000);
             CloseHandle(process);
+        }
+    }
+    private void AnimateIcons()
+    {
+        if(_motions.Count==0)return;
+        if(!IsWindow(_motionWindow)){_motions.Clear();return;}
+        var now=System.Diagnostics.Stopwatch.GetTimestamp();
+        var dt=_lastFrame==0?1d/60:(now-_lastFrame)/(double)System.Diagnostics.Stopwatch.Frequency;_lastFrame=now;
+        foreach(var (index,flight) in _motions.ToArray())
+        {
+            var oldX=(int)Math.Round(flight.Motion.X);var oldY=(int)Math.Round(flight.Motion.Y);
+            var done=flight.Motion.Step(dt);var x=(int)Math.Round(flight.Motion.X);var y=(int)Math.Round(flight.Motion.Y);
+            if(x!=oldX || y!=oldY || done)
+            {
+                if(x is <short.MinValue or >short.MaxValue || y is <short.MinValue or >short.MaxValue)
+                {Interlocked.Exchange(ref _dirty,1);_motions.Remove(index);continue;}
+                if(!Send(_motionWindow,0x100f,(nuint)index,(nint)((y<<16)|(x&0xffff)),out _))break;
+                var cached=_iconCache?.FindIndex(icon=>icon.Index==index)??-1;
+                if(cached>=0)_iconCache![cached]=(index,flight.Rectangle(x,y));
+            }
+            if(done)_motions.Remove(index);
         }
     }
     private static bool Intersects(NativeRect a, NativeRect b) => a.Left < b.Right && a.Right > b.Left && a.Top < b.Bottom && a.Bottom > b.Top;
@@ -204,6 +235,7 @@ internal sealed class DesktopIconAvoidance : IDisposable
         lock (_gate) { _disposed = true; _surfaces.Clear(); _timer.Dispose(); }
         lock (_workGate)
         {
+            _motions.Clear();if(_highResolution){timeEndPeriod(1);_highResolution=false;}
             if (_autoArrangeWindow != 0 && IsWindow(_autoArrangeWindow)) SetWindowLongPtrW(_autoArrangeWindow, -16, (nint)(GetWindowLongPtrW(_autoArrangeWindow, -16).ToInt64() | 0x100));
         }
     }

@@ -9,7 +9,7 @@ internal sealed class DesktopPointerRouter : IDisposable
 {
     private delegate nint MouseProcedure(int code, nuint message, nint data);
     [StructLayout(LayoutKind.Sequential)] private struct MouseData { public NativePoint Point; public uint Data, Flags, Time; public nuint Extra; }
-    public sealed record HitRegion(double Left, double Top, double Right, double Bottom, bool Focus = false, bool Avoid = false, bool Hit = true, bool Route = false);
+    public sealed record HitRegion(double Left, double Top, double Right, double Bottom, bool Focus = false, bool Avoid = false, bool Hit = true, bool Route = false, string? Id = null);
     public sealed record HitRegions(double Ratio, HitRegion[] Rectangles);
     private readonly Dictionary<nint, HitRegions> _windows = new();
     private readonly MouseProcedure _procedure;

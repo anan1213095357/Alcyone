@@ -502,6 +502,11 @@ public partial class Home
 
     private void ChangeStateActionMethod(string stateId, string lifecycle, string value)
     {
+        if(value == "script:new-action")
+        {
+            _startWithConditionTemplate=false;_startWithActionTemplate=true;
+            _scriptEditorOpen=_scriptHost is not null;return;
+        }
         var action = GetStateAction(stateId, lifecycle);
         if (action is null) return;
 

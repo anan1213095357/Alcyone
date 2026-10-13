@@ -4,9 +4,10 @@ public partial class Home
 {
     private bool _scriptEditorOpen;
     private bool _startWithConditionTemplate;
+    private bool _startWithActionTemplate;
     private ScriptWorkbench? _scriptWorkbench;
     private ScriptAiContext? _scriptAiContext;
-    private Task OpenScriptEditorAsync() { _startWithConditionTemplate = false; _scriptEditorOpen = _scriptHost is not null; return Task.CompletedTask; }
+    private Task OpenScriptEditorAsync() { _startWithConditionTemplate = false; _startWithActionTemplate = false; _scriptEditorOpen = _scriptHost is not null; return Task.CompletedTask; }
     private void OpenScriptAi(ScriptAiContext context)
     {
         if (_scriptAiContext?.File != context.File || _scriptAiContext?.Kind != context.Kind)

@@ -637,20 +637,23 @@
                                 <div class="group-title">@L["切换出口"]</div>
                                 <button class="btn small" @onclick="() => AddOutput(state.Id)">@L["+ 插头"]</button>
                             </summary><div class="property-body">
-                            <div class="hint">@L["从上往下就是切换优先级。"]</div>
                             <div style="margin-top:8px">
                                 @for (var outputIndex = 0; outputIndex < state.Outputs.Count; outputIndex++)
                                 {
                                     var output = state.Outputs[outputIndex];
                                     var connected = GetEdgeFromPort(state.Id, output.Id) is not null;
-                                    <details class="transition-editor property-subfold" @key="output.Id"><summary class="property-subsummary"><span>@output.Name</span><small>@(connected ? L["已连接"] : L["未连接"])</small></summary>
-                                        <div class="transition-head">
-                                            <input class="input" value="@output.Name" @oninput="e => RenameOutput(state.Id, output.Id, e.Value?.ToString() ?? string.Empty)" />
-                                            <button class="mini-btn" @onclick="() => MoveOutput(state.Id, output.Id, -1)">↑</button>
-                                            <button class="mini-btn" @onclick="() => MoveOutput(state.Id, output.Id, 1)">↓</button>
-                                            <button class="remove-btn" @onclick="() => RemoveOutput(state.Id, output.Id)">×</button>
-                                        </div>
-                                        <div class="output-meta">@L.Format("优先级：{0}", outputIndex + 1) · @(connected ? L["已连接"] : L["未连接"])</div>
+                                    <details class="transition-editor property-subfold" @key="output.Id">
+                                        <summary class="property-subsummary output-drawer-heading">
+                                            <InlineEditableName @key="output.Id" Text="@output.Name" TextChanged="value => RenameOutput(state.Id, output.Id, value)" Label="@L["编辑出口名称"]" />
+                                            <span class="output-connection @(connected ? "connected" : "disconnected")" title="@(connected ? L["已连接"] : L["未连接"])" aria-label="@(connected ? L["已连接"] : L["未连接"])">
+                                                <svg viewBox="0 0 20 20" aria-hidden="true">@if(connected){<path d="m8 12 4-4M7 10 5 12a3 3 0 0 0 4 4l2-2M9 6l2-2a3 3 0 0 1 4 4l-2 2" />}else{<path d="m6 11-2 2a3 3 0 0 0 4 4l2-2M10 5l2-2a3 3 0 0 1 4 4l-2 2M5 5l2 2M13 13l2 2" />}</svg>
+                                            </span>
+                                            <span class="output-drawer-actions">
+                                                <button type="button" title="@L["上移"]" disabled="@(outputIndex == 0)" @onclick:stopPropagation="true" @onclick="() => MoveOutput(state.Id, output.Id, -1)">↑</button>
+                                                <button type="button" title="@L["下移"]" disabled="@(outputIndex == state.Outputs.Count - 1)" @onclick:stopPropagation="true" @onclick="() => MoveOutput(state.Id, output.Id, 1)">↓</button>
+                                                <button type="button" class="output-delete" title="@L["删除出口"]" @onclick:stopPropagation="true" @onclick="() => RemoveOutput(state.Id, output.Id)">×</button>
+                                            </span>
+                                        </summary>
                                         <div class="transition-grid">
                                             <label class="output-field-label">@L["条件组合"]</label>
                                             <select class="select" value="@output.MatchMode" @onchange='e => ChangeOutputMatchMode(state.Id, output.Id, e.Value?.ToString() ?? "all")'>
@@ -662,20 +665,16 @@
 
                                         @if (output.MatchMode != "always")
                                         {
-                                            <div class="condition-list-header"><span>@L["判断条件"] <small>@output.Conditions.Count</small></span><button type="button" class="add-condition-button" @onclick="() => AddCondition(state.Id, output.Id)"><span aria-hidden="true">＋</span>@L["添加条件"]</button></div>
+                                            <div class="condition-list-header"><div class="condition-list-title"><span>@L["判断条件"]</span><span class="condition-count">@output.Conditions.Count</span></div><button type="button" class="add-condition-button" @onclick="() => AddCondition(state.Id, output.Id)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>@L["添加条件"]</button></div>
                                             @for (var conditionIndex = 0; conditionIndex < output.Conditions.Count; conditionIndex++)
                                             {
                                                 var condition = output.Conditions[conditionIndex];
-                                                <div class="condition-editor condition-kind-@condition.Kind" data-check="@condition.SystemCheck" style="@ConditionAccent(conditionIndex)" @key="condition.Id">
-                                                    <div class="condition-heading"><span class="condition-index">@L.Format("条件 {0}", conditionIndex + 1)</span><button class="condition-remove" title="@L["删除条件"]" @onclick="() => RemoveCondition(state.Id, output.Id, condition.Id)">×</button></div>
+                                                <details class="condition-editor condition-fold condition-kind-@condition.Kind" open data-check="@condition.SystemCheck" style="@ConditionAccent(conditionIndex)" @key="condition.Id">
+                                                    <summary class="condition-heading"><span class="condition-index">@L.Format("条件 {0}", conditionIndex + 1)</span><button type="button" class="condition-remove" title="@L["删除条件"]" aria-label="@L["删除条件"]" @onclick:stopPropagation="true" @onclick="() => RemoveCondition(state.Id, output.Id, condition.Id)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m5 5 6 6m0-6-6 6" /></svg></button></summary><div class="condition-fold-body">
                                                     <div class="recognition-condition-row">
                                                         <SearchPicker Clearable="true" Options="ConditionOptions" Value="@ConditionTarget(condition)" ValueChanged="value => ChangeConditionTarget(condition, value)" Placeholder="选择判断 API" />
                                                     </div>
-                                                    @if (string.IsNullOrEmpty(condition.Kind))
-                                                    {
-                                                        <div class="hint">@L["请选择判断 API，再配置条件。"]</div>
-                                                    }
-                                                    else if (condition.Kind == "script")
+                                                    @if (condition.Kind == "script")
                                                     {
                                                         <div class="recognition-filter-row">
                                                             <label>@L["函数返回"]</label>
@@ -767,7 +766,7 @@
                                                         <div class="hint" style="white-space:pre-wrap">@RecognitionConditionResult(condition)</div>
                                                     }
 
-                                                    else
+                                                    else if (condition.Kind == "variable")
                                                     {
                                                     <div class="recognition-filter-row">
                                                         <label>@L["比较方式"]</label>
@@ -815,7 +814,7 @@
                                                         }
                                                     </div>
                                                     }
-                                                </div>
+                                                </div></details>
                                             }
                                             
                                         }
@@ -2039,7 +2038,7 @@
 
 @if (_scriptEditorOpen && _scriptHost is not null)
 {
-    <ScriptWorkbench @ref="_scriptWorkbench" Host="_scriptHost" StartWithConditionTemplate="_startWithConditionTemplate" OnClose="() => _scriptEditorOpen = false" OnAi="OpenScriptAi" />
+    <ScriptWorkbench @ref="_scriptWorkbench" Host="_scriptHost" StartWithConditionTemplate="_startWithConditionTemplate" StartWithActionTemplate="_startWithActionTemplate" OnClose="() => _scriptEditorOpen = false" OnAi="OpenScriptAi" />
 }
 
 
