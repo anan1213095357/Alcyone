@@ -15,6 +15,10 @@
 @rendermode InteractiveServer
 
 <div id="app" class="@(_desktopMode ? "desktop-mode" : null)">
+            @if (!IsWallpaperView && _interfaceMode && CurrentInterface is { } screen)
+            {
+                <InterfaceDesigner @key="screen.Id" Screen="screen" Actions="InterfaceActions" Variables="Machine.Variables" Values="Runtime.Variables" ValueChanged="SetInterfaceValueAsync" Changed="SaveConfigAsync" AiRequested="OpenInterfaceAi" ScriptRequested="OpenInterfaceScript" Clicked="InvokeInterfaceControlAsync" Closed="() => _interfaceMode=false" />
+            }
     @if (!IsWallpaperView)
     {
     <div class="topbar">
@@ -122,11 +126,19 @@
             <InputFile id="importFile" OnChange="ImportConfigAsync" accept=".json,application/json" style="display:none" />
         </div>
             </div>
-            <div class="section">
-                <div class="section-head">
+            <details class="section left-fold interface-management" data-interface-config="@_configKey" open>
+                <summary class="section-head"><div class="section-title">@L["界面管理"]</div><button class="btn small" @onclick="AddInterfaceAsync" @onclick:stopPropagation @onclick:preventDefault>＋ @L["新建"]</button></summary>
+                <div class="interface-library-hint">@L["拖到画布显示，点击铅笔设计"]</div>
+                @foreach (var interfaceScreen in Machine.Screens)
+                {
+                    <div class="interface-page-row" draggable="true" data-interface-source="@interfaceScreen.Id"><span class="interface-list-icon">▣</span><span class="interface-page-name">@interfaceScreen.Name</span><span class="interface-placement-dot @(interfaceScreen.IsPlaced ? "placed" : "")" title="@L[interfaceScreen.IsPlaced ? "已放置" : "未放置"]"></span><button class="interface-edit" title="@L["设计界面"]" @onclick="() => SelectInterface(interfaceScreen.Id)">✎</button><button class="remove-btn" title="@L["删除界面"]" @onclick="() => DeleteInterfaceAsync(interfaceScreen.Id)">×</button></div>
+                }
+            </details>
+            <details class="section left-fold">
+                <summary class="section-head">
                     <div class="section-title">@L["并行状态域"]</div>
                     <button class="btn small" @onclick="AddRegion">@L["+ 状态域"]</button>
-                </div>
+                </summary>
                 <div id="regionList">
                     @foreach (var region in Machine.Regions)
                     {
@@ -145,13 +157,13 @@
                     }
                 </div>
                 <div class="hint">@L["每个状态域独立拥有自己的 Current State。"]<br />@L["多个状态域可以同时运行。"]</div>
-            </div>
+            </details>
 
-            <div class="section">
-                <div class="section-head">
+            <details class="section left-fold">
+                <summary class="section-head">
                     <div class="section-title">@L["全局变量"]</div>
                     <button class="btn small" @onclick="AddVariable">@L["+ 变量"]</button>
-                </div>
+                </summary>
                 <div id="variableList">
                     @foreach (var variable in Machine.Variables)
                     {
@@ -178,12 +190,12 @@
                         </div>
                     }
                 </div>
-            </div>
-            <div class="section">
-                <div class="section-head">
+            </details>
+            <details class="section left-fold">
+                <summary class="section-head">
                     <div class="section-title">@L["识别库"] <span class="hint">@Machine.Recognitions.Count(i => i.ParentId is null)</span></div>
                     <button class="btn small" @onclick="() => OpenRecognitionManager()">@L["管理 / 导入"]</button>
-                </div>
+                </summary>
                 @foreach (var item in Machine.Recognitions.Where(i => i.ParentId is null))
                 {
                     <button class="recognition-summary" @key="item.Id" @onclick="() => OpenRecognitionManager(item.Id)">
@@ -194,12 +206,13 @@
                 {
                     <div class="hint">@L["导入字典或多点颜色，在出口条件中选择识别项目。"]</div>
                 }
-            </div>
+            </details>
 
         </aside>
 
         }
         <main id="workspace" class="workspace">
+            <div style="display:contents">
             @if (!IsWallpaperView)
             {
                 <nav class="canvas-workbench-bar" aria-label="@L["画布开发工具"]"><div class="workbench-context"><i></i><span>@L["状态画布"]</span></div>
@@ -215,6 +228,12 @@
             <div id="worldScale">
                 <div id="world">
                     <div id="alcyoneGroupLayer"></div>
+                    <div id="interfaceLayer">
+                        @foreach (var placedInterface in Machine.Screens.Where(s => s.IsPlaced))
+                        {
+                            <InterfaceSurface @key="placedInterface.Id" Screen="placedInterface" ConfigKey="@_configKey" Desktop="IsWallpaperView" Variables="Machine.Variables" Values="Runtime.Variables" ValueChanged="SetInterfaceValueAsync" Edit="() => SelectInterface(placedInterface.Id)" Remove="() => RemovePlacedInterfaceAsync(placedInterface.Id)" Clicked="control => InvokePlacedInterfaceAsync(placedInterface.Id, control)" />
+                        }
+                    </div>
                     <svg id="edgeSvg">
                         <g id="edgeLayer"></g>
                         <path id="tempEdge"></path>
@@ -367,6 +386,7 @@
                         }
                     </div>
                 </div>
+            </div>
             </div>
         </main>
 
@@ -1559,10 +1579,14 @@
         }
 
         function onPointerDown(event) {
+            if (event.target.closest?.(".interface-designer")) return;
+            const interfaceSurface = event.target.closest?.(".interface-surface");
+            if (interfaceSurface && (desktopView || event.button === 0)) return;
             if (!workspace) return;
             if (event.target.closest?.('.state-card,.alcyone-orb') || (isBackground(event.target) && [0,1,2].includes(event.button)))
                 dotnet?.invokeMethodAsync("SetCanvasInteraction",true);
-            if (window.alcyoneGroups?.pointerDown(event)) return;
+            if (interfaceSurface && [1,2].includes(event.button)) dotnet?.invokeMethodAsync("SetCanvasInteraction",true);
+            if (!interfaceSurface && window.alcyoneGroups?.pointerDown(event)) return;
             if (desktopView) return;
             const header = event.target.closest?.(".state-header");
             if (header && event.button === 0) {
@@ -1673,7 +1697,9 @@
         function onCanvasContextMenu(event) { event.preventDefault(); }
 
         function onWheel(event) {
-            if (!workspace || event.target.closest('input, textarea, select, .canvas-selection-toolbar, .alcyone-fold-popover, .desktop-ai-console')) return;
+            if (!workspace || event.target.closest('.canvas-selection-toolbar, .alcyone-fold-popover, .desktop-ai-console, .interface-designer')) return;
+            const interfaceSurface = event.target.closest('.interface-surface');
+            if (interfaceSurface ? desktopView : event.target.closest('input, textarea, select')) return;
             event.preventDefault();
             const rect = workspace.getBoundingClientRect();
             const mouseX = event.clientX - rect.left;
@@ -1695,6 +1721,7 @@
         }
 
         function onKeyDown(event) {
+            if (document.querySelector(".interface-designer")) return;
             if (desktopView) return;
             const tag = document.activeElement?.tagName;
             if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;

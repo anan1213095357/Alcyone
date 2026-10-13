@@ -1,0 +1,85 @@
+@inherits LocalizedComponent
+@using System.Globalization
+@inject DesktopWallpaperService DesktopService
+@implements IDisposable
+<div class="interface-surface" data-interface-id="@Screen.Id" data-config-key="@ConfigKey" style="left:@(N(Screen.X))px;top:@(N(Screen.Y))px;width:@(N(Screen.Width))px;height:@(N(Screen.Height))px;background:@(GlassColor(Screen.Background,Screen.BackgroundOpacity))" @onpointerdown:stopPropagation>
+    <div class="interface-surface-handle" data-interface-handle><span>⠿</span><strong>@Screen.Name</strong>@if (!Desktop) { <button title="@L["设计界面"]" @onclick="Edit">✎</button><button title="@L["从画布移除"]" @onclick="Remove">×</button> }</div>
+    @foreach (var c in Screen.Controls)
+    {
+        <div @key="c.Id" class="interface-live-control @(c.Kind == "panel" ? "glass-panel" : "")" style="left:@(N(c.X))px;top:@(N(c.Y))px;width:@(N(c.Width))px;height:@(N(c.Height))px;color:@c.Color;background:@(GlassColor(c.Background,c.BackgroundOpacity))">
+            @switch (c.Kind)
+            {
+                case "button":
+                    <button disabled="@_busy" @onclick="() => Execute(c)">@c.Text</button>
+                    break;
+                case "input":
+                    <input class="@(_activeNativeControl==c.Id ? "native-editing" : null)" type="@(InputKind(c)=="number" && !Desktop ? "number" : "text")" step="any" data-value-kind="@InputKind(c)" data-native-input="@(Desktop ? NativeId(c) : null)" readonly="@Desktop" placeholder="@c.Text" value="@BoundText(c)" @onchange="e => ChangeValue(c,e.Value?.ToString() ?? string.Empty)" />
+                    break;
+                case "checkbox":
+                <label><input type="checkbox" checked="@(BoundText(c) == "true")" @onchange='e => ChangeValue(c, e.Value?.ToString()?.ToLowerInvariant() ?? "false")' /> @c.Text</label>
+                    break;
+                case "select":
+                    <select value="@BoundText(c)" @onchange="e => ChangeValue(c,e.Value?.ToString() ?? string.Empty)">@foreach (var option in c.Options) { <option>@option</option> }</select>
+                    break;
+                default:
+                    <span>@(string.IsNullOrWhiteSpace(c.VariableName) ? c.Text : BoundText(c))</span>
+                    break;
+            }
+        </div>
+    }
+    @if (_error.Length > 0) { <div class="interface-live-error">@_error</div> }
+</div>
+@code {
+    [Parameter] public InterfaceScreenModel Screen { get; set; } = new();
+    [Parameter] public string ConfigKey { get; set; } = "";
+    [Parameter] public bool Desktop { get; set; }
+    [Parameter] public List<VariableModel> Variables { get; set; } = new();
+    [Parameter] public EventCallback Edit { get; set; }
+    [Parameter] public EventCallback Remove { get; set; }
+    [Parameter] public EventCallback<InterfaceControlModel> Clicked { get; set; }
+    private string? _activeNativeControl;
+    private readonly Dictionary<string,string> _nativeIds=new();
+    private string NativeId(InterfaceControlModel control) { if(!_nativeIds.TryGetValue(control.Id,out var id)) _nativeIds[control.Id]=id=Guid.NewGuid().ToString("N"); return id; }
+    private string InputKind(InterfaceControlModel control)=>Variables.FirstOrDefault(v=>v.Name==control.VariableName)?.Type ?? "string";
+    protected override void OnInitialized() => DesktopService.TextInput.Changed+=OnNativeInput;
+    private void OnNativeInput(DesktopTextInput.Update update)
+    {
+        if(!Desktop) return;
+        var id=_nativeIds.FirstOrDefault(p=>p.Value==update.Id).Key;
+        var control=Screen.Controls.FirstOrDefault(c=>c.Id==id); if(control is null) return;
+        _=InvokeAsync(async()=>
+        {
+            _activeNativeControl=update.Active ? control.Id : null;
+            _draftValues[control.Id]=update.Text;
+            if(update.Submit || !update.Active) await ChangeValue(control,update.Text);
+            StateHasChanged();
+        });
+    }
+    public void Dispose()=>DesktopService.TextInput.Changed-=OnNativeInput;
+    public override ValueTask DisposeAsync() { Dispose(); return base.DisposeAsync(); }
+    private bool _busy;
+    private string _error="";
+    [Parameter] public IReadOnlyDictionary<string,System.Text.Json.Nodes.JsonNode?> Values { get; set; } = new Dictionary<string,System.Text.Json.Nodes.JsonNode?>();
+    [Parameter] public EventCallback<InterfaceValueChange> ValueChanged { get; set; }
+    private readonly Dictionary<string,string> _draftValues=new();
+    private string BoundText(InterfaceControlModel control)
+    {
+        if(string.IsNullOrWhiteSpace(control.VariableName)) return _draftValues.GetValueOrDefault(control.Id,"");
+        if(!Values.TryGetValue(control.VariableName,out var value)||value is null) return "";
+        if(value is System.Text.Json.Nodes.JsonValue scalar && scalar.TryGetValue<string>(out var text)) return text;
+        return value.ToJsonString();
+    }
+    private async Task ChangeValue(InterfaceControlModel control,string value)
+    {
+        _draftValues[control.Id]=value; _error="";
+        if(string.IsNullOrWhiteSpace(control.VariableName)) return;
+        try { await ValueChanged.InvokeAsync(new(Screen.Id,control.Id,value)); } catch(Exception ex) { _error=ex.Message; }
+    }
+    private static string GlassColor(string color,double opacity) => color + ((int)Math.Round(Math.Clamp(opacity,0,1)*255)).ToString("X2");
+    private static string N(double value)=>value.ToString(CultureInfo.InvariantCulture);
+    private async Task Execute(InterfaceControlModel control)
+    {
+        if(_busy) return; _busy=true; _error="";
+        try { await Clicked.InvokeAsync(control); } catch(Exception ex) { _error=ex.Message; } finally { _busy=false; }
+    }
+}

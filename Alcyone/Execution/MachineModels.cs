@@ -4,6 +4,7 @@ namespace StateMachine.Execution;
 
     public sealed class MachineModel
     {
+        public List<InterfaceScreenModel> Screens { get; set; } = new();
         public List<RegionModel> Regions { get; set; } = new();
         public List<VariableModel> Variables { get; set; } = new();
         public List<RecognitionItem> Recognitions { get; set; } = new();

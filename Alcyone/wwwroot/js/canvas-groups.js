@@ -42,9 +42,9 @@
     function rectangle(node) {
         const r = node.getBoundingClientRect();
         return { left:r.left, top:r.top, right:r.right, bottom:r.bottom,
-            id:node.dataset.groupId ? "group:"+node.dataset.groupId : node.dataset.stateId ? "state:"+node.dataset.stateId : null,
-            focus:!!node.closest('.desktop-ai-console'),
-            avoid:node.matches('.state-card,.alcyone-orb,.desktop-ai-console,.ai-response,.ai-suggestions') };
+            id:node.dataset.interfaceId ? 'interface:'+node.dataset.interfaceId : node.dataset.groupId ? "group:"+node.dataset.groupId : node.dataset.stateId ? "state:"+node.dataset.stateId : null,
+            focus:!!node.closest('.desktop-ai-console,.interface-surface'),
+            avoid:node.matches('.state-card,.alcyone-orb,.desktop-ai-console,.ai-response,.ai-suggestions,.interface-surface') };
     }
     function reportMovingObstacles() {
         if (!api?.desktopView || !window.external?.sendMessage || !gesture || performance.now()-lastAvoidance < 32) return;
@@ -65,7 +65,7 @@
         hitFrame = window.alcyoneAnimation.requestFrame(() => {
             hitFrame = 0;
             if (gesture) return;
-            const rectangles = [...api.workspace.querySelectorAll('.state-card:not([hidden]),.alcyone-orb,.canvas-selection-toolbar:not([hidden]),.alcyone-fold-popover,.desktop-ai-console,.ai-response,.ai-suggestions')].map(rectangle);
+            const rectangles = [...api.workspace.querySelectorAll('.state-card:not([hidden]),.alcyone-orb,.canvas-selection-toolbar:not([hidden]),.alcyone-fold-popover,.desktop-ai-console,.ai-response,.ai-suggestions,.interface-surface,.interface-surface-handle')].map(rectangle);
             rectangles.push(...routeObstacles());
             const json = JSON.stringify({ ratio: window.devicePixelRatio || 1, rectangles });
             if (json !== lastHitRegions) { lastHitRegions = json; window.external.sendMessage('alcyone:desktop:hitregions:' + json); }
@@ -540,7 +540,7 @@
             if (!busy && !gesture) render();
         },
         pointerDown(event) {
-            if (event.target.closest?.('.alcyone-fold-popover,.orb-name,.canvas-selection-toolbar,.desktop-ai-console')) return true;
+            if (event.target.closest?.('.alcyone-fold-popover,.orb-name,.canvas-selection-toolbar,.desktop-ai-console,.interface-surface,.interface-designer')) return true;
             if (busy) return true;
             const card = event.target.closest?.('.state-card');
             if (event.button === 0 && card && !event.shiftKey && !event.target.closest('button,input,select,textarea,.port')) {
@@ -633,7 +633,7 @@
             return g.moved;
         },
         click(event) {
-            if (event.target.closest?.('.alcyone-fold-popover,.canvas-selection-toolbar,.desktop-ai-console')) return true;
+            if (event.target.closest?.('.alcyone-fold-popover,.canvas-selection-toolbar,.desktop-ai-console,.interface-surface,.interface-designer')) return true;
             if (busy || event.target.closest?.('.alcyone-orb')) return true;
             const card = event.target.closest?.('.state-card');
             if (event.shiftKey && card && !event.target.closest('button,input,select,.port')) {

@@ -23,6 +23,8 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     private readonly string _viewToken = Guid.NewGuid().ToString("N");
     private readonly Dictionary<string, PhotinoWindow> _surfaces = new(StringComparer.Ordinal);
     private DesktopDisplay[] _displays = [];
+    private DesktopDisplay[]? _pendingDisplays;
+    private long _pendingDisplaysSince;
     private DesktopPresentation? _presentation;
     private readonly string _className = "Alcyone.Desktop." + Guid.NewGuid().ToString("N");
     private WindowProc? _procedure;
@@ -371,7 +373,17 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             force = true;
         }
         if (!force && displays.SequenceEqual(_displays) && _surfaces.Count == displays.Length &&
-            _surfaces.Values.All(surface => IsWindow(surface.WindowHandle))) return;
+            _surfaces.Values.All(surface => IsWindow(surface.WindowHandle))) { _pendingDisplays=null; return; }
+        if (!force && _displays.Length > 0 && !displays.SequenceEqual(_displays))
+        {
+            if (_pendingDisplays is null || !displays.SequenceEqual(_pendingDisplays))
+            {
+                _pendingDisplays=displays; _pendingDisplaysSince=Environment.TickCount64;
+                return;
+            }
+            if (Environment.TickCount64-_pendingDisplaysSince < 1000) return;
+        }
+        _pendingDisplays=null;
         var created = new List<string>();
         try
         {
@@ -379,7 +391,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             {
                 if (_surfaces.TryGetValue(display.Device, out var surface) && IsWindow(surface.WindowHandle))
                 {
-                    if (force) Reparent(surface.WindowHandle, _host);
+                    if (GetParent(surface.WindowHandle) != _host) Reparent(surface.WindowHandle, _host);
                     PositionSurface(surface, display);
                 }
                 else
@@ -409,6 +421,9 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         var previous = SetThreadDpiAwarenessContext((nint)(-4));
         try
         {
+            if (GetWindowRect(surface.WindowHandle,out var current) &&
+                current.Left==display.X && current.Top==display.Y &&
+                current.Right-current.Left==display.Width && current.Bottom-current.Top==display.Height) return;
             var origin = new NativePoint { X = display.X, Y = display.Y };
             MapWindowPoints(0, _host, ref origin, 1);
             if (!SetWindowPos(surface.WindowHandle, (nint)1, origin.X, origin.Y,
@@ -540,8 +555,11 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         finally { DestroyMenu(menu); }
     }
 
+    [DllImport("user32.dll")] private static extern nint GetParent(nint window);
+
     private static void Reparent(nint window, nint parent)
     {
+        if (GetParent(window)==parent) return;
         Marshal.SetLastPInvokeError(0);
         if (SetParent(window, parent) == 0 && Marshal.GetLastPInvokeError() != 0) throw new Win32Exception();
     }

@@ -1,0 +1,225 @@
+@inherits LocalizedComponent
+@using StateMachine.Execution
+@using System.Globalization
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="interface-editor-overlay">
+<div class="interface-designer" @ref="_root" @onpointerdown:stopPropagation @onwheel:stopPropagation>
+    <section class="design-workspace">
+        <header class="design-toolbar">
+            <button class="design-back btn" @onclick="Closed">✓ @L["完成设计"]</button><strong>@L["界面设计"]</strong><span>@Screen.Name</span>
+            <button class="btn" @onclick="AiRequested">✦ @L["AI 生成界面"]</button>
+            <button class="btn" @onclick="() => _preview = !_preview">@L[_preview ? "返回设计" : "预览界面"]</button>
+        </header>
+        @if (!_preview)
+        {
+            <div class="design-palette">
+                @foreach (var kind in Kinds)
+                {
+                    <button draggable="true" data-control-kind="@kind.Key" @onclick="() => Add(kind.Key)"><span class="palette-icon">@ControlIcon(kind.Key)</span><span>@L[kind.Value]</span></button>
+                }
+                <small>@L["拖放控件到画板，或点击添加"]</small>
+            </div>
+        }
+        <div class="design-scroll">
+            <div class="design-board @(_preview ? "preview" : "")" data-screen-id="@Screen.Id" style="width:@(N(Screen.Width))px;height:@(N(Screen.Height))px;background:@(GlassColor(Screen.Background,Screen.BackgroundOpacity))" @onclick="() => _selectedId = null">
+                @foreach (var control in Screen.Controls)
+                {
+                    <div @key="control.Id" class="design-control @(control.Kind == "panel" ? "glass-panel" : "") @(Selected == control ? "selected" : "")" data-ui-id="@control.Id" data-preview="@_preview.ToString().ToLowerInvariant()" style="left:@(N(control.X))px;top:@(N(control.Y))px;width:@(N(control.Width))px;height:@(N(control.Height))px;color:@control.Color;background:@(GlassColor(control.Background,control.BackgroundOpacity))" @onclick="() => Select(control)" @onclick:stopPropagation>
+                        @switch (control.Kind)
+                        {
+                            case "button":
+                                <button disabled="@_invoking" @onclick="() => Execute(control)">@control.Text</button>
+                                break;
+                            case "input":
+                                <input type="@(Variables.FirstOrDefault(v=>v.Name==control.VariableName)?.Type=="number" ? "number" : "text")" step="any" placeholder="@control.Text" readonly="@(!_preview)" value="@BoundText(control)" @onchange="e => ChangeValue(control,e.Value?.ToString() ?? string.Empty)" />
+                                break;
+                            case "checkbox":
+                                    <label><input type="checkbox" disabled="@(!_preview)" checked="@(BoundText(control) == "true")" @onchange='e => ChangeValue(control, e.Value?.ToString()?.ToLowerInvariant() ?? "false")' /> @control.Text</label>
+                                break;
+                            case "select":
+                                <select disabled="@(!_preview)" value="@BoundText(control)" @onchange="e => ChangeValue(control,e.Value?.ToString() ?? string.Empty)">@foreach (var option in control.Options) { <option>@option</option> }</select>
+                                break;
+                            case "panel":
+                                <div class="design-panel">@control.Text</div>
+                                break;
+                            default:
+                                <span>@(string.IsNullOrWhiteSpace(control.VariableName) ? control.Text : BoundText(control))</span>
+                                break;
+                        }
+                        @if (!_preview && Selected == control) { <button type="button" class="design-control-delete" title="@L["删除控件"]" @onclick="DeleteSelected" @onclick:stopPropagation>×</button> }
+                        @if (!_preview) { <span class="design-grip" data-ui-resize title="@L["调整大小"]"></span> }
+                    </div>
+                }
+            </div>
+        </div>
+        @if (!string.IsNullOrEmpty(_error)) { <div class="design-error">@_error</div> }
+    </section>
+    <aside class="design-properties">
+        <div class="design-inspector-heading"><h3>@L["属性"]</h3><button type="button" class="design-close" title="@L["关闭编辑器"]" aria-label="@L["关闭编辑器"]" @onclick="Closed"><svg viewBox="0 0 20 20"><path d="m5 5 10 10 M15 5 5 15" /></svg></button></div>
+        @if (Selected is { } selected)
+        {
+            <div class="design-selection"><span>@L[Kinds.GetValueOrDefault(selected.Kind, "文本")]</span><strong>@selected.Name</strong></div>
+            @if (selected.Kind is "input" or "label" or "checkbox" or "select")
+            {
+                <details class="design-property-section" open><summary>@L["变量绑定"]</summary><div class="design-property-body">
+                    <div class="design-action-heading"><span>@L["全局变量"]</span><small>@L["双向同步"]</small></div>
+                    <SearchPicker Value="@selected.VariableName" Options="@BindingOptions(selected)" ValueChanged="value => BindControl(selected,value)" Placeholder="@L["选择变量"]" Clearable="true" />
+                    <p class="design-binding-hint">@L["输入值写入变量，变量变化同步显示。"]</p>
+                </div></details>
+            }
+            <details class="design-property-section" open><summary>@L["基本信息"]</summary><div class="design-property-body">
+                <label>@L["名称"]<input @bind="selected.Name" @bind:after="Save" /></label>
+                <label>@L["文本"]<input @bind="selected.Text" @bind:after="Save" /></label>
+                @if (selected.Kind == "select") { <label>@L["选项（每行一个）"]<textarea value="@string.Join("\n", selected.Options)" @onchange="e => SetOptions(selected, e.Value?.ToString() ?? string.Empty)"></textarea></label> }
+            </div></details>
+            <details class="design-property-section" open><summary>@L["位置与尺寸"]</summary><div class="design-property-body design-property-grid">
+                <label>X<input type="number" @bind="selected.X" @bind:after="ClampSave" /></label><label>Y<input type="number" @bind="selected.Y" @bind:after="ClampSave" /></label>
+                <label>@L["宽度"]<input type="number" min="24" @bind="selected.Width" @bind:after="ClampSave" /></label><label>@L["高度"]<input type="number" min="24" @bind="selected.Height" @bind:after="ClampSave" /></label>
+            </div></details>
+            <details class="design-property-section"><summary>@L["外观"]</summary><div class="design-property-body">
+                <label class="glass-opacity">@L["玻璃透明度"] <output>@((int)Math.Round((1-selected.BackgroundOpacity)*100))%</output><input type="range" min="0" max="100" step="1" value="@N((1-selected.BackgroundOpacity)*100)" @oninput="e => SetTransparency(selected, e)" /></label>
+                <div class="design-property-grid"><label>@L["文字颜色"]<input type="color" @bind="selected.Color" @bind:after="Save" /></label><label>@L["玻璃色调"]<input type="color" @bind="selected.Background" @bind:after="Save" /></label></div>
+            </div></details>
+            @if (selected.Kind == "button")
+            {
+                <details class="design-property-section" open><summary>@L["点击动作"]</summary><div class="design-property-body">
+                    <div class="design-action-heading"><span>@L["生命周期函数"]</span><button class="design-script-link" @onclick="ScriptRequested">✎ @L["编写脚本…"]</button></div>
+                    <SearchPicker Value="@selected.ClickAction.ActionMethod" Options="@ActionPickerOptions" ValueChanged="key => SetAction(selected, key)" Placeholder="@L["选择生命周期函数"]" Clearable="true" />
+                    @if (Actions.FirstOrDefault(a => a.Key == selected.ClickAction.ActionMethod) is { } action)
+                    {
+                        @if (action.Parameters.Count > 0) { <div class="design-parameter-heading">@L["参数设置"]<span>@action.Parameters.Count</span></div> }
+                        @foreach (var parameter in action.Parameters)
+                        {
+                            var argument = selected.ClickAction.ActionArguments.FirstOrDefault(a => a.ParameterName == parameter.Name);
+                            if (argument is not null)
+                            {
+                                <div class="design-argument" @key="parameter.Name">
+                                    <div class="design-argument-heading"><strong>@parameter.Label</strong><select aria-label="@L["参数来源"]" @bind="argument.Source" @bind:after="Save"><option value="literal">@L["固定值"]</option><option value="variable">@L["全局变量"]</option></select></div>
+                                    @if (argument.Source == "variable") { <SearchPicker Value="@argument.VariableName" Options="@VariablePickerOptions" ValueChanged="value => SetVariable(argument, value)" Placeholder="@L["选择变量"]" /> }
+                                    else if (parameter.Choices.Length > 0) { <select aria-label="@parameter.Label" @bind="argument.LiteralValue" @bind:after="Save">@foreach (var choice in parameter.Choices) { <option>@choice</option> }</select> }
+                                    else { <input aria-label="@parameter.Label" @bind="argument.LiteralValue" @bind:after="Save" /> }
+                                </div>
+                            }
+                        }
+                    }
+                </div></details>
+            }
+
+        }
+        else
+        {
+            <div class="design-selection"><span>@L["画板"]</span><strong>@Screen.Name</strong></div>
+            <details class="design-property-section" open><summary>@L["画板设置"]</summary><div class="design-property-body">
+                <label>@L["名称"]<input @bind="Screen.Name" @bind:after="Save" /></label>
+                <div class="design-property-grid"><label>@L["宽度"]<input type="number" min="240" max="7680" @bind="Screen.Width" @bind:after="ResizeScreen" /></label><label>@L["高度"]<input type="number" min="160" max="4320" @bind="Screen.Height" @bind:after="ResizeScreen" /></label></div>
+                <label class="glass-opacity">@L["玻璃透明度"] <output>@((int)Math.Round((1-Screen.BackgroundOpacity)*100))%</output><input type="range" min="0" max="100" step="1" value="@N((1-Screen.BackgroundOpacity)*100)" @oninput="e => SetTransparency(Screen, e)" /></label>
+                <label>@L["玻璃色调"]<input type="color" @bind="Screen.Background" @bind:after="Save" /></label>
+            </div></details>
+            <p class="design-empty-hint">@L["选择控件以编辑属性"]</p>
+        }
+    </aside>
+</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public InterfaceScreenModel Screen { get; set; } = new();
+    [Parameter] public List<InterfaceActionOption> Actions { get; set; } = new();
+    [Parameter] public List<VariableModel> Variables { get; set; } = new();
+    [Parameter] public EventCallback Closed { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+    [Parameter] public EventCallback AiRequested { get; set; }
+    [Parameter] public EventCallback ScriptRequested { get; set; }
+    [Parameter] public EventCallback<InterfaceControlModel> Clicked { get; set; }
+    private ElementReference _root;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<InterfaceDesigner>? _reference;
+    private string? _selectedId;
+    private bool _preview, _invoking;
+    private string _error = "";
+    private InterfaceControlModel? Selected => Screen.Controls.FirstOrDefault(c => c.Id == _selectedId);
+    private static string ControlIcon(string kind) => kind switch { "button"=>"▣", "label"=>"T", "input"=>"⌨", "checkbox"=>"☑", "select"=>"≡", _=>"▤" };
+    private static readonly Dictionary<string, string> Kinds = new() { ["button"]="按钮", ["label"]="文本", ["input"]="输入框", ["checkbox"]="复选框", ["select"]="下拉框", ["panel"]="容器" };
+    [Parameter] public IReadOnlyDictionary<string,System.Text.Json.Nodes.JsonNode?> Values { get; set; } = new Dictionary<string,System.Text.Json.Nodes.JsonNode?>();
+    [Parameter] public EventCallback<InterfaceValueChange> ValueChanged { get; set; }
+    private readonly Dictionary<string,string> _draftValues=new();
+    private string BoundText(InterfaceControlModel control)
+    {
+        if(string.IsNullOrWhiteSpace(control.VariableName)) return _draftValues.GetValueOrDefault(control.Id,"");
+        if(!Values.TryGetValue(control.VariableName,out var value)||value is null) return "";
+        if(value is System.Text.Json.Nodes.JsonValue scalar && scalar.TryGetValue<string>(out var text)) return text;
+        return value.ToJsonString();
+    }
+    private async Task ChangeValue(InterfaceControlModel control,string value)
+    {
+        _draftValues[control.Id]=value; _error="";
+        if(string.IsNullOrWhiteSpace(control.VariableName)) return;
+        try { await ValueChanged.InvokeAsync(new(Screen.Id,control.Id,value)); } catch(Exception ex) { _error=ex.Message; }
+    }
+    private static string GlassColor(string color,double opacity) => color + ((int)Math.Round(Math.Clamp(opacity,0,1)*255)).ToString("X2");
+    private static string N(double value) => value.ToString(CultureInfo.InvariantCulture);
+    private List<PickerOption> ActionPickerOptions => Actions.Select(a => new PickerOption(a.Key, a.Name, a.Group)).ToList();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/interface-designer.js");
+        _reference = DotNetObjectReference.Create(this);
+        await _module.InvokeVoidAsync("attach", _root, _reference);
+    }
+    private IEnumerable<PickerOption> BindingOptions(InterfaceControlModel control) => Variables.Where(v => control.Kind=="checkbox" ? v.Type=="boolean" : control.Kind=="select" ? v.Type=="string" : true).Select(v=>new PickerOption(v.Name,v.Name,"",L[v.Type]));
+    private async Task BindControl(InterfaceControlModel control,string value) { control.VariableName=value; await Save(); }
+    private List<PickerOption> VariablePickerOptions => Variables.Select(v=>new PickerOption(v.Name,v.Name)).ToList();
+    private async Task SetVariable(ActionArgumentModel argument,string value) { argument.VariableName=value; await Save(); }
+    private async Task SetTransparency(object target,ChangeEventArgs e)
+    {
+        if(!double.TryParse(e.Value?.ToString(),NumberStyles.Float,CultureInfo.InvariantCulture,out var amount)) return;
+        var opacity=1-Math.Clamp(amount,0,100)/100;
+        if(target is InterfaceScreenModel screen) screen.BackgroundOpacity=opacity;
+        if(target is InterfaceControlModel control) control.BackgroundOpacity=opacity;
+        await Save();
+    }
+    private Task Save() => Changed.InvokeAsync();
+    private void Select(InterfaceControlModel control) { if (!_preview) _selectedId = control.Id; }
+    private async Task Add(string kind) => await DropControl(kind, 32 + Screen.Controls.Count % 8 * 20, 32 + Screen.Controls.Count % 8 * 20);
+    [JSInvokable] public async Task DropControl(string kind, double x, double y)
+    {
+        if (_preview || !Kinds.ContainsKey(kind)) return;
+        var control = new InterfaceControlModel { Kind=kind, Name=$"{kind}{Screen.Controls.Count+1}", Text=L[Kinds[kind]], X=x, Y=y, Width=kind=="panel" ? 280 : 160, Height=kind=="panel" ? 180 : 40, Options=kind=="select" ? new() { "Option 1", "Option 2" } : new() };
+        Screen.Controls.Add(control); _selectedId = control.Id;
+        await ClampSave(); StateHasChanged();
+    }
+    [JSInvokable] public async Task CommitControl(string screenId, string id, double x, double y, double width, double height)
+    {
+        if (_preview || Screen.Id != screenId) return;
+        var control = Screen.Controls.FirstOrDefault(c => c.Id == id);
+        if (control is null) return;
+        control.X=x; control.Y=y; control.Width=width; control.Height=height; _selectedId=id;
+        await ClampSave(); StateHasChanged();
+    }
+    private void Clamp(InterfaceControlModel c)
+    {
+        c.Width=Math.Clamp(c.Width,24,Screen.Width); c.Height=Math.Clamp(c.Height,24,Screen.Height);
+        c.X=Math.Clamp(c.X,0,Screen.Width-c.Width); c.Y=Math.Clamp(c.Y,0,Screen.Height-c.Height);
+    }
+    private async Task ClampSave() { if (Selected is { } c) Clamp(c); await Save(); }
+    private async Task ResizeScreen() { Screen.Width=Math.Clamp(Screen.Width,240,7680); Screen.Height=Math.Clamp(Screen.Height,160,4320); foreach(var c in Screen.Controls) Clamp(c); await Save(); }
+    private async Task SetOptions(InterfaceControlModel c, string text) { c.Options=text.Split('\n',StringSplitOptions.RemoveEmptyEntries).Select(s=>s.Trim()).ToList(); await Save(); }
+    private async Task DeleteSelected() { Screen.Controls.RemoveAll(c => c.Id == _selectedId); _selectedId=null; await Save(); }
+    private async Task SetAction(InterfaceControlModel c, string key)
+    {
+        c.ClickAction=new() { ActionMethod=key, ActionArguments=Actions.FirstOrDefault(a=>a.Key==key)?.Parameters.Select(p=>new ActionArgumentModel { ParameterName=p.Name, LiteralValue=p.DefaultValue }).ToList() ?? new() };
+        await Save();
+    }
+    private async Task Execute(InterfaceControlModel c)
+    {
+        if (!_preview || _invoking) return;
+        _invoking=true; _error="";
+        try { await Clicked.InvokeAsync(c); } catch(Exception ex) { _error=ex.Message; } finally { _invoking=false; }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null) { try { await _module.InvokeVoidAsync("detach", _root); await _module.DisposeAsync(); } catch (JSDisconnectedException) { } }
+        _reference?.Dispose();
+    }
+}

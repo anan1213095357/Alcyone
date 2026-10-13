@@ -98,6 +98,7 @@ public partial class Home
         if (_aiDialogOpen) await JS.InvokeVoidAsync("alcyoneAiInput.resizeAll");
         if (firstRender)
         {
+            await InitializeInterfaceCanvasAsync();
             _jsBridge = new JsBridge(StateMoved, SelectStateFromJs, SelectEdgeFromJs, ClearSelectionFromJs, EscapeFromJs, DeleteSelectionFromJs);
             _jsBridge.SaveGroups = SaveGroupsFromJs;
             _jsBridge.CanvasInteraction = SetCanvasInteraction;
@@ -1594,6 +1595,9 @@ public partial class Home
 
     private void NormalizeMachine()
     {
+        Machine.Screens ??= new();
+        NormalizeInterfaces(Machine.Screens);
+        if (_interfaceId is not null && !Machine.Screens.Any(s => s.Id == _interfaceId)) { _interfaceId=null; _interfaceMode=false; }
         Machine.Regions ??= new List<RegionModel>();
         Machine.Variables ??= new List<VariableModel>();
         Machine.States ??= new List<StateModel>();
@@ -1822,6 +1826,11 @@ public partial class Home
             try { await JS.InvokeVoidAsync("industrialStateMachineUi.dispose"); }
             catch (JSDisconnectedException) { }
         }
+        if (_interfaceCanvasModule is not null)
+        {
+            try { await _interfaceCanvasModule.InvokeVoidAsync("detach"); await _interfaceCanvasModule.DisposeAsync(); } catch (JSDisconnectedException) { }
+        }
+        _interfaceCanvasReference?.Dispose();
         _dotNetRef?.Dispose();
     }
 
@@ -2261,6 +2270,9 @@ reply 尽量简短。
                 : "\n使用简体中文说明方案。保留已有的用户命名、识别查找文字、标识符和 JSON 字段名。";
 
             systemPrompt += ScriptDevelopmentInstructions;
+            systemPrompt += "\n你也支持生成可视化界面。只要求界面时 applyMachine=false，保留现有状态机。返回 JSON 顶层增加 screens 数组；未修改的界面不返回。每个界面：id（新建用唯一英文ID，修改保留原ID）、name、width、height、background（#RRGGBB）、backgroundOpacity（0到1的玻璃色调不透明度，默认0.25，背景始终毛玻璃）、controls；放置在画布时 isPlaced=true，x/y 为画布位置（画布4000×2500），修改时保留已有放置位置。每个控件：id、kind（button/label/input/checkbox/select/panel）、name、text、x、y、width、height、color、background、backgroundOpacity、variableName（input/checkbox/select可绑定现有全局变量名，双向同步；checkbox绑定boolean，select绑定string，input绑定string/number/json）、options（下拉字符串数组）、clickAction:{actionMethod:真实动作Key,actionArguments:[{parameterName,source:literal或variable,literalValue,variableName}]}。所有坐标在画板内；容器只是背景面板，控件均按画板绝对坐标排列，面板先于其他控件。点击动作调用已有生命周期方法；需要新动作同时生成scripts，Key遵守现有动作规则。不需要修改的流程或脚本数组可为空。输入控件可通过variableName双向绑定全局变量，按钮动作参数可引用这个全局变量。\n";
+            systemPrompt += "当前界面配置：" + JsonSerializer.Serialize(Machine.Screens, _jsonOptions);
+            if (_interfaceMode) systemPrompt += "\n当前用户正在界面设计器，优先处理界面需求，除非明确要求修改状态机，否则applyMachine=false。当前界面ID：" + _interfaceId;
 
             if (_aiScope == "script" && _scriptAiContext is not null)
                 systemPrompt += $$"""
@@ -2318,6 +2330,8 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
             var plan = JsonSerializer.Deserialize<AiMachinePlan>(json, _jsonOptions)
                 ?? throw new InvalidOperationException("AI返回数据无法解析。");
 
+            plan.Screens ??= new();
+            NormalizeInterfaces(plan.Screens);
             plan.Scripts ??= new List<AiScriptPlan>();
             plan.Regions ??= new List<AiRegionPlan>();
             plan.Variables ??= new List<AiVariablePlan>();
@@ -2330,7 +2344,7 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
             if (_aiScope == "machine" && plan.Scripts.Count > 0) throw new InvalidOperationException("当前选择仅流程，生成结果不能修改脚本。");
             if (plan.ApplyMachine)
                 ValidateAiPlan(plan, validateActions: false);
-            else if (plan.Scripts.Count == 0)
+            else if (plan.Scripts.Count == 0 && plan.Screens.Count == 0)
                 throw new InvalidOperationException("AI没有生成任何可应用的流程或 C# 热更改动。");
 
             _pendingAiPlan = plan;
@@ -2397,14 +2411,35 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
                 DiscoverActionMethods();
             }
 
+            if (plan.Screens.Count > 0)
+            {
+                foreach (var screen in plan.Screens)
+                {
+                    foreach (var control in screen.Controls.Where(c => c.Kind == "button"))
+                    {
+                        if (!string.IsNullOrWhiteSpace(control.ClickAction.ActionMethod) && GetActionDescriptor(control.ClickAction.ActionMethod) is null)
+                            throw new InvalidOperationException($"界面按钮动作不存在：{control.ClickAction.ActionMethod}");
+                        NormalizeActionArguments(control.ClickAction);
+                    }
+                }
+            }
             if (plan.ApplyMachine)
             {
-                // 到这里新 csx 动作已经存在，可以做完整动作校验。
                 ValidateAiPlan(plan, validateActions: true);
                 ApplyAiPlan(plan);
             }
-
+            if (plan.Screens.Count > 0)
+            {
+                foreach (var screen in plan.Screens)
+                {
+                    var index = Machine.Screens.FindIndex(s => s.Id == screen.Id);
+                    if (index >= 0) Machine.Screens[index] = screen; else Machine.Screens.Add(screen);
+                }
+                SelectInterface(plan.Screens[0].Id);
+            }
+            await SaveConfigCoreAsync(true);
             var changes = new List<string>();
+            if (plan.Screens.Count > 0) changes.Add($"界面 {plan.Screens.Count} 个");
 
             if (plan.ApplyMachine)
                 changes.Add($"流程 {plan.States.Count} 个状态 / {plan.Transitions.Count} 条连线");
@@ -2694,6 +2729,7 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
                 new MachineModel
                 {
                     Recognitions = oldMachine.Recognitions,
+                    Screens = oldMachine.Screens,
                     Settings =
                         new MachineSettings
                         {
@@ -3042,6 +3078,8 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
             string.Empty;
 
         public bool ApplyMachine { get; set; } = true;
+
+        public List<InterfaceScreenModel> Screens { get; set; } = new();
 
         public List<AiScriptPlan> Scripts { get; set; } = new();
 
@@ -3587,6 +3625,12 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
             text.AppendLine();
         }
 
+        if (plan.Screens.Count > 0)
+        {
+            text.AppendLine($"界面：{plan.Screens.Count}");
+            foreach (var screen in plan.Screens) text.AppendLine($"▣ {screen.Name} · {screen.Width} × {screen.Height} · {screen.Controls.Count} 个控件");
+            text.AppendLine();
+        }
         if (plan.ApplyMachine)
         {
             text.AppendLine($"状态域：{plan.Regions.Count}");
