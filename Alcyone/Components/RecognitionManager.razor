@@ -8,7 +8,7 @@
         <header class="manager-topbar">
             <div><h2>@L["识别库管理"]</h2><span>@L["字典 / 点阵 / 多点颜色"]</span></div>
             <div class="top-actions">
-                <button class="close-manager" disabled="@IsBusy" @onclick="OnClose" aria-label="@L["关闭识别库"]" title="@L["关闭"]"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+                <button class="close-manager" disabled="@(_importing || _selectingRange)" @onclick="OnClose" aria-label="@L["关闭识别库"]" title="@L["关闭"]"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
             </div>
         </header>
         @if (_error is not null)

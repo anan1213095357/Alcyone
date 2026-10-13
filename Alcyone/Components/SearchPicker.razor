@@ -1,7 +1,7 @@
 @inherits LocalizedComponent
 @using Microsoft.AspNetCore.Components.Web
 <div class="search-picker">
-    <div class="picker-control">    <button type="button" class="picker-trigger" aria-haspopup="dialog" aria-expanded="@_open" @onclick="Open"><span><small>@L[Selected?.Group]</small>@(Selected?.Label ?? (string.IsNullOrEmpty(Value) ? L[Placeholder] : Value))</span><span class="chevron">⌕</span></button>@if(Clearable && !string.IsNullOrEmpty(Value)){<button type="button" class="picker-clear" title="@L["清除选择"]" aria-label="@L["清除选择"]" @onclick="Clear">×</button>}</div>
+    <div class="picker-control">    <button type="button" class="picker-trigger" aria-haspopup="dialog" aria-expanded="@_open" @onclick="Open"><span><small>@LocalizedGroup(Selected?.Group)</small>@(Selected?.Label ?? (string.IsNullOrEmpty(Value) ? L[Placeholder] : Value))</span><span class="chevron">⌕</span></button>@if(Clearable && !string.IsNullOrEmpty(Value)){<button type="button" class="picker-clear" title="@L["清除选择"]" aria-label="@L["清除选择"]" @onclick="Clear">×</button>}</div>
     @if (_open)
     {
         <div class="picker-dismiss" data-overlay-dismiss @onclick="Close"></div>
@@ -25,7 +25,7 @@
                 @for (var i = 0; i < choices.Count; i++)
                 {
                     var item = choices[i]; var index = i;
-                    <button type="button" class="option @(index == _index ? "focused" : "") @(item.Value == Value ? "selected" : "")" @onclick="() => Choose(item.Value)"><span><strong>@L[item.Label]</strong><small>@(string.IsNullOrWhiteSpace(_query) ? L[item.Description] : L[item.Group] + " · " + L[item.Description])</small></span>@if(item.Value==Value){<span>✓</span>}</button>
+                    <button type="button" class="option @(index == _index ? "focused" : "") @(item.Value == Value ? "selected" : "")" @onclick="() => Choose(item.Value)"><span><strong>@L[item.Label]</strong><small>@(string.IsNullOrWhiteSpace(_query) ? L[item.Description] : LocalizedGroup(item.Group) + " · " + L[item.Description])</small></span>@if(item.Value==Value){<span>✓</span>}</button>
                 }
                 @if (!choices.Any() && (!string.IsNullOrWhiteSpace(_query) || !Categories.Any())) { <div class="no-result">@(Options.Any() ? L["没有匹配项，试试名称、API 或分类。"] : L["还没有可选项目，请先创建项目。"])</div> }
                 @if (AllowCustom && !string.IsNullOrWhiteSpace(_query) && !Options.Any(o => o.Value == _query.Trim())) { <button type="button" class="custom" @onclick="() => Choose(_query.Trim())">@L["使用输入值："]@_query.Trim()</button> }
@@ -35,6 +35,7 @@
     }
 </div>
 @code {
+    private string LocalizedGroup(string? group) => string.Join(" / ",(group ?? "").Split('/',StringSplitOptions.RemoveEmptyEntries).Select(part=>L[part]));
     private async Task Clear(){Close();await ValueChanged.InvokeAsync("");}
     [Parameter] public IEnumerable<PickerOption> Options { get; set; } = [];
     [Parameter] public bool Clearable { get; set; }

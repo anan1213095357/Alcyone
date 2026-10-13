@@ -1,12 +1,13 @@
+@inherits LocalizedComponent
 @using Microsoft.AspNetCore.Components.Web
 <div class="editable-name">
     @if(_editing)
     {
-        <input @ref="_input" value="@_draft" @oninput="e => _draft=e.Value?.ToString()??string.Empty" @onblur="Commit" @onkeydown="KeyDown" @onclick:stopPropagation="true" aria-label="@Label" />
+        <input @ref="_input" value="@_draft" @oninput="e => _draft=e.Value?.ToString()??string.Empty" @onblur="Commit" @onkeydown="KeyDown" @onclick:stopPropagation="true" aria-label="@L[Label]" />
     }
     else
     {
-        <span title="@Text">@Text</span><button type="button" title="@Label" aria-label="@Label" @onclick:stopPropagation="true" @onclick="Begin"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 13-1 4 4-1L16 7l-3-3zM11 6l3 3" /></svg></button>
+        <span title="@Text">@Text</span><button type="button" title="@L[Label]" aria-label="@L[Label]" @onclick:stopPropagation="true" @onclick="Begin"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 13-1 4 4-1L16 7l-3-3zM11 6l3 3" /></svg></button>
     }
 </div>
 @code {

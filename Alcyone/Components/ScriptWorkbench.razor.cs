@@ -171,7 +171,7 @@ public partial class ScriptWorkbench
         (d.Title + Text[d.Description] + d.Signature).Contains(_docQuery, StringComparison.OrdinalIgnoreCase));
 
     private string? _editorLanguage;
-    private object[] LocalizedDocs => Docs.Select(d => (object)new { d.Title, Description = Text[d.Description], d.Signature, d.Prefix, Insert = d.Example }).ToArray();
+    private object[] LocalizedDocs => Docs.Select(d => (object)new { d.Title, Description = Text[d.Description], Signature = Text[d.Signature], d.Prefix, Insert = d.Example }).ToArray();
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)

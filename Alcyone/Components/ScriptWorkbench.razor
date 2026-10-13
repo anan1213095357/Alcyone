@@ -79,7 +79,7 @@
                         {
                             <details class="studio-doc" open="@(doc.Title == "StateScript")">
                                 <summary><span><b>@Text[doc.Title]</b><small>@Text[doc.Description]</small></span><span>⌄</span></summary>
-                                <div class="studio-doc-detail"><code class="studio-signature">@doc.Signature</code><p>@Text[doc.Notes]</p><pre>@doc.Example</pre><button disabled="@(!_ready || _active is null || _busy)" @onclick="() => InsertExampleAsync(doc)">@Text["插入示例 ↗"]</button></div>
+                                <div class="studio-doc-detail"><code class="studio-signature">@Text[doc.Signature]</code><p>@Text[doc.Notes]</p><pre>@doc.Example</pre><button disabled="@(!_ready || _active is null || _busy)" @onclick="() => InsertExampleAsync(doc)">@Text["插入示例 ↗"]</button></div>
                             </details>
                         }
                         @if (!FilteredDocs.Any()) { <p class="studio-doc-no-results">@Text["没有找到匹配的 API。"]</p> }
