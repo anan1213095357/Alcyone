@@ -1,0 +1,12 @@
+@inherits LocalizedComponent
+<div class="test-group">
+    <button type="button" disabled="@Busy" @onclick="Test">@L["测试条件"]</button>
+    <output class="result @State" title="@Error">@L[Busy ? "测试中…" : Result]</output>
+</div>
+@code {
+    [Parameter] public EventCallback Test { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string Result { get; set; } = "未测试";
+    [Parameter] public string State { get; set; } = "pending";
+    [Parameter] public string? Error { get; set; }
+}

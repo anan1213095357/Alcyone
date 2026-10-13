@@ -419,7 +419,8 @@
                     else
                     {
                         var state = SelectedState!;
-                        <div class="field">
+                        <details class="group property-fold" open @key='(state.Id + "basic")'><summary class="property-summary"><span class="group-title">@L["基本信息"]</span></summary><div class="property-body">
+<div class="field">
                             <label class="field-label">@L["状态名称"]</label>
                             <input class="input" value="@state.Name" @oninput="e => RenameState(state.Id, e.Value?.ToString() ?? string.Empty)" />
                         </div>
@@ -439,11 +440,12 @@
                             </label>
                         </div>
 
-                        <div class="group">
-                            <div class="group-header">
+                        </div></details>
+<details class="group property-fold" @key='(state.Id + "进入插头")'>
+                            <summary class="group-header property-summary">
                                 <div class="group-title">@L["进入插头"]</div>
                                 <button class="btn small" @onclick="() => AddInput(state.Id)">@L["+ 插头"]</button>
-                            </div>
+                            </summary><div class="property-body">
                             @foreach (var input in state.Inputs)
                             {
                                 <div class="port-editor" @key="input.Id">
@@ -453,10 +455,10 @@
                                     </div>
                                 </div>
                             }
-                        </div>
+                        </div></details>
 
-                        <div class="group">
-                            <div class="group-title">@L["状态生命周期"]</div>
+                        <details class="group property-fold" @key='(state.Id + "状态生命周期")'>
+                            <summary class="property-summary"><span class="group-title">@L["状态生命周期"]</span></summary><div class="property-body">
                             <div class="hint">@L["进入脚本执行一次；循环脚本每个扫描周期执行；离开脚本在转入目标状态前执行一次。"]</div>
 
                             @foreach (var lifecycle in GetLifecycleActions(state))
@@ -469,8 +471,8 @@
                                     NormalizeActionArguments(actionCall, actionDescriptor);
                                 }
 
-                                <div class="action-box">
-                                    <div class="field-label">@L[lifecycle.Title]</div>
+                                <details class="action-box property-subfold" @key="(state.Id + lifecycle.Key)">
+                                    <summary class="property-subsummary">@L[lifecycle.Title]</summary>
 
                                     <SearchPicker Options="LifecycleOptions" Value="@actionCall.ActionMethod" ValueChanged="value => ChangeStateActionMethod(state.Id, lifecycle.Key, value)" Placeholder="选择生命周期 API" />
 
@@ -626,31 +628,31 @@
                                             }
                                         </div>
                                     }
-                                </div>
+                                </details>
                             }
-                        </div>
+                        </div></details>
 
-                        <div class="group">
-                            <div class="group-header">
+                        <details class="group property-fold" @key='(state.Id + "切换出口")'>
+                            <summary class="group-header property-summary">
                                 <div class="group-title">@L["切换出口"]</div>
                                 <button class="btn small" @onclick="() => AddOutput(state.Id)">@L["+ 插头"]</button>
-                            </div>
+                            </summary><div class="property-body">
                             <div class="hint">@L["从上往下就是切换优先级。"]</div>
                             <div style="margin-top:8px">
                                 @for (var outputIndex = 0; outputIndex < state.Outputs.Count; outputIndex++)
                                 {
                                     var output = state.Outputs[outputIndex];
                                     var connected = GetEdgeFromPort(state.Id, output.Id) is not null;
-                                    <div class="transition-editor" @key="output.Id">
+                                    <details class="transition-editor property-subfold" @key="output.Id"><summary class="property-subsummary"><span>@output.Name</span><small>@(connected ? L["已连接"] : L["未连接"])</small></summary>
                                         <div class="transition-head">
                                             <input class="input" value="@output.Name" @oninput="e => RenameOutput(state.Id, output.Id, e.Value?.ToString() ?? string.Empty)" />
                                             <button class="mini-btn" @onclick="() => MoveOutput(state.Id, output.Id, -1)">↑</button>
                                             <button class="mini-btn" @onclick="() => MoveOutput(state.Id, output.Id, 1)">↓</button>
                                             <button class="remove-btn" @onclick="() => RemoveOutput(state.Id, output.Id)">×</button>
                                         </div>
-                                        <div style="margin-bottom:7px;color:#65738a;font-size:9px">@L.Format("优先级：{0}", outputIndex + 1) · @(connected ? L["已连接"] : L["未连接"])</div>
+                                        <div class="output-meta">@L.Format("优先级：{0}", outputIndex + 1) · @(connected ? L["已连接"] : L["未连接"])</div>
                                         <div class="transition-grid">
-                                            <div style="display:flex;align-items:center;color:#748298;font-size:9px">@L["条件组合"]</div>
+                                            <label class="output-field-label">@L["条件组合"]</label>
                                             <select class="select" value="@output.MatchMode" @onchange='e => ChangeOutputMatchMode(state.Id, output.Id, e.Value?.ToString() ?? "all")'>
                                                 <option value="all">@L["ALL 全部成立"]</option>
                                                 <option value="any">@L["ANY 任意成立"]</option>
@@ -660,14 +662,14 @@
 
                                         @if (output.MatchMode != "always")
                                         {
+                                            <div class="condition-list-header"><span>@L["判断条件"] <small>@output.Conditions.Count</small></span><button type="button" class="add-condition-button" @onclick="() => AddCondition(state.Id, output.Id)"><span aria-hidden="true">＋</span>@L["添加条件"]</button></div>
                                             @for (var conditionIndex = 0; conditionIndex < output.Conditions.Count; conditionIndex++)
                                             {
                                                 var condition = output.Conditions[conditionIndex];
-                                                <div class="condition-editor" @key="condition.Id">
-                                                    <div class="condition-index">@L.Format("条件 {0}", conditionIndex + 1)</div>
+                                                <div class="condition-editor condition-kind-@condition.Kind" data-check="@condition.SystemCheck" style="@ConditionAccent(conditionIndex)" @key="condition.Id">
+                                                    <div class="condition-heading"><span class="condition-index">@L.Format("条件 {0}", conditionIndex + 1)</span><button class="condition-remove" title="@L["删除条件"]" @onclick="() => RemoveCondition(state.Id, output.Id, condition.Id)">×</button></div>
                                                     <div class="recognition-condition-row">
-                                                        <SearchPicker Options="ConditionOptions" Value="@ConditionTarget(condition)" ValueChanged="value => ChangeConditionTarget(condition, value)" Placeholder="选择判断 API" />
-                                                        <button class="remove-btn" @onclick="() => RemoveCondition(state.Id, output.Id, condition.Id)">×</button>
+                                                        <SearchPicker Clearable="true" Options="ConditionOptions" Value="@ConditionTarget(condition)" ValueChanged="value => ChangeConditionTarget(condition, value)" Placeholder="选择判断 API" />
                                                     </div>
                                                     @if (string.IsNullOrEmpty(condition.Kind))
                                                     {
@@ -678,8 +680,9 @@
                                                         <div class="recognition-filter-row">
                                                             <label>@L["函数返回"]</label>
                                                             <select class="select" value="@(condition.ExpectedSuccess ? "true" : "false")" @onchange='e => { condition.ExpectedSuccess = e.Value?.ToString() == "true"; RefreshCurrentConditionResults(); }'><option value="true">@L["true 时触发"]</option><option value="false">@L["false 时触发"]</option></select>
-                                                            <button class="btn" @onclick="() => TestRecognitionConditionAsync(condition)">@L["测试条件"]</button>
+                                                            
                                                         </div>
+                                                        <ConditionTestButton Test="() => TestRecognitionConditionAsync(condition)" Busy="@(_testingCondition == condition.Id)" Result="@ConditionTestText(condition)" State="@ConditionTestStyle(condition)" Error="@(_conditionTests.GetValueOrDefault(condition.Id)?.Error)" />
                                                         <div class="hint">@L["等待函数执行完毕后判断。通过 Vars 读取变量；异常时不会触发，详情见日志。"]</div>
                                                     }
                                                     else if (condition.Kind == "windows")
@@ -760,7 +763,7 @@
                                                         }
                                                         <div class="hint">@L["填写的项目同时满足才成立，留空的项目不参与判断。"]</div>
                                                         <button class="btn small" @onclick="() => OpenRecognitionManager(condition.RecognitionId)">@L["编辑识别项目"]</button>
-                                                        <button class="btn small" disabled="@(_executing || Runtime.Running)" @onclick="() => TestRecognitionConditionAsync(condition)">@L["测试当前条件"]</button>
+                                                        <ConditionTestButton Test="() => TestRecognitionConditionAsync(condition)" Busy="@(_testingCondition == condition.Id)" Result="@ConditionTestText(condition)" State="@ConditionTestStyle(condition)" Error="@(_conditionTests.GetValueOrDefault(condition.Id)?.Error)" />
                                                         <div class="hint" style="white-space:pre-wrap">@RecognitionConditionResult(condition)</div>
                                                     }
 
@@ -814,17 +817,17 @@
                                                     }
                                                 </div>
                                             }
-                                            <button class="btn small" style="margin-top:6px" @onclick="() => AddCondition(state.Id, output.Id)">@L["+ 条件"]</button>
+                                            
                                         }
                                         else
                                         {
                                             <div class="hint">@L["无条件出口如果优先级最高，会让后面的出口永远没有机会执行。"]</div>
                                         }
 
-                                    </div>
+                                    </details>
                                 }
                             </div>
-                        </div>
+                        </div></details>
                         <button class="danger" @onclick="DeleteSelectedState">@L["删除整个状态"]</button>
                     }
                 </div>
@@ -837,19 +840,22 @@
     {
     <div class="bottom">
         <div class="log-panel">
-            <div class="bottom-header">
+            <div class="bottom-header log-header">
+                <span class="log-heading">@L["运行日志"]</span>
+                <span class="log-status">
                 <div id="runtimeDot" class="status-dot @(Runtime.Running ? "running" : "")"></div>
                 <span id="runtimeStatus">@(Runtime.Running ? "RUNNING" : "STOPPED")</span>
-                <div class="spacer"></div>
-                <button class="btn small" @onclick="ClearLogs">@L["清空"]</button>
+                </span><div class="spacer"></div><span class="log-total">@Logs.Count</span>
+                <button class="log-clear" @onclick="ClearLogs">@L["清空"]</button>
             </div>
             <div id="console">
+                @if (Logs.Count == 0) { <div class="log-empty"><span>· · ·</span>@L["暂无日志，等待新的运行事件"]</div> }
                 @foreach (var log in Logs)
                 {
-                    <div @key="log.Id">
+                    <div class="log-row level-@log.Level" @key="log.Id">
                         <span class="log-time">@log.Time</span>
-                        <span class="log-@log.Level">[@log.Type]</span>
-                        <span class="log-@log.Level">@L[log.Message]</span>
+                        <span class="log-kind">@log.Type</span>
+                        <span class="log-message">@L[log.Message]</span>
                     </div>
                 }
             </div>

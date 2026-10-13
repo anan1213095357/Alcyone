@@ -1,4 +1,22 @@
 (() => {
+    // Popup dismiss layers intercept clicks, but must not swallow panel scrolling.
+    document.addEventListener('wheel', event => {
+        const overlay=event.target.closest?.('.picker-dismiss');
+        if(!overlay)return;
+        const previous=overlay.style.pointerEvents;
+        overlay.style.pointerEvents='none';
+        let target;
+        try{target=document.elementFromPoint(event.clientX,event.clientY);}
+        finally{overlay.style.pointerEvents=previous;}
+        for(let node=target;node;node=node.parentElement){
+            if(!/auto|scroll/.test(getComputedStyle(node).overflowY) || node.scrollHeight<=node.clientHeight+1)continue;
+            const before=node.scrollTop;
+            node.scrollTop+=event.deltaY*(event.deltaMode===1?24:event.deltaMode===2?node.clientHeight:1);
+            if(node.scrollTop!==before)break;
+        }
+        event.preventDefault();event.stopPropagation();
+    },{capture:true,passive:false});
+
     // A selection/drag ending outside a dialog produces a click on its backdrop.
     // Dismiss only a stationary press that also began on that exact backdrop.
     let dismissPress;

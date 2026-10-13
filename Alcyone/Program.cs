@@ -16,7 +16,7 @@ internal static class Program
     {
         // Photino uses SW_SHOWDEFAULT for its first ShowWindow. STARTUPINFO's SW_HIDE
         // makes that first show hidden, without briefly displaying/minimizing the editor.
-        if (OperatingSystem.IsWindows() && !args.Any(a=>a is "--tray-host" or "--check-host" or "--browser-host"))
+        if (OperatingSystem.IsWindows() && !System.Diagnostics.Debugger.IsAttached && !args.Any(a=>a is "--tray-host" or "--check-host" or "--browser-host"))
         {
             var executable=Environment.ProcessPath ?? throw new InvalidOperationException("无法确定程序路径。");
             var start=new System.Diagnostics.ProcessStartInfo(executable)

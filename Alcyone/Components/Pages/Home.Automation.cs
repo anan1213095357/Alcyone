@@ -6,6 +6,12 @@ namespace StateMachine.Components.Pages;
 
 public partial class Home
 {
+    private static string ConditionAccent(int index)
+    {
+        // Golden-angle hues keep neighbouring conditions distinct without loud saturation.
+        var hue=(211+index*137.508)%360;
+        return "--condition-color:hsl("+hue.ToString("F1",System.Globalization.CultureInfo.InvariantCulture)+",32%,67%);";
+    }
     private static readonly string[] NumericRecognitionOperators = { "==", "!=", ">", ">=", "<", "<=" };
     private bool _recognitionManagerOpen;
     private string? _recognitionSelection;
@@ -34,8 +40,18 @@ public partial class Home
             L[result.Found ? "成功" : "失败"], result.Similarity.ToString("F1"), result.X, result.Y,
             L[EvaluateRecognitionCondition(condition) ? "满足" : "不满足"], string.IsNullOrEmpty(result.Text) ? L["（空）"] : result.Text);
     }
+    private readonly Dictionary<string,ConditionTestResult> _conditionTests = new();
+    private string? _testingCondition;
+    private string ConditionTestText(ConditionModel condition) => _testingCondition==condition.Id ? "测试中…" : !_conditionTests.TryGetValue(condition.Id,out var result) ? "未测试" : result.Error is not null ? "测试异常" : result.Matched==true ? "满足条件" : "不满足";
+    private string ConditionTestStyle(ConditionModel condition) => _conditionTests.TryGetValue(condition.Id,out var result) ? result.Error is not null ? "error" : result.Matched==true ? "matched" : "unmatched" : "pending";
     private async Task TestRecognitionConditionAsync(ConditionModel condition)
-    { if (_session is not null) { await _session.ConfigureAsync(Machine); await _session.TestConditionAsync(condition); ApplyRuntimeSnapshot(); } }
+    {
+        if(_session is null || _testingCondition is not null)return;
+        _testingCondition=condition.Id;
+        try {await _session.ConfigureAsync(Machine);_conditionTests[condition.Id]=await _session.TestConditionResultAsync(condition);ApplyRuntimeSnapshot();}
+        catch(Exception ex){_conditionTests[condition.Id]=new(null,ex.GetBaseException().Message);}
+        finally{_testingCondition=null;}
+    }
     private string ConditionTarget(ConditionModel condition)
     {
         if (string.IsNullOrEmpty(condition.Kind)) return "";
@@ -47,6 +63,13 @@ public partial class Home
     }
     private void ChangeConditionTarget(ConditionModel condition, string target)
     {
+        _conditionTests.Remove(condition.Id);
+        if(string.IsNullOrEmpty(target))
+        {
+            condition.Kind="";condition.ScriptMethod="";condition.RecognitionId="";
+            condition.SystemCheck="";condition.SystemQuery="";condition.Left="";condition.Recognition=null;
+            RefreshCurrentConditionResults();return;
+        }
         if (target == "script:new")
         {
             _startWithConditionTemplate = true;

@@ -1,7 +1,7 @@
 @inherits LocalizedComponent
 @using Microsoft.AspNetCore.Components.Web
 <div class="search-picker">
-    <button type="button" class="picker-trigger" aria-haspopup="dialog" aria-expanded="@_open" @onclick="Open"><span><small>@L[Selected?.Group]</small>@(Selected?.Label ?? (string.IsNullOrEmpty(Value) ? L[Placeholder] : Value))</span><span class="chevron">⌕</span></button>
+    <div class="picker-control">    <button type="button" class="picker-trigger" aria-haspopup="dialog" aria-expanded="@_open" @onclick="Open"><span><small>@L[Selected?.Group]</small>@(Selected?.Label ?? (string.IsNullOrEmpty(Value) ? L[Placeholder] : Value))</span><span class="chevron">⌕</span></button>@if(Clearable && !string.IsNullOrEmpty(Value)){<button type="button" class="picker-clear" title="@L["清除选择"]" aria-label="@L["清除选择"]" @onclick="Clear">×</button>}</div>
     @if (_open)
     {
         <div class="picker-dismiss" data-overlay-dismiss @onclick="Close"></div>
@@ -27,7 +27,9 @@
     }
 </div>
 @code {
+    private async Task Clear(){Close();await ValueChanged.InvokeAsync("");}
     [Parameter] public IEnumerable<PickerOption> Options { get; set; } = [];
+    [Parameter] public bool Clearable { get; set; }
     [Parameter] public string Value { get; set; } = "";
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public string Placeholder { get; set; } = "选择项目";

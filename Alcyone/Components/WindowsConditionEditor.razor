@@ -21,8 +21,7 @@
     }
     else { <div class="field-caption">@L["期望结果"]</div><select value="@(Condition.ExpectedSuccess ? "true" : "false")" @onchange="ChangeExpected"><option value="true">@L["满足 / 存在"]</option><option value="false">@L["不满足 / 不存在"]</option></select> }
     <button type="button" @onclick="LoadOptions">@L["刷新可选目标"]</button>
-    <button type="button" @onclick="Test">@L["测试当前条件"]</button>
-    @if (_result is not null) { <small>@L[_result]</small> }
+    <ConditionTestButton Test="Test" Result="@(_result is null ? "未测试" : _result.StartsWith("条件不满足") ? "不满足" : "满足条件")" State="@(_result is null ? "pending" : _result.StartsWith("条件不满足") ? "unmatched" : "matched")" />
 </div>
 @code {
     [Parameter, EditorRequired] public ConditionModel Condition { get; set; } = default!;
