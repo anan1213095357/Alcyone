@@ -22,15 +22,19 @@
         const paths = [...api.world.querySelectorAll('.edge-hit')].filter(p => p.style.pointerEvents !== 'none');
         const matrix = paths[0]?.getScreenCTM();
         if (!matrix) return [];
-        const stamp = [matrix.a,matrix.b,matrix.c,matrix.d,matrix.e,matrix.f,...paths.map(p=>p.getAttribute('d'))].join('|');
+        const stamp = [matrix.a,matrix.b,matrix.c,matrix.d,matrix.e,matrix.f,...paths.map(p=>p.getAttribute('d')+':'+p.dataset.interplanet)].join('|');
         if (stamp === routeStamp) return routeRectangles;
         routeStamp = stamp; routeRectangles = [];
+        const scale=Math.hypot(matrix.a,matrix.b), planetWidth=180*scale;
+        const perRoute=Math.max(2,Math.floor(1400/Math.max(1,paths.length)));
         for (const path of paths) {
-            const length = path.getTotalLength();
-            const steps = Math.min(256,Math.max(1,Math.ceil(length*Math.hypot(matrix.a,matrix.b)/24)));
-            for(let i=0;i<=steps && routeRectangles.length<1400;i++) {
+            const length = path.getTotalLength(), halfWidth=path.dataset.interplanet==='true' ? planetWidth/2 : 9;
+            const steps = Math.min(256,perRoute-1,Math.max(1,Math.ceil(length*scale/Math.max(24,halfWidth*.7))));
+            // Half a sample interval closes gaps along the entire curve, including long routes.
+            const radius=halfWidth+length*scale/(steps*2);
+            for(let i=0;i<=steps;i++) {
                 const p=path.getPointAtLength(length*i/steps).matrixTransform(matrix);
-                routeRectangles.push({left:p.x-9,top:p.y-9,right:p.x+9,bottom:p.y+9,avoid:true,hit:false,route:true});
+                routeRectangles.push({left:p.x-radius,top:p.y-radius,right:p.x+radius,bottom:p.y+radius,avoid:true,hit:false,route:true});
             }
         }
         return routeRectangles;
