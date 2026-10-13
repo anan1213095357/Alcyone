@@ -26,7 +26,7 @@
             <div class="design-board @(_preview ? "preview" : "")" data-screen-id="@Screen.Id" style="width:@(N(Screen.Width))px;height:@(N(Screen.Height))px;background:@(GlassColor(Screen.Background,Screen.BackgroundOpacity))" @onclick="() => _selectedId = null">
                 @foreach (var control in Screen.Controls)
                 {
-                    <div @key="control.Id" class="design-control @(control.Kind == "panel" ? "glass-panel" : "") @(Selected == control ? "selected" : "")" data-ui-id="@control.Id" data-preview="@_preview.ToString().ToLowerInvariant()" style="left:@(N(control.X))px;top:@(N(control.Y))px;width:@(N(control.Width))px;height:@(N(control.Height))px;color:@control.Color;background:@(GlassColor(control.Background,control.BackgroundOpacity))" @onclick="() => Select(control)" @onclick:stopPropagation>
+                    <div @key="control.Id" class="design-control @(control.Kind == "panel" ? "glass-panel" : "") @(Selected == control ? "selected" : "")" data-ui-id="@control.Id" data-preview="@_preview.ToString().ToLowerInvariant()" style="left:@(N(control.X))px;top:@(N(control.Y))px;width:@(N(control.Width))px;height:@(N(control.Height))px;z-index:@control.ZIndex;color:@control.Color;background:@(GlassColor(control.Background,control.BackgroundOpacity))" @onclick="() => Select(control)" @onclick:stopPropagation>
                         @switch (control.Kind)
                         {
                             case "button":
@@ -77,6 +77,10 @@
             <details class="design-property-section" open><summary>@L["位置与尺寸"]</summary><div class="design-property-body design-property-grid">
                 <label>X<input type="number" @bind="selected.X" @bind:after="ClampSave" /></label><label>Y<input type="number" @bind="selected.Y" @bind:after="ClampSave" /></label>
                 <label>@L["宽度"]<input type="number" min="24" @bind="selected.Width" @bind:after="ClampSave" /></label><label>@L["高度"]<input type="number" min="24" @bind="selected.Height" @bind:after="ClampSave" /></label>
+            </div></details>
+            <details class="design-property-section" open><summary>@L["层级"]</summary><div class="design-property-body">
+                <label>@L["层级数值"]<input type="number" min="-1000" max="1000" @bind="selected.ZIndex" @bind:after="Save" /></label>
+                <div class="design-layer-actions"><button class="btn" @onclick="() => ChangeLayer(selected, 1)">@L["上移一层"]</button><button class="btn" @onclick="() => ChangeLayer(selected, -1)">@L["下移一层"]</button><button class="btn" @onclick="() => MoveLayerEnd(selected, true)">@L["置顶"]</button><button class="btn" @onclick="() => MoveLayerEnd(selected, false)">@L["置底"]</button></div>
             </div></details>
             <details class="design-property-section"><summary>@L["外观"]</summary><div class="design-property-body">
                 <label class="glass-opacity">@L["玻璃透明度"] <output>@((int)Math.Round((1-selected.BackgroundOpacity)*100))%</output><input type="range" min="0" max="100" step="1" value="@N((1-selected.BackgroundOpacity)*100)" @oninput="e => SetTransparency(selected, e)" /></label>
@@ -179,13 +183,29 @@
         if(target is InterfaceControlModel control) control.BackgroundOpacity=opacity;
         await Save();
     }
+    private async Task ChangeLayer(InterfaceControlModel control,int direction)
+    {
+        var ordered=Screen.Controls.OrderBy(c=>c.ZIndex).ThenBy(c=>Screen.Controls.IndexOf(c)).ToList();
+        var index=ordered.IndexOf(control); var next=index+direction;
+        if(next<0 || next>=ordered.Count) return;
+        (ordered[index],ordered[next])=(ordered[next],ordered[index]);
+        for(var i=0;i<ordered.Count;i++) ordered[i].ZIndex=i;
+        await Save();
+    }
+    private async Task MoveLayerEnd(InterfaceControlModel control,bool top)
+    {
+        var ordered=Screen.Controls.Where(c=>c!=control).OrderBy(c=>c.ZIndex).ToList();
+        if(top) ordered.Add(control); else ordered.Insert(0,control);
+        for(var i=0;i<ordered.Count;i++) ordered[i].ZIndex=i;
+        await Save();
+    }
     private Task Save() => Changed.InvokeAsync();
     private void Select(InterfaceControlModel control) { if (!_preview) _selectedId = control.Id; }
     private async Task Add(string kind) => await DropControl(kind, 32 + Screen.Controls.Count % 8 * 20, 32 + Screen.Controls.Count % 8 * 20);
     [JSInvokable] public async Task DropControl(string kind, double x, double y)
     {
         if (_preview || !Kinds.ContainsKey(kind)) return;
-        var control = new InterfaceControlModel { Kind=kind, Name=$"{kind}{Screen.Controls.Count+1}", Text=L[Kinds[kind]], X=x, Y=y, Width=kind=="panel" ? 280 : 160, Height=kind=="panel" ? 180 : 40, Options=kind=="select" ? new() { "Option 1", "Option 2" } : new() };
+        var control = new InterfaceControlModel { Kind=kind, ZIndex=kind=="panel" ? 0 : 10, Name=$"{kind}{Screen.Controls.Count+1}", Text=L[Kinds[kind]], X=x, Y=y, Width=kind=="panel" ? 280 : 160, Height=kind=="panel" ? 180 : 40, Options=kind=="select" ? new() { "Option 1", "Option 2" } : new() };
         Screen.Controls.Add(control); _selectedId = control.Id;
         await ClampSave(); StateHasChanged();
     }

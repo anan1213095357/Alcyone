@@ -957,5 +957,11 @@
   "双向同步": "Two-way sync",
   "输入值写入变量，变量变化同步显示。": "Input updates the variable; variable changes update the control.",
   "玻璃透明度": "Glass transparency",
-  "玻璃色调": "Glass tint"
+  "玻璃色调": "Glass tint",
+  "层级": "Layers",
+  "层级数值": "Layer index",
+  "上移一层": "Bring forward",
+  "下移一层": "Send backward",
+  "置顶": "Bring to front",
+  "置底": "Send to back"
 }

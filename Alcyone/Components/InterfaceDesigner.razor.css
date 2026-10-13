@@ -14,3 +14,5 @@
 .design-toolbar .design-back{background:#28557c;border:1px solid #6696bc;color:#eef7ff;font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;box-shadow:0 3px 12px #0003}.design-control-delete{position:absolute!important;right:0;top:-32px;width:26px!important;height:26px!important;padding:0!important;display:grid;place-items:center;background:#362431!important;border:1px solid #8a5260!important;color:#ffb9c6!important;pointer-events:auto!important;z-index:8;font-size:18px!important;cursor:pointer}.design-control.selected{z-index:3}
 
 .design-control-delete{top:4px;right:4px}
+
+.design-layer-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}.design-layer-actions .btn{font-size:11px;padding:7px}.design-control.selected{outline-color:#8bd0ff}

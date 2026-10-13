@@ -6,7 +6,7 @@
     <div class="interface-surface-handle" data-interface-handle><span>⠿</span><strong>@Screen.Name</strong>@if (!Desktop) { <button title="@L["设计界面"]" @onclick="Edit">✎</button><button title="@L["从画布移除"]" @onclick="Remove">×</button> }</div>
     @foreach (var c in Screen.Controls)
     {
-        <div @key="c.Id" class="interface-live-control @(c.Kind == "panel" ? "glass-panel" : "")" style="left:@(N(c.X))px;top:@(N(c.Y))px;width:@(N(c.Width))px;height:@(N(c.Height))px;color:@c.Color;background:@(GlassColor(c.Background,c.BackgroundOpacity))">
+        <div @key="c.Id" class="interface-live-control @(c.Kind == "panel" ? "glass-panel" : "")" style="left:@(N(c.X))px;top:@(N(c.Y))px;width:@(N(c.Width))px;height:@(N(c.Height))px;z-index:@c.ZIndex;color:@c.Color;background:@(GlassColor(c.Background,c.BackgroundOpacity))">
             @switch (c.Kind)
             {
                 case "button":

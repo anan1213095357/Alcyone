@@ -17,6 +17,7 @@ public sealed class InterfaceScreenModel
 public sealed class InterfaceControlModel
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public int ZIndex { get; set; } = 10;
     public string VariableName { get; set; } = "";
     public string Kind { get; set; } = "button";
     public string Name { get; set; } = "control";

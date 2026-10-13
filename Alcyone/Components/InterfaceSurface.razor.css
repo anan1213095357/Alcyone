@@ -9,3 +9,5 @@
 .interface-surface{backdrop-filter:blur(26px) saturate(140%);-webkit-backdrop-filter:blur(26px) saturate(140%)}
 
 .interface-live-control>input.native-editing{color:transparent;caret-color:transparent}.interface-live-control>input.native-editing::placeholder{color:transparent}
+
+.interface-surface-handle{z-index:2147483647}

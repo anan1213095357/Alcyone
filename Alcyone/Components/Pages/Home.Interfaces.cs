@@ -17,6 +17,9 @@ public partial class Home
             screen.BackgroundOpacity=double.IsFinite(screen.BackgroundOpacity) ? Math.Clamp(screen.BackgroundOpacity,0,1) : 0.25;
             screen.Background=InterfaceColor(screen.Background,"#101b2b");
             screen.Controls ??=new();
+            // Older configurations put every control on the same layer. Keep panels behind interactive controls.
+            if(screen.Controls.Count>0 && screen.Controls.All(c=>c.ZIndex==10))
+                foreach(var panel in screen.Controls.Where(c=>c.Kind=="panel")) panel.ZIndex=0;
             var controls=new HashSet<string>(StringComparer.Ordinal);
             foreach (var c in screen.Controls)
             {
