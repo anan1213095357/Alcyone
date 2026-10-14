@@ -77,7 +77,7 @@ public sealed partial class MachineSession : IAsyncDisposable
         _notificationPending = false;
         if (!_disposed) Notify();
     }
-    public Task ConfigureAsync(MachineModel machine) => DispatchAsync(() => { if (JsonSerializer.Serialize(Machine, _jsonOptions) == JsonSerializer.Serialize(machine, _jsonOptions)) return; Machine = Clone(machine); _publishedMachine = Clone(Machine); _recognitionRevision++; _recognitionResults.Clear(); DiscoverActionMethods(); if (!Runtime.Running && !_executing) ResetRuntime(); Notify(); });
+    public Task ConfigureAsync(MachineModel machine) => DispatchAsync(() => { if (JsonSerializer.Serialize(Machine, _jsonOptions) == JsonSerializer.Serialize(machine, _jsonOptions)) return; Machine = Clone(machine); _publishedMachine = Clone(Machine); _conditionScanCache.Clear(); _recognitionRevision++; _recognitionResults.Clear(); DiscoverActionMethods(); if (!Runtime.Running && !_executing) ResetRuntime(); Notify(); });
     public Task StartAsync() => DispatchAsync(() => { if (_executing || Runtime.Running) return; _runTask = RunMachineAsync(); Notify(); });
     public Task StopAsync() => DispatchAsync(() => { StopRuntime(); Notify(); });
     public Task ResetAsync() => DispatchAsync(() => { ResetRuntime(); Notify(); });
@@ -164,6 +164,7 @@ public sealed partial class MachineSession : IAsyncDisposable
     private void DiscoverActionMethods()
     {
         _actionMethods.Clear();
+        _conditionScanCache.Clear();
         _scriptConditionResults.Clear();
         _scriptConditions.Clear();
         foreach (var target in _scriptHost?.ActionTargets ?? Array.Empty<object>())
@@ -747,7 +748,7 @@ public sealed partial class MachineSession : IAsyncDisposable
         catch (Exception ex) { AddLog("CONDITION", ex.InnerException?.Message ?? ex.Message, "error"); return false; }
     }
 
-    private bool EvaluateCondition(ConditionModel condition)
+    private bool EvaluateConditionNow(ConditionModel condition)
     {
         if (string.IsNullOrEmpty(condition.Kind)) return false;
         if (condition.Kind == "script") return _scriptConditionResults.GetValueOrDefault(condition.Id);
@@ -872,6 +873,7 @@ public sealed partial class MachineSession : IAsyncDisposable
         Runtime.EnteredStates.Clear();
         Runtime.CurrentEdgeIds.Clear();
         Runtime.ConditionResults.Clear();
+        _conditionScanCache.Clear();
         _scriptConditionResults.Clear();
 
         foreach (var variable in Machine.Variables)
@@ -908,6 +910,7 @@ public sealed partial class MachineSession : IAsyncDisposable
         if (!Runtime.EnteredStates.TryGetValue(region.Id, out var enteredStateId) ||
             enteredStateId != state.Id)
         {
+            foreach(var condition in state.Outputs.SelectMany(o=>o.Conditions)) _conditionScanCache.Remove(condition.Id);
             await InvokeActionAsync(state.BeforeLeaveAction);
             Runtime.EnteredStates[region.Id] = state.Id;
         }
@@ -923,7 +926,7 @@ public sealed partial class MachineSession : IAsyncDisposable
         foreach (var output in state.Outputs)
         {
             foreach (var condition in output.Conditions.Where(c => c.Kind == "script" && output.MatchMode != "always"))
-                await EvaluateScriptConditionAsync(condition);
+                if (ConditionScanDue(condition)) RecordConditionScan(condition,await EvaluateScriptConditionAsync(condition));
             var detail = EvaluateOutputDetailed(output);
 
             if (!Runtime.ConditionResults.TryGetValue(state.Id, out var resultMap))
@@ -980,6 +983,7 @@ public sealed partial class MachineSession : IAsyncDisposable
             // 目标卡片的进入脚本
             // 在真正进入目标卡片之前执行
             // =====================================================
+            foreach(var condition in targetState.Outputs.SelectMany(o=>o.Conditions)) _conditionScanCache.Remove(condition.Id);
             await InvokeActionAsync(targetState.BeforeLeaveAction);
             _executionCancellation.Token.ThrowIfCancellationRequested();
 
@@ -1034,6 +1038,7 @@ public sealed partial class MachineSession : IAsyncDisposable
         Runtime.Running = true;
         Runtime.StopRequested = false;
         var token = ++_runToken;
+        _conditionScanCache.Clear();
         _recognitionResults.Clear();
         _recognitionRevision++;
         var recognitionLoop = RecognitionLoopAsync(_executionCancellation.Token);
@@ -1289,8 +1294,9 @@ public sealed partial class MachineSession : IAsyncDisposable
             var item = Machine.Recognitions.FirstOrDefault(i => !i.IsFolder && i.Id == condition.RecognitionId)
                 ?? throw new InvalidOperationException("条件引用的识别项目已删除，请重新选择。");
             var key = RecognitionScanKey(condition, item);
-            if (!scanned.Add(key)) continue;
-            await ScanRecognitionConditionAsync(condition);
+            if (!ConditionScanDue(condition)) continue;
+            if (scanned.Add(key)) await ScanRecognitionConditionAsync(condition);
+            RecordConditionScan(condition,EvaluateRecognitionCondition(condition));
         }
     }
 

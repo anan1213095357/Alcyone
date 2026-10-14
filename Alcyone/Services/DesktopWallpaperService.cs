@@ -289,6 +289,11 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             .Load(_url + "/desktop/" + _viewToken);
         surface.RegisterWebMessageReceivedHandler((_, message) =>
         {
+            if (!_disposed && message == "alcyone:desktop:text-close")
+            {
+                TextInput.Close(surface.WindowHandle);
+                return;
+            }
             const string resizeInput = "alcyone:desktop:text-resize:";
             if (!_disposed && message.StartsWith(resizeInput, StringComparison.Ordinal))
             {

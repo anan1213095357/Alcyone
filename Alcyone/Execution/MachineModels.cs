@@ -105,6 +105,7 @@ namespace StateMachine.Execution;
 
     public sealed class ConditionModel
     {
+        public int ScanIntervalMilliseconds { get; set; }
         public string ScriptMethod { get; set; } = "";
         public string SystemCheck { get; set; } = "file.exists";
         public string SystemQuery { get; set; } = "";

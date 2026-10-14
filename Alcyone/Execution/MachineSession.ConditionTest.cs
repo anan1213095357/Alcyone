@@ -14,7 +14,7 @@ public sealed partial class MachineSession
             await DispatchAsync(()=>
             {
                 var error=Logs.LastOrDefault(log=>!previous.Contains(log.Id)&&log.Level=="error")?.Message;
-                result=new ConditionTestResult(error is null?EvaluateCondition(condition):null,error);
+                result=new ConditionTestResult(error is null?EvaluateConditionNow(condition):null,error);
             });
             return result;
         }

@@ -23,17 +23,17 @@
             </div>
         }
         <div class="design-scroll">
-            <div class="design-board @(_preview ? "preview" : "")" data-screen-id="@Screen.Id" style="width:@(N(Screen.Width))px;height:@(N(Screen.Height))px;background:@(GlassColor(Screen.Background,Screen.BackgroundOpacity))" @onclick="() => _selectedId = null">
+            <div class="design-board @(Screen.BackgroundOpacity<=0 ? "glass-clear" : "") @(_preview ? "preview" : "")" data-screen-id="@Screen.Id" style="width:@(N(Screen.Width))px;height:@(N(Screen.Height))px;background:@(GlassColor(Screen.Background,Screen.BackgroundOpacity))" @onclick="() => _selectedId = null">
                 @foreach (var control in Screen.Controls)
                 {
-                    <div @key="control.Id" class="design-control @(control.Kind == "panel" ? "glass-panel" : "") @(Selected == control ? "selected" : "")" data-ui-id="@control.Id" data-preview="@_preview.ToString().ToLowerInvariant()" style="left:@(N(control.X))px;top:@(N(control.Y))px;width:@(N(control.Width))px;height:@(N(control.Height))px;z-index:@control.ZIndex;color:@control.Color;background:@(GlassColor(control.Background,control.BackgroundOpacity))" @onclick="() => Select(control)" @onclick:stopPropagation>
+                    <div @key="control.Id" class="design-control @(control.BackgroundOpacity<=0 ? "glass-clear" : "") @(control.Kind == "panel" ? "glass-panel" : "") @(Selected == control ? "selected" : "")" data-ui-id="@control.Id" data-preview="@_preview.ToString().ToLowerInvariant()" style="left:@(N(control.X))px;top:@(N(control.Y))px;width:@(N(control.Width))px;height:@(N(control.Height))px;z-index:@control.ZIndex;color:@control.Color;background:@(GlassColor(control.Background,control.BackgroundOpacity))" @onclick="() => Select(control)" @onclick:stopPropagation>
                         @switch (control.Kind)
                         {
                             case "button":
-                                <button disabled="@_invoking" @onclick="() => Execute(control)">@control.Text</button>
+                                <button class="action-feedback @(_activeButton==control.Id ? "is-working" : "") @(_feedbackButton==control.Id ? (_buttonFailed ? "is-failed" : "is-complete") : "")" disabled="@_invoking" aria-busy="@(_activeButton==control.Id)" @onclick="() => Execute(control)"><span>@control.Text</span>@if (_activeButton==control.Id) { <i class="button-spinner" aria-hidden="true"></i> }</button>
                                 break;
                             case "input":
-                                <input type="@(Variables.FirstOrDefault(v=>v.Name==control.VariableName)?.Type=="number" ? "number" : "text")" step="any" placeholder="@control.Text" readonly="@(!_preview)" value="@BoundText(control)" @onchange="e => ChangeValue(control,e.Value?.ToString() ?? string.Empty)" />
+                                <input type="@(Variables.FirstOrDefault(v=>v.Name==control.VariableName)?.Type=="number" ? "number" : "text")" step="any" placeholder="@control.Text" readonly="@(!_preview)" value="@BoundText(control)" @oninput="e => ChangeValue(control,e.Value?.ToString() ?? string.Empty)" />
                                 break;
                             case "checkbox":
                                     <label><input type="checkbox" disabled="@(!_preview)" checked="@(BoundText(control) == "true")" @onchange='e => ChangeValue(control, e.Value?.ToString()?.ToLowerInvariant() ?? "false")' /> @control.Text</label>
@@ -141,6 +141,8 @@
     private DotNetObjectReference<InterfaceDesigner>? _reference;
     private string? _selectedId;
     private bool _preview, _invoking;
+    private string? _activeButton, _feedbackButton;
+    private bool _buttonFailed;
     private string _error = "";
     private InterfaceControlModel? Selected => Screen.Controls.FirstOrDefault(c => c.Id == _selectedId);
     private static string ControlIcon(string kind) => kind switch { "button"=>"▣", "label"=>"T", "input"=>"⌨", "checkbox"=>"☑", "select"=>"≡", _=>"▤" };
@@ -161,6 +163,7 @@
         if(string.IsNullOrWhiteSpace(control.VariableName)) return;
         try { await ValueChanged.InvokeAsync(new(Screen.Id,control.Id,value)); } catch(Exception ex) { _error=ex.Message; }
     }
+    // A fully transparent layer must contribute no tint.
     private static string GlassColor(string color,double opacity) => color + ((int)Math.Round(Math.Clamp(opacity,0,1)*255)).ToString("X2");
     private static string N(double value) => value.ToString(CultureInfo.InvariantCulture);
     private List<PickerOption> ActionPickerOptions => Actions.Select(a => new PickerOption(a.Key, a.Name, a.Group)).ToList();
@@ -233,9 +236,18 @@
     }
     private async Task Execute(InterfaceControlModel c)
     {
-        if (!_preview || _invoking) return;
-        _invoking=true; _error="";
-        try { await Clicked.InvokeAsync(c); } catch(Exception ex) { _error=ex.Message; } finally { _invoking=false; }
+        if(!_preview || _invoking) return;
+        _feedbackButton=null; _buttonFailed=false; _error="";
+        if(string.IsNullOrWhiteSpace(c.ClickAction.ActionMethod))
+        {
+            _error=L["请先绑定点击动作。"];
+            _buttonFailed=true; _feedbackButton=c.Id;
+            return;
+        }
+        _invoking=true; _activeButton=c.Id; StateHasChanged();
+        try { await Clicked.InvokeAsync(c); }
+        catch(Exception ex) { _error=ex.Message; _buttonFailed=true; }
+        finally { _invoking=false; _activeButton=null; _feedbackButton=c.Id; }
     }
     public async ValueTask DisposeAsync()
     {

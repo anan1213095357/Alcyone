@@ -694,6 +694,10 @@
                                                     <div class="recognition-condition-row">
                                                         <SearchPicker Clearable="true" Options="ConditionOptions" Value="@ConditionTarget(condition)" ValueChanged="value => ChangeConditionTarget(condition, value)" Placeholder="选择判断 API" />
                                                     </div>
+                                                    @if (!string.IsNullOrWhiteSpace(condition.Kind))
+                                                    {
+                                                        <div class="condition-scan-setting"><label>@L["扫描间隔"]</label><div><input class="input" type="number" min="0" max="3600000" step="50" @bind="condition.ScanIntervalMilliseconds" /><span>ms</span></div><small>@L["0 保持原扫描速度；间隔内复用上次结果。"]</small></div>
+                                                    }
                                                     @if (condition.Kind == "script")
                                                     {
                                                         <div class="recognition-filter-row">

@@ -8,8 +8,8 @@ namespace StateMachine;
 // A normal top-level EDIT owns keyboard/IME input; wallpaper WebViews remain shell children.
 public sealed class DesktopTextInput : IDisposable
 {
-    public sealed record Update(string Id, string Text, bool Submit, bool Active);
-    private sealed record Request(string Id, string Text, double Left, double Top, double Width, double Height, double Ratio, double FontSize = 14, string FontFamily = "Segoe UI", string TextColor = "", string BackgroundColor = "", string ValueKind = "string", bool TransparentSurface = false);
+    public sealed record Update(string Id, string Text, bool Submit, bool Active, bool Composing = false);
+    private sealed record Request(string Id, string Text, double Left, double Top, double Width, double Height, double Ratio, double FontSize = 14, string FontFamily = "Segoe UI", string TextColor = "", string BackgroundColor = "", string ValueKind = "string", bool TransparentSurface = false, int FontWeight = 400);
     public event Action<Update>? Changed;
     private readonly string _class = "Alcyone.Input." + Guid.NewGuid().ToString("N");
     private readonly WindowProc _windowProc, _editProc;
@@ -28,6 +28,7 @@ public sealed class DesktopTextInput : IDisposable
             || !double.IsFinite(request.Left + request.Top + request.Width + request.Height + request.Ratio)
             || request.Width is <= 0 or > 2000 || request.Height is <= 0 or > 200 || !GetWindowRect(surface, out var bounds)) return;
         EnsureWindow();
+        Close();
         _surface = surface; _id = request.Id; _composing = false; _imeCommitAt = 0;
         var width = (int)Math.Ceiling(request.Width * request.Ratio);
         var height = (int)Math.Ceiling(request.Height * request.Ratio);
@@ -43,8 +44,10 @@ public sealed class DesktopTextInput : IDisposable
         _brush=request.TransparentSurface ? CaptureBackground(bounds.Left+(int)(request.Left*request.Ratio),bounds.Top+(int)(request.Top*request.Ratio),width,height) : 0;
         _snapshotBackground=_brush!=0 && request.TransparentSurface;
         if(_brush==0) _brush=CreateSolidBrush(_backgroundColor);
-        var fontSize=double.IsFinite(request.FontSize) ? Math.Clamp(request.FontSize,8,72) : 14;
-        var font = CreateFontW(-(int)Math.Round(fontSize * request.Ratio), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, string.IsNullOrWhiteSpace(request.FontFamily) || request.FontFamily.Length>100 ? "Segoe UI" : request.FontFamily);
+        var fontSize=double.IsFinite(request.FontSize) ? Math.Clamp(request.FontSize,1,144) : 14;
+        var family=request.FontFamily.Trim(' ', '\'', '"');
+        if(string.IsNullOrWhiteSpace(family)||family.Length>100||family is "system-ui" or "sans-serif" or "inherit") family="Segoe UI";
+        var font = CreateFontW(-(int)Math.Round(fontSize * request.Ratio), 0, 0, 0, Math.Clamp(request.FontWeight,100,900), 0, 0, 0, 1, 0, 0, 5, 0, family);
         SendMessageW(_edit, 0x0030, (nuint)font, 1);
         if (_font != 0) DeleteObject(_font); _font = font;
         SetWindowPos(_edit, 0, 0, 0, width, height, 0x0014);
@@ -65,6 +68,7 @@ public sealed class DesktopTextInput : IDisposable
         SetForegroundWindow(_host);
         SetFocus(_edit);
         SendMessageW(_edit, 0x00b1, (nuint)request.Text.Length, request.Text.Length);
+        ShowCaret(_edit);
         Publish();
     }
     public void Resize(nint surface, string json)
@@ -85,7 +89,7 @@ public sealed class DesktopTextInput : IDisposable
     private void Publish(bool submit = false)
     {
         var text = new StringBuilder(GetWindowTextLengthW(_edit) + 1); GetWindowTextW(_edit, text, text.Capacity);
-        Changed?.Invoke(new(_id, text.ToString(), submit, _active));
+        Changed?.Invoke(new(_id, text.ToString(), submit, _active, _composing));
     }
     private static nint CaptureBackground(int x,int y,int width,int height)
     {
@@ -95,7 +99,8 @@ public sealed class DesktopTextInput : IDisposable
         {
             if(memory==0 || bitmap==0) return 0;
             var previous=SelectObject(memory,bitmap);
-            var copied=BitBlt(memory,0,0,width,height,screen,x,y,0x00cc0020);
+            // Sample a text-free lower strip, so the background brush never contains old glyphs.
+            var copied=StretchBlt(memory,0,0,width,height,screen,x,y+Math.Max(0,height-2),width,1,0x00cc0020);
             SelectObject(memory,previous);
             return copied ? CreatePatternBrush(bitmap) : 0;
         }
@@ -105,6 +110,7 @@ public sealed class DesktopTextInput : IDisposable
     [DllImport("gdi32.dll")] private static extern nint CreateCompatibleBitmap(nint dc,int width,int height);
     [DllImport("gdi32.dll")] private static extern nint CreatePatternBrush(nint bitmap);
     [DllImport("gdi32.dll")] private static extern bool DeleteDC(nint dc);
+    [DllImport("gdi32.dll")] private static extern bool StretchBlt(nint target,int x,int y,int width,int height,nint source,int sourceX,int sourceY,int sourceWidth,int sourceHeight,uint operation);
     [DllImport("gdi32.dll")] private static extern bool BitBlt(nint target,int x,int y,int width,int height,nint source,int sourceX,int sourceY,uint operation);
     [DllImport("gdi32.dll")] private static extern int SetBkMode(nint dc,int mode);
     private static uint ParseColor(string value,uint fallback)
@@ -118,7 +124,7 @@ public sealed class DesktopTextInput : IDisposable
     {
         if (_host != 0) return;
         _brush = CreateSolidBrush(0x00291b13);
-        var cls = new WindowClass { Size = (uint)Marshal.SizeOf<WindowClass>(), Procedure = _windowProc, Instance = GetModuleHandleW(null), ClassName = _class, Background = 0 };
+        var cls = new WindowClass { Size = (uint)Marshal.SizeOf<WindowClass>(), Procedure = _windowProc, Instance = GetModuleHandleW(null), ClassName = _class, Background = 0, Cursor = LoadCursorW(0,(nint)32513) };
         if (RegisterClassExW(ref cls) == 0) throw new System.ComponentModel.Win32Exception();
         _registered = true;
         _host = CreateWindowExW(0x80, _class, "Alcyone 输入", 0x80000000, 0, 0, 1, 1, 0, 0, cls.Instance, 0);
@@ -129,13 +135,14 @@ public sealed class DesktopTextInput : IDisposable
     }
     private nint WindowMessage(nint hwnd, uint message, nuint wParam, nint lParam)
     {
-        if (message == 0x0111 && (wParam >> 16 & 0xffff) == 0x0300 && _active) Publish();
-        if (message == 0x0006 && (wParam & 0xffff) == 0 && Environment.TickCount64>=_focusGraceUntil) Close();
+        if (message == 0x0111 && (wParam >> 16 & 0xffff) == 0x0300 && _active) { InvalidateRect(_edit,0,true); Publish(); }
+        if (message == 0x0006 && (wParam & 0xffff) == 0) Close();
         if (message == 0x0133) { SetTextColor((nint)wParam, _textColor); SetBkColor((nint)wParam, _backgroundColor); SetBkMode((nint)wParam,_snapshotBackground ? 1 : 2); return _brush; }
         return DefWindowProcW(hwnd, message, wParam, lParam);
     }
     private nint EditMessage(nint hwnd, uint message, nuint wParam, nint lParam)
     {
+        if(message==0x0020) { SetCursor(LoadCursorW(0,(nint)32513)); return 1; }
         if(message==0x0102 && wParam>=32 && wParam<127)
         {
             var character=(char)wParam;
@@ -143,7 +150,7 @@ public sealed class DesktopTextInput : IDisposable
             if(_valueKind=="boolean" && !"truefalsTRUEFALS".Contains(character)) return 0;
         }
         if (message == 0x010d) _composing = true;
-        if (message == 0x010e) { _composing = false; _imeCommitAt = Environment.TickCount64; }
+        if (message == 0x010e) { _composing = false; _imeCommitAt = Environment.TickCount64; Publish(); }
         if (message == 0x0100 && wParam == 13 && Environment.TickCount64 - _imeCommitAt < 80) return 0;
         if (message == 0x0100 && !_composing && wParam == 65 && (GetKeyState(17) & 0x8000) != 0)
         { SendMessageW(_edit, 0x00b1, 0, -1); return 0; }
@@ -164,6 +171,10 @@ public sealed class DesktopTextInput : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct InputRect { public int Left,Top,Right,Bottom; }
     [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(nint window,uint color,byte alpha,uint flags);
     [DllImport("user32.dll")] private static extern short GetKeyState(int key);
+    [DllImport("user32.dll")] private static extern bool InvalidateRect(nint window,nint rectangle,bool erase);
+    [DllImport("user32.dll")] private static extern nint SetCursor(nint cursor);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)] private static extern nint LoadCursorW(nint instance,nint name);
+    [DllImport("user32.dll")] private static extern bool ShowCaret(nint window);
     [DllImport("user32.dll")] private static extern nint SetFocus(nint hwnd);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool SetWindowTextW(nint hwnd, string text);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextW(nint hwnd, StringBuilder text, int count);

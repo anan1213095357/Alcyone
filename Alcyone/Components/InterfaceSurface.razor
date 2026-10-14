@@ -2,18 +2,18 @@
 @using System.Globalization
 @inject DesktopWallpaperService DesktopService
 @implements IDisposable
-<div class="interface-surface" data-interface-id="@Screen.Id" data-config-key="@ConfigKey" style="left:@(N(Screen.X))px;top:@(N(Screen.Y))px;width:@(N(Screen.Width))px;height:@(N(Screen.Height))px;background:@(GlassColor(Screen.Background,Screen.BackgroundOpacity))" @onpointerdown:stopPropagation>
+<div class="interface-surface @(Screen.BackgroundOpacity<=0 ? "glass-clear" : "")" data-interface-id="@Screen.Id" data-config-key="@ConfigKey" style="left:@(N(Screen.X))px;top:@(N(Screen.Y))px;width:@(N(Screen.Width))px;height:@(N(Screen.Height))px;background:@(GlassColor(Screen.Background,Screen.BackgroundOpacity))" @onpointerdown:stopPropagation>
     <div class="interface-surface-handle" data-interface-handle><span>⠿</span><strong>@Screen.Name</strong>@if (!Desktop) { <button title="@L["设计界面"]" @onclick="Edit">✎</button><button title="@L["从画布移除"]" @onclick="Remove">×</button> }</div>
     @foreach (var c in Screen.Controls)
     {
-        <div @key="c.Id" class="interface-live-control @(c.Kind == "panel" ? "glass-panel" : "")" style="left:@(N(c.X))px;top:@(N(c.Y))px;width:@(N(c.Width))px;height:@(N(c.Height))px;z-index:@c.ZIndex;color:@c.Color;background:@(GlassColor(c.Background,c.BackgroundOpacity))">
+        <div @key="c.Id" class="interface-live-control @(c.BackgroundOpacity<=0 ? "glass-clear" : "") @(c.Kind == "panel" ? "glass-panel" : "")" style="left:@(N(c.X))px;top:@(N(c.Y))px;width:@(N(c.Width))px;height:@(N(c.Height))px;z-index:@c.ZIndex;color:@c.Color;background:@(GlassColor(c.Background,c.BackgroundOpacity))">
             @switch (c.Kind)
             {
                 case "button":
-                    <button disabled="@_busy" @onclick="() => Execute(c)">@c.Text</button>
+                    <button class="action-feedback @(_activeButton==c.Id ? "is-working" : "") @(_feedbackButton==c.Id ? (_buttonFailed ? "is-failed" : "is-complete") : "")" disabled="@_busy" aria-busy="@(_activeButton==c.Id)" @onclick="() => Execute(c)"><span>@c.Text</span>@if (_activeButton==c.Id) { <i class="button-spinner" aria-hidden="true"></i> }</button>
                     break;
                 case "input":
-                    <input class="@(_activeNativeControl==c.Id ? "native-editing" : null)" type="@(InputKind(c)=="number" && !Desktop ? "number" : "text")" step="any" data-value-kind="@InputKind(c)" data-native-input="@(Desktop ? NativeId(c) : null)" readonly="@Desktop" placeholder="@c.Text" value="@BoundText(c)" @onchange="e => ChangeValue(c,e.Value?.ToString() ?? string.Empty)" />
+                    <input class="@(_activeNativeControl==c.Id ? "native-editing" : null)" type="@(InputKind(c)=="number" && !Desktop ? "number" : "text")" step="any" data-value-kind="@InputKind(c)" data-native-input="@(Desktop ? NativeId(c) : null)" readonly="@Desktop" placeholder="@c.Text" value="@BoundText(c)" @oninput="e => ChangeCompleteValue(c,e.Value?.ToString() ?? string.Empty)" />
                     break;
                 case "checkbox":
                 <label><input type="checkbox" checked="@(BoundText(c) == "true")" @onchange='e => ChangeValue(c, e.Value?.ToString()?.ToLowerInvariant() ?? "false")' /> @c.Text</label>
@@ -38,6 +38,7 @@
     [Parameter] public EventCallback Remove { get; set; }
     [Parameter] public EventCallback<InterfaceControlModel> Clicked { get; set; }
     private string? _activeNativeControl;
+    private long _nativeEventVersion;
     private readonly Dictionary<string,string> _nativeIds=new();
     private string NativeId(InterfaceControlModel control) { if(!_nativeIds.TryGetValue(control.Id,out var id)) _nativeIds[control.Id]=id=Guid.NewGuid().ToString("N"); return id; }
     private string InputKind(InterfaceControlModel control)=>Variables.FirstOrDefault(v=>v.Name==control.VariableName)?.Type ?? "string";
@@ -47,17 +48,32 @@
         if(!Desktop) return;
         var id=_nativeIds.FirstOrDefault(p=>p.Value==update.Id).Key;
         var control=Screen.Controls.FirstOrDefault(c=>c.Id==id); if(control is null) return;
+        var version=++_nativeEventVersion;
         _=InvokeAsync(async()=>
         {
+            if(version!=_nativeEventVersion) { if(!update.Active || update.Submit) await ChangeValue(control,update.Text); return; }
             _activeNativeControl=update.Active ? control.Id : null;
             _draftValues[control.Id]=update.Text;
-            if(update.Submit || !update.Active) await ChangeValue(control,update.Text);
+            StateHasChanged();
+            if(!update.Composing && (!update.Active || update.Submit || IsCompleteValue(control,update.Text))) await ChangeValue(control,update.Text);
             StateHasChanged();
         });
     }
     public void Dispose()=>DesktopService.TextInput.Changed-=OnNativeInput;
     public override ValueTask DisposeAsync() { Dispose(); return base.DisposeAsync(); }
+    private bool IsCompleteValue(InterfaceControlModel control,string text)
+    {
+        switch(InputKind(control))
+        {
+            case "number": return double.TryParse(text,NumberStyles.Float,CultureInfo.InvariantCulture,out var number) && double.IsFinite(number);
+            case "boolean": return bool.TryParse(text,out _);
+            case "json": try { System.Text.Json.Nodes.JsonNode.Parse(text); return true; } catch(System.Text.Json.JsonException) { return false; }
+            default: return true;
+        }
+    }
     private bool _busy;
+    private string? _activeButton, _feedbackButton;
+    private bool _buttonFailed;
     private string _error="";
     [Parameter] public IReadOnlyDictionary<string,System.Text.Json.Nodes.JsonNode?> Values { get; set; } = new Dictionary<string,System.Text.Json.Nodes.JsonNode?>();
     [Parameter] public EventCallback<InterfaceValueChange> ValueChanged { get; set; }
@@ -69,17 +85,29 @@
         if(value is System.Text.Json.Nodes.JsonValue scalar && scalar.TryGetValue<string>(out var text)) return text;
         return value.ToJsonString();
     }
+    private async Task ChangeCompleteValue(InterfaceControlModel control,string text) { _draftValues[control.Id]=text; if(IsCompleteValue(control,text)) await ChangeValue(control,text); }
     private async Task ChangeValue(InterfaceControlModel control,string value)
     {
         _draftValues[control.Id]=value; _error="";
         if(string.IsNullOrWhiteSpace(control.VariableName)) return;
         try { await ValueChanged.InvokeAsync(new(Screen.Id,control.Id,value)); } catch(Exception ex) { _error=ex.Message; }
     }
+    // A fully transparent layer must contribute no tint.
     private static string GlassColor(string color,double opacity) => color + ((int)Math.Round(Math.Clamp(opacity,0,1)*255)).ToString("X2");
     private static string N(double value)=>value.ToString(CultureInfo.InvariantCulture);
     private async Task Execute(InterfaceControlModel control)
     {
-        if(_busy) return; _busy=true; _error="";
-        try { await Clicked.InvokeAsync(control); } catch(Exception ex) { _error=ex.Message; } finally { _busy=false; }
+        if(_busy) return;
+        _feedbackButton=null; _buttonFailed=false; _error="";
+        if(string.IsNullOrWhiteSpace(control.ClickAction.ActionMethod))
+        {
+            _error=L["请先绑定点击动作。"];
+            _buttonFailed=true; _feedbackButton=control.Id;
+            return;
+        }
+        _busy=true; _activeButton=control.Id; StateHasChanged();
+        try { await Clicked.InvokeAsync(control); }
+        catch(Exception ex) { _error=ex.Message; _buttonFailed=true; }
+        finally { _busy=false; _activeButton=null; _feedbackButton=control.Id; }
     }
 }

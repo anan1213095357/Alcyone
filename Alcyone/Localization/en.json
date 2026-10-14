@@ -963,5 +963,8 @@
   "上移一层": "Bring forward",
   "下移一层": "Send backward",
   "置顶": "Bring to front",
-  "置底": "Send to back"
+  "置底": "Send to back",
+  "请先绑定点击动作。": "Bind a click action first.",
+  "扫描间隔": "Scan interval",
+  "0 保持原扫描速度；间隔内复用上次结果。": "0 keeps the original scan rate. Reuse the previous result between scans."
 }
