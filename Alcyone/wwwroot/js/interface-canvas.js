@@ -14,7 +14,9 @@ export function attach(bridge) {
         if(input && e.button===0 && window.external?.sendMessage) {
             e.preventDefault();
             const r=input.getBoundingClientRect(),style=getComputedStyle(input),parent=getComputedStyle(input.parentElement);
-            window.external.sendMessage('alcyone:desktop:text-input:'+JSON.stringify({id:input.dataset.nativeInput,text:input.value,left:r.left+parseFloat(style.paddingLeft),top:r.top+1,width:Math.max(1,r.width-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),height:r.height-2,ratio:devicePixelRatio||1,fontSize:parseFloat(style.fontSize),fontFamily:style.fontFamily.split(',')[0].replaceAll('"',''),textColor:parent.color,backgroundColor:parent.backgroundColor,valueKind:input.dataset.valueKind,transparentSurface:true}));
+            const open=()=>{ window.external.sendMessage('alcyone:desktop:text-input:'+JSON.stringify({id:input.dataset.nativeInput,text:input.value,left:r.left+parseFloat(style.paddingLeft),top:r.top+1,width:Math.max(1,r.width-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),height:r.height-2,ratio:devicePixelRatio||1,fontSize:parseFloat(style.fontSize),fontFamily:style.fontFamily.split(',')[0].replaceAll('"',''),textColor:parent.color,backgroundColor:parent.backgroundColor,valueKind:input.dataset.valueKind,transparentSurface:true})); };
+            input.classList.add('native-editing');
+            requestAnimationFrame(()=>requestAnimationFrame(open));
             return;
         }
         const handle=e.target.closest('[data-interface-handle]');if(!handle||e.target.closest('button')||e.button!==0)return;e.preventDefault();e.stopPropagation();window.getSelection()?.removeAllRanges();const node=handle.closest('.interface-surface'),p=position(e);drag={node,left:node.offsetLeft,top:node.offsetTop,sx:e.clientX,sy:e.clientY,cx:e.clientX,cy:e.clientY,scale:p.scale,pointer:e.pointerId};node.setPointerCapture(e.pointerId);},{signal});
