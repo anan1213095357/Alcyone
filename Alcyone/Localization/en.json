@@ -980,5 +980,12 @@
   "对话模式": "Conversation mode",
   "日常咨询": "Chat",
   "删除桌面文件时播放星舰打包动画": "Play starship packing animation when desktop files are removed",
-  "预览星舰打包动画": "Preview starship packing animation"
+  "预览星舰打包动画": "Preview starship packing animation",
+  "放大收款码": "Enlarge payment QR code",
+  "作者提供的微信收款码": "Author-provided WeChat payment QR code",
+  "点击放大": "Click to enlarge",
+  "使用咨询": "Usage consultation",
+  "微信扫码支付": "Pay with WeChat",
+  "软件免费，付费下载均为诈骗；使用咨询为付费服务。": "This software is free. Paid downloads are scams. Usage consultation is a paid service.",
+  "微信收款码": "WeChat payment QR code"
 }

@@ -13,18 +13,41 @@
                 <a href="https://github.com/anan1213095357/Alcyone" target="_blank" rel="noopener noreferrer"><span class="link-icon">◇</span><span><small>OPEN SOURCE</small><strong>@L["Alcyone 项目源码"]</strong></span><b>↗</b></a>
                 <a href="https://github.com/anan1213095357/Alcyone/issues" target="_blank" rel="noopener noreferrer"><span class="link-icon">✧</span><span><small>FEEDBACK</small><strong>@L["问题反馈与建议"]</strong></span><b>↗</b></a>
             </div>
+            <div class="about-payment">
+                <button class="payment-thumbnail" title="@L["放大收款码"]" aria-label="@L["放大收款码"]" @onclick="() => _paymentOpen=true"><img src="images/author-payment.jpg" alt="@L["作者提供的微信收款码"]" /><span>@L["点击放大"]</span></button>
+                <div class="payment-copy"><strong>@L["使用咨询"]</strong><span>@L["微信扫码支付"]</span><small>@L["软件免费，付费下载均为诈骗；使用咨询为付费服务。"]</small></div>
+            </div>
             <footer>Windows · .NET 10 · Blazor <span>Signed by weishanghu</span></footer>
         </div>
         <aside class="about-contact"><span class="contact-label"><i></i> @L["保持联系"]</span><h3>@L["微信聊一聊"]</h3><p>@L["扫码添加作者，交流与反馈"]</p><div class="wechat-image"><img src="images/author-wechat.jpg" alt="@L["作者提供的微信好友二维码"]" /></div><small>@L["打开微信扫一扫，添加我为好友"]</small><span class="contact-footnote">@L["感谢每一个让项目变得更好的想法。"]</span></aside>
     </section>
 </div>
 
+@if (_paymentOpen)
+{
+    <div class="payment-lightbox" @onclick="() => _paymentOpen=false">
+        <section role="dialog" aria-modal="true" @onkeydown="HandleKey" aria-label="@L["微信收款码"]" @onclick:stopPropagation="true">
+            <button class="payment-close" aria-label="@L["关闭"]" @onclick="() => _paymentOpen=false" @ref="_paymentCloseButton">×</button>
+            <img src="images/author-payment.jpg" alt="@L["作者提供的微信收款码"]" />
+        </section>
+    </div>
+}
+
 @code {
     [Parameter] public EventCallback OnClose { get; set; }
-    private ElementReference _closeButton;
+    private ElementReference _closeButton, _paymentCloseButton;
+    private bool _paymentOpen, _paymentWasOpen;
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender) await _closeButton.FocusAsync();
+        if(_paymentOpen && !_paymentWasOpen) await _paymentCloseButton.FocusAsync();
+        if(!_paymentOpen && _paymentWasOpen) await _closeButton.FocusAsync();
+        _paymentWasOpen=_paymentOpen;
     }
-    private Task HandleKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e) => e.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
+    private Task HandleKey(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if(e.Key!="Escape")return Task.CompletedTask;
+        if(_paymentOpen){_paymentOpen=false;return Task.CompletedTask;}
+        return OnClose.InvokeAsync();
+    }
 }
