@@ -12,11 +12,12 @@ export function attach(root, bridge) {
         d.h = d.resize ? Math.max(24, Math.min(d.board.clientHeight - d.y, d.height + dy)) : d.height;
         Object.assign(d.node.style, {left:d.x+'px',top:d.y+'px',width:d.w+'px',height:d.h+'px'});
     };
+    document.addEventListener('selectstart',e=>{if(drag)e.preventDefault();},{signal});
     root.addEventListener('pointerdown', e => {
         const node = e.target.closest('[data-ui-id]');
         if (e.target.closest('.design-control-delete')) return;
         if (!node || node.dataset.preview === 'true' || e.button !== 0) return;
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault(); e.stopPropagation(); window.getSelection()?.removeAllRanges();
         const board = node.closest('.design-board');
         drag = {node,board,resize:!!e.target.closest('[data-ui-resize]'),left:node.offsetLeft,top:node.offsetTop,width:node.offsetWidth,height:node.offsetHeight,startX:e.clientX,startY:e.clientY,clientX:e.clientX,clientY:e.clientY,pointer:e.pointerId};
         node.setPointerCapture(e.pointerId);

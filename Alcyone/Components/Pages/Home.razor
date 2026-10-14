@@ -1276,6 +1276,7 @@
         }
 
         function drawEdges() {
+            window.alcyoneRouteParticles?.begin();
             if (!edgeLayer) return;
             if (window.alcyoneAnimation.paused) { scheduleDrawEdges(); return; }
             clearTimeout(flightCleanup);
@@ -1307,6 +1308,7 @@
                 if (interplanet && !flights.length) shipFlights.delete(edge.id);
                 const highlighted = interplanet ? flights.length > 0 : running.has(edge.id);
                 for(const started of flights)nextArrival=Math.min(nextArrival,started+flightDuration-now);
+                if(interplanet)window.alcyoneRouteParticles?.set(edge.id,d,metric,edgeOpacity,highlighted);
                 const signature=JSON.stringify([d,edgeOpacity,interplanet,highlighted,edgeState.selectedEdgeId===edge.id,edge.delayMilliseconds,flights,document.documentElement.lang,edgeState.starshipAppearance,edgeState.starshipScale,edgeState.starshipImageVersion]);
                 const saved=edgeMarkup.get(edge.id);
                 if(saved?.signature===signature){html+=saved.html;ships+=saved.ships;continue;}
@@ -1332,32 +1334,7 @@
     if (interplanet) {
         const dx = end.x-start.x, dy = end.y-start.y, length = Math.max(1,Math.hypot(dx,dy));
         html += `<path class="star-route-halo" d="${d}" fill="none" stroke="${highlighted ? '#35efca' : '#6ba7ed'}" stroke-width="${highlighted ? 34 : 26}" opacity="${edgeOpacity*(highlighted ? .3 : .1)}" />`;
-        const sampler = metric;
-        const routeLength = sampler.getTotalLength(), samples = [];
-        for (let i=0;i<=32;i++) {
-            const at=routeLength*i/32, p=sampler.getPointAtLength(at), q=sampler.getPointAtLength(Math.min(routeLength,at+1));
-            const previous=sampler.getPointAtLength(Math.max(0,at-1));
-            const vx=q.x-previous.x, vy=q.y-previous.y, n=Math.max(.001,Math.hypot(vx,vy));
-            samples.push({x:p.x,y:p.y,nx:-vy/n,ny:vx/n});
-        }
-        for (let lane = -4; lane <= 4; lane++) {
-            const points = samples.map((p,i) => {
-                const taper=Math.sin(Math.PI*i/32), fringe=Math.abs(lane)>=3;
-                const jitter=(Math.sin(i*1.73+lane*3.1)+Math.sin(i*.63+lane))*(fringe?3.2:1.2);
-                const shift=(lane*3.2+jitter)*taper;
-                return {x:p.x+p.nx*shift,y:p.y+p.ny*shift};
-            });
-            let dustPath=`M ${points[0].x} ${points[0].y}`;
-            for(let i=1;i<points.length-1;i++) dustPath+=` Q ${points[i].x} ${points[i].y} ${(points[i].x+points[i+1].x)/2} ${(points[i].y+points[i+1].y)/2}`;
-            dustPath+=` T ${points[32].x} ${points[32].y}`;
-            const duration = (lane % 2 ? 1.2 : 1.6) * (highlighted ? .6 : 1);
-            const delay = -((window.alcyoneAnimation.now()/1000 + (lane+3)*.19) % duration);
-            const opacity = edgeOpacity * (highlighted ? (lane === 0 ? 1 : .9) : (lane === 0 ? .85 : .5));
-            html += `<path class="warp-dust ${highlighted ? 'is-outputting' : ''}" d="${dustPath}" fill="none"
-                stroke="${highlighted ? (lane%2 ? '#eefff7' : '#53f5cd') : (lane%2 ? '#d4eaff' : '#88bfff')}" stroke-width="${(lane===0 ? 2.4 : 1.5)*(highlighted ? 1.25 : 1)}" stroke-linecap="round"
-                stroke-dasharray="${Math.abs(lane)>=3 ? '1 9 .5 27 1 43 .5 38' : (lane%2 ? '3 17 1 39' : '1 13 2 44')}"
-                style="animation-duration:${duration}s;animation-delay:${delay}s;opacity:${opacity}" />`;
-        }
+
     }
     html += `
     <path
@@ -1471,6 +1448,7 @@
                     flight.animation.currentTime=Math.max(0,elapsed);flight.duration=duration;
                 }
             }
+            window.alcyoneRouteParticles?.end();
             const liveIds=new Set((edgeState.edges||[]).map(edge=>edge.id));
             for(const id of routeMetrics.keys())if(!liveIds.has(id)){routeMetrics.delete(id);edgeMarkup.delete(id);}
             if (Number.isFinite(nextArrival)) flightCleanup = setTimeout(drawEdges, nextArrival * 1000 + 20);
@@ -1609,6 +1587,7 @@
             }
 
             if (event.button === 1 || event.button === 2) {
+                window.getSelection()?.removeAllRanges();
                 pan = {
                     mouseX: event.clientX,
                     mouseY: event.clientY,
@@ -1970,6 +1949,7 @@
                 clearTimeout(flightCleanup); shipFlights.clear();
                 if (!initialized) return;
                 window.alcyoneGroups?.dispose();
+                window.alcyoneRouteParticles?.dispose();
                 stopStarfield?.(); stopStarfield = null;
                 workspace?.removeEventListener("pointerdown", onPointerDown);
                 workspace?.removeEventListener("contextmenu", onCanvasContextMenu);

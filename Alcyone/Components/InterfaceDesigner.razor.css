@@ -16,3 +16,5 @@
 .design-control-delete{top:4px;right:4px}
 
 .design-layer-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}.design-layer-actions .btn{font-size:11px;padding:7px}.design-control.selected{outline-color:#8bd0ff}
+
+.interface-surface-handle,.interface-surface-handle *,.design-control:not([data-preview="true"]),.design-control:not([data-preview="true"]) *{user-select:none;-webkit-user-select:none}

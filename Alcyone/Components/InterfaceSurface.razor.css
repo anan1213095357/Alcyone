@@ -11,3 +11,7 @@
 .interface-live-control>input.native-editing{color:transparent;caret-color:transparent}.interface-live-control>input.native-editing::placeholder{color:transparent}
 
 .interface-surface-handle{z-index:2147483647}
+
+.interface-surface-handle,.interface-surface-handle *,.design-control:not([data-preview="true"]),.design-control:not([data-preview="true"]) *{user-select:none;-webkit-user-select:none}
+
+.interface-surface,.interface-surface *{user-select:none;-webkit-user-select:none}.interface-surface input:not([type=checkbox]),.interface-surface textarea{user-select:text;-webkit-user-select:text}
