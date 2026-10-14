@@ -218,7 +218,7 @@ internal sealed class DesktopIconAvoidance : IDisposable
         if (!success) _ipcTimedOut = true;
         return success;
     }
-    private static nint FindIconList()
+    internal static nint FindIconList()
     {
         nint list = 0;
         EnumWindows((window, _) =>

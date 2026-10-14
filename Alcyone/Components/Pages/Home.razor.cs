@@ -62,7 +62,25 @@ public partial class Home
     private bool _aiDialogOpen;
     private bool _aiBusy;
     private AiStreamProgress? _aiProgress;
-    private string _aiScope = "both";
+    private bool _aiEditInterfaces, _aiEditMachine=true, _aiEditScripts=true;
+    private bool HasAiScope => _aiEditInterfaces || _aiEditMachine || _aiEditScripts;
+    private string AiScopeInstructions => $"允许修改：界面={_aiEditInterfaces}，状态机流程={_aiEditMachine}，脚本={_aiEditScripts}。未勾选界面则 screens=[]；未勾选流程则 applyMachine=false；未勾选脚本则 scripts=[]。即使其他说明建议生成相关内容，也必须遵守这些范围。勾选表示允许，可按需要只修改部分已勾选内容。";
+    private void SelectAiChat() { _aiEditInterfaces=false; _aiEditMachine=false; _aiEditScripts=false; AiScopeChanged(); }
+    private void ToggleAiScope(int scope)
+    {
+        if(scope==0) _aiEditInterfaces=!_aiEditInterfaces;
+        if(scope==1) _aiEditMachine=!_aiEditMachine;
+        if(scope==2) _aiEditScripts=!_aiEditScripts;
+        AiScopeChanged();
+    }
+    private void AiScopeChanged() { _pendingAiPlan=null; _aiError=string.Empty; }
+    private void ValidateAiScope(AiMachinePlan plan)
+    {
+        if(!HasAiScope) throw new InvalidOperationException("请至少选择一个修改范围。");
+        if(!_aiEditInterfaces && plan.Screens.Count>0) throw new InvalidOperationException("未勾选界面，不能应用界面改动。");
+        if(!_aiEditMachine && plan.ApplyMachine) throw new InvalidOperationException("未勾选流程，不能应用流程改动。");
+        if(!_aiEditScripts && plan.Scripts.Count>0) throw new InvalidOperationException("未勾选脚本，不能应用脚本改动。");
+    }
     private bool _startingRuntime, _steppingRuntime, _resettingRuntime, _stoppingRuntime;
     private bool RuntimeControlsBusy => _session is null || Runtime.Running || _executing
         || _startingRuntime || _steppingRuntime || _resettingRuntime || _stoppingRuntime;
@@ -1157,6 +1175,7 @@ public partial class Home
         var condition = FindCondition(stateId, outputId, conditionId);
         if (condition is null) return;
         condition.Left = value;
+        NormalizeVariableComparison(condition);
         RefreshCurrentConditionResults();
     }
 
@@ -1165,6 +1184,7 @@ public partial class Home
         var condition = FindCondition(stateId, outputId, conditionId);
         if (condition is null) return;
         condition.Operator = value;
+        NormalizeVariableComparison(condition);
         RefreshCurrentConditionResults();
     }
 
@@ -1173,7 +1193,8 @@ public partial class Home
         var condition = FindCondition(stateId, outputId, conditionId);
         if (condition is null) return;
         condition.RightMode = value;
-        if (value == "variable") condition.RightValue = JsonValue.Create(Machine.Variables.FirstOrDefault()?.Name ?? string.Empty);
+        NormalizeVariableComparison(condition);
+        if (value == "variable") condition.RightValue = JsonValue.Create(ComparisonVariables(condition).FirstOrDefault()?.Name ?? string.Empty);
         RefreshCurrentConditionResults();
     }
 
@@ -1680,6 +1701,7 @@ public partial class Home
                     condition.Operator ??= "==";
                     condition.RightMode ??= "literal";
                     condition.RightType ??= "boolean";
+                    NormalizeVariableComparison(condition);
                     condition.RightValue ??= JsonValue.Create(false);
                 }
             }
@@ -1908,6 +1930,7 @@ public partial class Home
     private void OpenAiDialog()
     {
         _scriptAiContext = null;
+        _aiEditInterfaces=false; _aiEditMachine=false; _aiEditScripts=false;
         _aiDialogOpen = true;
         _aiError = string.Empty;
     }
@@ -2003,7 +2026,7 @@ public partial class Home
             var systemPrompt = $$"""
 你是桌面自动化状态机与 C# 脚本开发助手。
 本产品使用多点找色、字典 OCR、固定文字查找判断当前画面，再执行键鼠脚本。不要生成 PLC、输送线、洗衣机或机器人控制示例。
-本次修改范围：{{(_aiScope == "script" ? "仅脚本：applyMachine=false，只修改 csx 文件。" : _aiScope == "machine" ? "仅流程：applyMachine=true，scripts 必须为空，只调用现有动作。" : "按用户需求修改流程与脚本。")}}
+本次修改范围：{{AiScopeInstructions}}
 状态机和持续识别运行在独立后台服务，页面刷新不会停止运行。不要在 loopAction 里自行写无限 OCR/找色循环，持续检测由出口识别条件负责。
 多点色库根项 isFolder=true 只是库，不能作为 recognitionId；必须引用其 parentId 关联下的实际记录（isFolder=false）。脚本按“库名/记录名”或真实 ID 查找，避免同名混淆。
 
@@ -2272,9 +2295,9 @@ reply 尽量简短。
             systemPrompt += ScriptDevelopmentInstructions;
             systemPrompt += "\n你也支持生成可视化界面。只要求界面时 applyMachine=false，保留现有状态机。返回 JSON 顶层增加 screens 数组；未修改的界面不返回。每个界面：id（新建用唯一英文ID，修改保留原ID）、name、width、height、background（#RRGGBB）、backgroundOpacity（0到1的玻璃色调不透明度，默认0.25，背景始终毛玻璃）、controls；放置在画布时 isPlaced=true，x/y 为画布位置（画布4000×2500），修改时保留已有放置位置。每个控件：id、kind（button/label/input/checkbox/select/panel）、name、text、x、y、width、height、zIndex（层级越大越靠前；背景面板默认0，输入框和按钮默认10）、color、background、backgroundOpacity、variableName（input/checkbox/select可绑定现有全局变量名，双向同步；checkbox绑定boolean，select绑定string，input绑定string/number/json）、options（下拉字符串数组）、clickAction:{actionMethod:真实动作Key,actionArguments:[{parameterName,source:literal或variable,literalValue,variableName}]}。所有坐标在画板内；容器只是背景面板，控件均按画板绝对坐标排列，面板先于其他控件。点击动作调用已有生命周期方法；需要新动作同时生成scripts，Key遵守现有动作规则。不需要修改的流程或脚本数组可为空。输入控件可通过variableName双向绑定全局变量，按钮动作参数可引用这个全局变量。\n";
             systemPrompt += "当前界面配置：" + JsonSerializer.Serialize(Machine.Screens, _jsonOptions);
-            if (_interfaceMode) systemPrompt += "\n当前用户正在界面设计器，优先处理界面需求，除非明确要求修改状态机，否则applyMachine=false。当前界面ID：" + _interfaceId;
+            if (_interfaceMode && !_aiEditMachine) systemPrompt += "\n当前用户正在界面设计器，优先处理界面需求，除非明确要求修改状态机，否则applyMachine=false。当前界面ID：" + _interfaceId;
 
-            if (_aiScope == "script" && _scriptAiContext is not null)
+            if (_aiEditScripts && _scriptAiContext is not null)
                 systemPrompt += $$"""
 
 本次从脚本编辑器发起，请按以下上下文完成用户需求，不要求用户再描述特性、类结构或脚本类型。
@@ -2282,11 +2305,13 @@ reply 尽量简短。
 {{(_scriptAiContext.Kind == "action" ? "生成 StateScript 类，用 [StateAction] 标注动作，返回 void 或 Task。" : _scriptAiContext.Kind is "condition" or "async-condition" ? "生成 StateScript 类，用 [StateCondition(显示名称, 分类)] 标注 public 无参数方法。该函数表示是否触发条件，不是生命周期动作，不使用 [StateAction]。" : "优先保留当前代码类型；新脚本根据用户意图判断：执行操作用 [StateAction]，判断是否满足/触发用 [StateCondition]。")}}
 条件函数只能返回 bool、Task<bool> 或 ValueTask<bool>；true 表示满足，false 表示不满足；异步条件必须等待工作完成后返回结果。同步条件返回 bool，异步条件使用 async Task<bool>。
 使用外部 NuGet 库时在脚本顶部添加 #r "nuget: 包名, 版本"，宿主会自动下载依赖并编译；外部库必须带齐对应 using 或使用完整类型名；FreeSql 的 [Table]/[Column] 使用 using FreeSql.DataAnnotations;，不要误用 EF 的同名属性。不要要求用户手动安装库。StateCondition 已由宿主导入，不需要额外 using。条件可用 Vars.Get<T> 读取已有变量，可用 Api 和 System.IO 等实际接口判断，异常不应伪装成满足条件。
-applyMachine 必须为 false。已有文件优先修改当前文件并保留其他功能；新建时使用下方文件名（如为空或非法则取有效英文名）。返回完整可编译代码并添加简短中文注释。
+未勾选流程时 applyMachine 必须为 false。已有文件优先修改当前文件并保留其他功能；新建时使用下方文件名（如为空或非法则取有效英文名）。返回完整可编译代码并添加简短中文注释。
 以下 source 是编辑器最新内容，包含未保存修改，优先于磁盘脚本。selection 是用户选中的片段，errors 是最近编译错误；修复需求结合它们处理。
 编辑上下文：{{JsonSerializer.Serialize(_scriptAiContext, _jsonOptions)}}
 """;
 
+            systemPrompt += "\n最终修改范围约束：" + AiScopeInstructions;
+            if(!HasAiScope) systemPrompt="你是 Alcyone 的 AI 对话助手。用户当前处于日常咨询模式。直接用 Markdown 自然回答问题；不生成变更方案JSON，不执行或修改界面、状态机、脚本。可以解释技术和给建议。";
             var aiConversation = _aiMessages
                 .Select(message => (object)new
                 {
@@ -2325,6 +2350,12 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
                 StateHasChanged();
             }));
 
+            if(!HasAiScope)
+            {
+                _pendingAiPlan=null;
+                _aiMessages.Add(new AiChatItem { Role="assistant",Reasoning=_aiProgress?.Reasoning ?? "",Text=content });
+                return;
+            }
             var json = ExtractAiJson(content);
 
             var plan = JsonSerializer.Deserialize<AiMachinePlan>(json, _jsonOptions)
@@ -2340,8 +2371,7 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
 
             ValidateAiScripts(plan.Scripts);
 
-            if (_aiScope == "script" && plan.ApplyMachine) throw new InvalidOperationException("当前选择仅脚本，生成结果不能修改流程。");
-            if (_aiScope == "machine" && plan.Scripts.Count > 0) throw new InvalidOperationException("当前选择仅流程，生成结果不能修改脚本。");
+            ValidateAiScope(plan);
             if (plan.ApplyMachine)
                 ValidateAiPlan(plan, validateActions: false);
             else if (plan.Scripts.Count == 0 && plan.Screens.Count == 0)
@@ -2378,6 +2408,8 @@ applyMachine 必须为 false。已有文件优先修改当前文件并保留其�
         if (_pendingAiPlan is null || _aiBusy)
             return;
 
+        try { ValidateAiScope(_pendingAiPlan); }
+        catch(Exception ex) { _aiError=ex.Message; return; }
         _aiBusy = true;
         _aiError = string.Empty;
 

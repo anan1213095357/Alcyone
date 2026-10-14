@@ -1,12 +1,13 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
-<div class="stream-view" @ref="_root">
+@inject StateMachine.Localization.UiText Text
+<div class="stream-view @(Busy ? "is-streaming" : "")" @ref="_root">
 @if (Progress is not null)
 {
     @if (Busy) { <div class="stream-status" role="status"><i></i>@Progress.Status</div> }
     @if (!string.IsNullOrEmpty(Progress.Reasoning))
     {
-        <details class="stream-thought"><summary>思考内容 · @Progress.Reasoning.Length 字符</summary><pre data-ai-thought-scroll>@Tail(Progress.Reasoning)</pre></details>
+        <details class="stream-thought"><summary><span>@Text["思考过程"]</span>@if (Busy) { <i class="thought-activity" aria-hidden="true"><b></b><b></b><b></b></i> }</summary><div class="thought-scroll-frame"><pre data-ai-thought-scroll>@Tail(Progress.Reasoning)</pre></div></details>
     }
     @if (Busy && !string.IsNullOrEmpty(Progress.Content)) { <div class="stream-content"><AiMarkdown Text="@Tail(JsonReply ? AiReplyText.FromPartialJson(Progress.Content) : Progress.Content)" /></div> }
 }

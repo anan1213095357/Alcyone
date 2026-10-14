@@ -37,6 +37,13 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     private bool _lastEditorHidden;
     private DesktopPointerRouter? _pointerRouter;
     private DesktopIconAvoidance? _iconAvoidance;
+    private DesktopFilePacking? _filePacking;
+    private DesktopDeleteInterceptor? _deleteInterceptor;
+    private sealed record PendingPackingDelete(DesktopFilePacking.Selection File,nint Surface);
+    private readonly Dictionary<string,PendingPackingDelete> _packingDeletes=new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string,byte> _packingDeletePaths=new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(nint Window,string Id,bool Success)> _packingResults=new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<DesktopFilePacking.Item> _packingPreviews=new();
     public DesktopTextInput TextInput { get; } = new();
     public bool AnimationsPaused { get; private set; }
     [DllImport("user32.dll", EntryPoint = "LoadImageW",
@@ -270,6 +277,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         ReconcileDisplays(force: true);
         if (_surfaces.Count == 0) throw new InvalidOperationException(text["没有检测到可用显示器。"]);
         IsDesktop = true;
+        EnsurePackingInterceptor();
         // Watch DPI changes as well as display broadcasts. Some scaling changes do not
         // send WM_DISPLAYCHANGE to an off-screen control window.
         SetTimer(_helper, 1, 2000, 0);
@@ -292,6 +300,12 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             if (!_disposed && message == "alcyone:desktop:text-close")
             {
                 TextInput.Close(surface.WindowHandle);
+                return;
+            }
+            const string packingCommit="alcyone:desktop:pack-commit:";
+            if(!_disposed && message.StartsWith(packingCommit,StringComparison.Ordinal))
+            {
+                CommitPackedFile(surface.WindowHandle,message[packingCommit.Length..]);
                 return;
             }
             const string resizeInput = "alcyone:desktop:text-resize:";
@@ -367,6 +381,60 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         SetForegroundWindow(handle);
     }
 
+    private void EnsurePackingInterceptor()
+    {
+        if(!preferences.FilePackingAnimation) return;
+        _filePacking ??=new DesktopFilePacking();
+        _deleteInterceptor ??=new DesktopDeleteInterceptor(()=>_filePacking?.SelectedFiles() ?? new(),RequestFilePacking);
+    }
+    private void RequestFilePacking(List<DesktopFilePacking.Selection> files)
+    {
+        if(!IsDesktop || _disposed || !preferences.FilePackingAnimation)return;
+        foreach(var file in files)
+        {
+            if(!_packingDeletePaths.TryAdd(file.Path,0))continue;
+            var id=Guid.NewGuid().ToString("N");_packingDeletes[id]=new(file,0);
+            _packingPreviews.Enqueue(new(file.Name,file.X,file.Y,id));
+        }
+        PostMessageW(_helper,0x0113,1,0);
+    }
+    private void CommitPackedFile(nint surface,string id)
+    {
+        if(!IsDesktop || !preferences.FilePackingAnimation || !_packingDeletes.TryGetValue(id,out var pending) || pending.Surface!=surface)return;
+        _packingDeletes.Remove(id);
+        _=Task.Run(()=>
+        {
+            var success=false;
+            try
+            {
+                var file=pending.File;
+                FileSystemInfo info=file.Directory ? new DirectoryInfo(file.Path) : new FileInfo(file.Path);
+                if(!info.Exists || info.CreationTimeUtc!=file.Created || info.LastWriteTimeUtc!=file.Written)
+                    throw new IOException("桌面文件在动画期间发生变化，已取消删除。");
+                if(file.Directory) Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(file.Path,Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin,Microsoft.VisualBasic.FileIO.UICancelOption.ThrowException);
+                else Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(file.Path,Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin,Microsoft.VisualBasic.FileIO.UICancelOption.ThrowException);
+                success=true;
+            }
+            catch(Exception ex){logger.LogError(ex,"Packing animation recycle operation failed");}
+            finally
+            {
+                _packingDeletePaths.TryRemove(pending.File.Path,out _);
+                if(!_disposed){_packingResults.Enqueue((surface,id,success));PostMessageW(_helper,0x0113,1,0);}
+            }
+        });
+    }
+    public void PreviewFilePacking()
+    {
+        if(!IsDesktop || _helper==0) return;
+        var display=_displays.FirstOrDefault(); if(display is null) return;
+        _packingPreviews.Enqueue(new DesktopFilePacking.Item("Alcyone.txt",display.X+display.Width/2,display.Y+display.Height/2));
+        PostMessageW(_helper,0x0113,1,0);
+    }
+    private bool TryTakePacking(out DesktopFilePacking.Item? item)
+    {
+        if(_packingPreviews.TryDequeue(out item)) return true;
+        item=null; return _filePacking?.TryTake(out item)==true;
+    }
     private void ReconcileDisplays(bool force = false)
     {
         var displays = DesktopDisplays.Enumerate();
@@ -448,6 +516,8 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     private void StopDesktop()
     {
         IsDesktop = false;
+        _deleteInterceptor?.Dispose(); _deleteInterceptor=null; _packingDeletes.Clear(); _packingDeletePaths.Clear();
+        _filePacking?.Dispose(); _filePacking=null;
         _pointerRouter?.Dispose(); _pointerRouter = null;
         _iconAvoidance?.Dispose(); _iconAvoidance = null;
         if (_helper != 0) KillTimer(_helper, 1);
@@ -506,6 +576,30 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
                 if (notification is 0x0203 or 0x0401) { RestoreEditor(); Changed?.Invoke(); }
                 else if (notification is 0x007b or 0x0205) ShowTrayMenu();
                 return 0;
+            }
+            if(IsDesktop && message==0x0113)
+            {
+                if(preferences.FilePackingAnimation) EnsurePackingInterceptor();
+                else { _deleteInterceptor?.Dispose(); _deleteInterceptor=null; _filePacking?.Dispose(); _filePacking=null; _packingDeletes.Clear(); _packingDeletePaths.Clear(); }
+            }
+            if(message==0x0113)
+            {
+                while(_packingResults.TryDequeue(out var result))
+                    if(IsWindow(result.Window)) _surfaces.Values.FirstOrDefault(s=>s.WindowHandle==result.Window)?.SendWebMessage("alcyone:desktop:pack-result:"+System.Text.Json.JsonSerializer.Serialize(new { id=result.Id,success=result.Success }));
+            }
+            if(IsDesktop && message==0x0113 && (_filePacking is not null || !_packingPreviews.IsEmpty))
+            {
+                while(TryTakePacking(out var item))
+                {
+                    if(item is null) continue;
+                    foreach(var surface in _surfaces.Values)
+                    {
+                        if(!GetWindowRect(surface.WindowHandle,out var bounds) || item.X<bounds.Left || item.X>=bounds.Right || item.Y<bounds.Top || item.Y>=bounds.Bottom) continue;
+                        if(item.Id is not null && _packingDeletes.TryGetValue(item.Id,out var pending)) _packingDeletes[item.Id]=pending with { Surface=surface.WindowHandle };
+                        surface.SendWebMessage("alcyone:desktop:pack-file:"+System.Text.Json.JsonSerializer.Serialize(new { id=item.Id,name=item.Name,x=item.X-bounds.Left,y=item.Y-bounds.Top }));
+                        break;
+                    }
+                }
             }
             if (IsDesktop && message is 0x007e or 0x001a or 0x0219 or 0x0113)
                 ReconcileDisplays(); // Topology, work area, device and periodic DPI refresh.

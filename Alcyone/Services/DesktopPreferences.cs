@@ -8,6 +8,7 @@ public sealed class DesktopPreferences
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private readonly string _path;
     private readonly object _gate = new();
+    public bool FilePackingAnimation { get; private set; } = true;
     public bool RestoreDesktop { get; private set; } = true;
     public bool DesktopEnabled { get; private set; }
     public string ConfigKey { get; private set; } = "default";
@@ -23,7 +24,7 @@ public sealed class DesktopPreferences
             if (!File.Exists(_path)) return;
             var saved = JsonSerializer.Deserialize<Settings>(File.ReadAllText(_path));
             if (saved is null) return;
-            RestoreDesktop = saved.RestoreDesktop; DesktopEnabled = saved.DesktopEnabled; ConfigKey = saved.ConfigKey;
+            FilePackingAnimation = saved.FilePackingAnimation; RestoreDesktop = saved.RestoreDesktop; DesktopEnabled = saved.DesktopEnabled; ConfigKey = saved.ConfigKey;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
     }
@@ -37,14 +38,15 @@ public sealed class DesktopPreferences
             command += $" \"{Path.Combine(AppContext.BaseDirectory, "Alcyone.dll")}\"";
         key.SetValue("Alcyone", command + " --startup");
     }
-    public void SetRestore(bool enabled) { lock (_gate) Save(new(enabled, DesktopEnabled, ConfigKey)); }
-    public void RememberDesktop(bool enabled, string? configKey = null) { lock (_gate) Save(new(RestoreDesktop, enabled, configKey ?? ConfigKey)); }
+    public void SetRestore(bool enabled) { lock (_gate) Save(new(enabled, DesktopEnabled, ConfigKey, FilePackingAnimation)); }
+    public void RememberDesktop(bool enabled, string? configKey = null) { lock (_gate) Save(new(RestoreDesktop, enabled, configKey ?? ConfigKey, FilePackingAnimation)); }
+    public void SetFilePacking(bool enabled) { lock(_gate) Save(new(RestoreDesktop,DesktopEnabled,ConfigKey,enabled)); }
     private void Save(Settings settings)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
         var temporary = _path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(settings)); File.Move(temporary, _path, true);
-        RestoreDesktop = settings.RestoreDesktop; DesktopEnabled = settings.DesktopEnabled; ConfigKey = settings.ConfigKey;
+        FilePackingAnimation = settings.FilePackingAnimation; RestoreDesktop = settings.RestoreDesktop; DesktopEnabled = settings.DesktopEnabled; ConfigKey = settings.ConfigKey;
     }
-    private sealed record Settings(bool RestoreDesktop, bool DesktopEnabled, string ConfigKey);
+    private sealed record Settings(bool RestoreDesktop, bool DesktopEnabled, string ConfigKey, bool FilePackingAnimation = true);
 }

@@ -754,6 +754,8 @@ public sealed partial class MachineSession : IAsyncDisposable
         if (condition.Kind == "script") return _scriptConditionResults.GetValueOrDefault(condition.Id);
         if (condition.Kind == "windows") return WindowsConditions.Evaluate(condition);
         if (condition.Kind == "recognition") return EvaluateRecognitionCondition(condition);
+        var variableType=Machine.Variables.FirstOrDefault(v=>v.Name==condition.Left)?.Type;
+        if(variableType is null || !VariableComparisonRules.Operators(variableType).Contains(condition.Operator)) return false;
         Runtime.Variables.TryGetValue(condition.Left, out var leftNode);
         JsonNode? rightNode;
         if (condition.RightMode == "variable")
@@ -762,9 +764,15 @@ public sealed partial class MachineSession : IAsyncDisposable
         }
         else
         {
-            rightNode = ConvertNodeValue(condition.RightValue, condition.RightType);
+            rightNode = ConvertNodeValue(condition.RightValue, variableType);
         }
 
+        if(condition.RightMode=="variable" && Machine.Variables.FirstOrDefault(v=>v.Name==NodeString(condition.RightValue))?.Type!=variableType) return false;
+        if(variableType=="json")
+        {
+            var equals=JsonNode.DeepEquals(leftNode,rightNode);
+            return condition.Operator=="==" ? equals : !equals;
+        }
         var left = Primitive(leftNode);
         var right = Primitive(rightNode);
         switch (condition.Operator)

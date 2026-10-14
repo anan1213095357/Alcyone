@@ -113,6 +113,7 @@ public partial class Home
             }
             condition.Kind = "variable";
             condition.Left = variable.Name;
+            NormalizeVariableComparison(condition);
         }
         RefreshCurrentConditionResults();
     }

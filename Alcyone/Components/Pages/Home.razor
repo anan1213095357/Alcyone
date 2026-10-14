@@ -795,7 +795,7 @@
                                                     <div class="recognition-filter-row">
                                                         <label>@L["比较方式"]</label>
                                                         <select class="select" value="@condition.Operator" @onchange='e => ChangeConditionOperator(state.Id, output.Id, condition.Id, e.Value?.ToString() ?? "==")'>
-                                                            @foreach (var op in Operators)
+                                                            @foreach (var op in ConditionOperators(condition))
                                                             {
                                                                 <option value="@op">@op</option>
                                                             }
@@ -808,11 +808,7 @@
                                                         </select>
                                                         @if (condition.RightMode == "literal")
                                                         {
-                                                            <select class="select" value="@condition.RightType" @onchange='e => ChangeConditionRightType(state.Id, output.Id, condition.Id, e.Value?.ToString() ?? "string")'>
-                                                                <option value="number">@L["数值"]</option>
-                                                                <option value="string">@L["文本"]</option>
-                                                                <option value="boolean">@L["是 / 否"]</option>
-                                                            </select>
+                                                            <select class="select" value="@condition.RightType" disabled title="@L["比较值类型跟随左侧变量"]"><option value="@ConditionVariableType(condition)">@L[ConditionVariableType(condition) == "number" ? "数值" : ConditionVariableType(condition) == "boolean" ? "布尔" : ConditionVariableType(condition) == "json" ? "JSON" : "文本"]</option></select>
                                                         }
                                                         else
                                                         {
@@ -823,7 +819,7 @@
                                                         <div style="display:flex;align-items:center;color:#718097;font-size:9px">@L["比较值"]</div>
                                                         @if (condition.RightMode == "variable")
                                                         {
-                                                            <SearchPicker Options="@VariableOptions(Machine.Variables)" Value="@NodeString(condition.RightValue)" ValueChanged="value => ChangeConditionRightValue(state.Id, output.Id, condition.Id, value)" Placeholder="选择比较变量" />
+                                                            <SearchPicker Options="@VariableOptions(ComparisonVariables(condition))" Value="@NodeString(condition.RightValue)" ValueChanged="value => ChangeConditionRightValue(state.Id, output.Id, condition.Id, value)" Placeholder="选择比较变量" />
                                                         }
                                                         else if (condition.RightType == "boolean")
                                                         {
@@ -936,12 +932,12 @@
             <div class="ai-header">
 
                 <div class="ai-header-left">
-                    <div class="ai-logo">✦</div>
+                    <div class="ai-logo"><img src="images/planet-logo-transparent.png" alt="Alcyone" /></div>
 
                     <div>
-                        <div class="ai-title">@L["AI 脚本助手"]</div>
+                        <div class="ai-title">@L["AI 开发助手"]</div>
                         <div class="ai-subtitle">
-                            @L["围绕当前色库和字典，编排识别条件与键鼠动作"]
+                            @L["从想法到界面、流程与脚本"]
                         </div>
                     </div>
                 </div>
@@ -970,13 +966,15 @@
                 </div>
             </div>
 
-            <div class="ai-scope-tabs" role="group" aria-label="@L["修改范围"]">
-                <button class="@(_aiScope == "both" ? "active" : "")" disabled="@_aiBusy" @onclick='() => _aiScope = "both"'>@L["流程与脚本"]</button>
-                <button class="@(_aiScope == "script" ? "active" : "")" disabled="@_aiBusy" @onclick='() => _aiScope = "script"'>@L["仅脚本"]</button>
-                <button class="@(_aiScope == "machine" ? "active" : "")" disabled="@_aiBusy" @onclick='() => _aiScope = "machine"'>@L["仅流程"]</button>
+            <div class="ai-scope-checks" role="group" aria-label="@L["对话模式"]">
+                <button class="ai-mode-chat @(!HasAiScope ? "selected" : "")" disabled="@_aiBusy" aria-pressed="@(!HasAiScope)" @onclick="SelectAiChat">@L["日常咨询"]</button>
+                <span class="ai-mode-divider"></span>
+                <button class="@(_aiEditInterfaces ? "selected" : "")" disabled="@_aiBusy" aria-pressed="@_aiEditInterfaces" @onclick="() => ToggleAiScope(0)">@L["界面"]</button>
+                <button class="@(_aiEditMachine ? "selected" : "")" disabled="@_aiBusy" aria-pressed="@_aiEditMachine" @onclick="() => ToggleAiScope(1)">@L["流程"]</button>
+                <button class="@(_aiEditScripts ? "selected" : "")" disabled="@_aiBusy" aria-pressed="@_aiEditScripts" @onclick="() => ToggleAiScope(2)">@L["脚本"]</button>
             </div>
             <!-- 对话主体 -->
-            @if (_aiScope == "script" && _scriptAiContext is not null)
+            @if (_aiEditScripts && _scriptAiContext is not null)
             {
                 <div class="script-ai-context">@L["正在编写："]@L[ScriptAiKindLabel(_scriptAiContext.Kind)] · @_scriptAiContext.File<br />@L["已附带当前代码、所选片段和编译错误。直接描述需求即可。"]</div>
             }
@@ -986,14 +984,14 @@
                 {
                     <div class="ai-welcome">
 
-                        <div class="ai-welcome-icon">✦</div>
+                        <div class="ai-welcome-icon"><img src="images/planet-logo-transparent.png" alt="" /></div>
 
                         <div class="ai-welcome-title">
-                            @L["描述你要执行的桌面操作"]
+                            @L["描述你想实现的功能"]
                         </div>
 
                         <div class="ai-welcome-desc">
-                            @L["选择已有识别项目，描述什么时候执行、执行哪些操作，以及执行后去哪个状态。"]
+                            @L["选择修改范围，描述目标。生成后预览，再应用到当前项目。"]
                         </div>
 
                         <div class="ai-example-grid">
@@ -1015,9 +1013,7 @@
 
                                 @if (message.Role == "assistant")
                                 {
-                                    <div class="ai-message-avatar">
-                                        ✦
-                                    </div>
+                                    <div class="ai-message-avatar"><img src="images/planet-logo-transparent.png" alt="AI" /></div>
                                 }
 
                                 <div class="ai-message-content">
@@ -1043,9 +1039,7 @@
                         {
                             <div class="ai-message-row assistant">
 
-                                <div class="ai-message-avatar">
-                                    ✦
-                                </div>
+                                <div class="ai-message-avatar"><img src="images/planet-logo-transparent.png" alt="AI" /></div>
 
                                 <div class="ai-message-content">
 
@@ -1147,7 +1141,7 @@
                             }
                             else
                             {
-                                <span>@L["开始发明"]</span>
+                                <span>@L[HasAiScope ? "生成方案" : "发送"]</span>
                                 <span class="ai-send-arrow">↑</span>
                             }
 

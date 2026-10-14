@@ -82,7 +82,7 @@ public partial class Home
     }
     private void SelectInterface(string id) { _configMenuOpen=false; _appSettingsOpen=false; _interfaceId=id; _interfaceMode=true; }
     private async Task DeleteInterfaceAsync(string id) { Machine.Screens.RemoveAll(s=>s.Id==id); if(_interfaceId==id) { _interfaceId=Machine.Screens.FirstOrDefault()?.Id; _interfaceMode=_interfaceId is not null; } await SaveConfigAsync(); }
-    private void OpenInterfaceAi() { OpenAiDialog(); _aiScope="both"; }
+    private void OpenInterfaceAi() { OpenAiDialog(); _aiEditInterfaces=true; _aiEditMachine=false; _aiEditScripts=false; }
     private void OpenInterfaceScript() { _startWithConditionTemplate=false; _startWithActionTemplate=true; _scriptEditorOpen=_scriptHost is not null; }
     private async Task InvokeInterfaceControlAsync(InterfaceControlModel control)
     {

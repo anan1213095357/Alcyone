@@ -966,5 +966,19 @@
   "置底": "Send to back",
   "请先绑定点击动作。": "Bind a click action first.",
   "扫描间隔": "Scan interval",
-  "0 保持原扫描速度；间隔内复用上次结果。": "0 keeps the original scan rate. Reuse the previous result between scans."
+  "0 保持原扫描速度；间隔内复用上次结果。": "0 keeps the original scan rate. Reuse the previous result between scans.",
+  "比较值类型跟随左侧变量": "Comparison value type follows the left variable.",
+  "流程": "Workflow",
+  "脚本": "Scripts",
+  "请至少选择一个修改范围。": "Select at least one change scope.",
+  "AI 开发助手": "AI development assistant",
+  "从想法到界面、流程与脚本": "From ideas to interfaces, workflows and scripts",
+  "描述你想实现的功能": "Describe what you want to build",
+  "选择修改范围，描述目标。生成后预览，再应用到当前项目。": "Choose a scope and describe your goal. Review the result, then apply it to your project.",
+  "生成方案": "Generate",
+  "思考过程": "Thinking",
+  "对话模式": "Conversation mode",
+  "日常咨询": "Chat",
+  "删除桌面文件时播放星舰打包动画": "Play starship packing animation when desktop files are removed",
+  "预览星舰打包动画": "Preview starship packing animation"
 }

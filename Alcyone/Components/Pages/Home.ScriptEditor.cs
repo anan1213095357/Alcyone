@@ -12,8 +12,8 @@ public partial class Home
     {
         if (_scriptAiContext?.File != context.File || _scriptAiContext?.Kind != context.Kind)
             ClearAiConversation();
-        _aiScope = "script";
         OpenAiDialog();
+        _aiEditInterfaces=false; _aiEditMachine=false; _aiEditScripts=true;
         _scriptAiContext = context;
     }
     private static string ScriptAiKindLabel(string kind) => kind switch { "condition" => "条件函数", "async-condition" => "异步条件函数", "auto" => "自动判断脚本类型", _ => "动作脚本" };
