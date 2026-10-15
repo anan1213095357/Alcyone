@@ -10,3 +10,7 @@
 
 .picker-control .picker-trigger{min-height:34px;padding:6px 9px;border-radius:6px}.picker-trigger>span:first-child{line-height:1.4}.picker-trigger small{font-size:13px;line-height:1.35;margin-bottom:2px}.chevron{font-size:16px}
 .search-line{padding:7px 9px}.breadcrumb.category-trail{padding:7px 8px;gap:4px}.category-trail .category-block{min-height:26px;padding:4px 7px;font-size:11px}.picker-results{padding:5px}.picker-results button{padding:7px 9px}.option strong{font-size:13px}.option small{font-size:11px;line-height:1.4;margin-top:3px}.picker-results .category-tiles .category{min-height:32px;padding:6px 8px}.picker-help{padding:7px 9px;font-size:10px}
+
+
+
+.picker-option-row{display:flex;align-items:center;gap:3px}.picker-option-row>.option{flex:1;min-width:0}.picker-option-row>.option>span:first-child{min-width:0;overflow-wrap:anywhere}.picker-results .picker-option-edit{flex:none;width:30px;height:30px;padding:6px;justify-content:center;color:#91b8d6}.picker-option-edit svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}.picker-option-edit:focus-visible{outline:2px solid #91c7ed;outline-offset:-2px}

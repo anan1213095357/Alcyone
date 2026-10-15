@@ -25,7 +25,13 @@
                 @for (var i = 0; i < choices.Count; i++)
                 {
                     var item = choices[i]; var index = i;
+                    <div class="picker-option-row">
                     <button type="button" class="option @(index == _index ? "focused" : "") @(item.Value == Value ? "selected" : "")" @onclick="() => Choose(item.Value)"><span><strong>@L[item.Label]</strong><small>@(string.IsNullOrWhiteSpace(_query) ? L[item.Description] : LocalizedGroup(item.Group) + " · " + L[item.Description])</small></span>@if(item.Value==Value){<span>✓</span>}</button>
+                        @if (item.CanEdit && OnEditOption.HasDelegate)
+                        {
+                            <button type="button" class="picker-option-edit" title="@L["编辑此条件脚本"]" aria-label="@(L["编辑此条件脚本"] + " · " + L[item.Label])" @onclick="() => EditOption(item.Value)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 13-1 4 4-1L16 7l-3-3-9 9zM11 6l3 3" /></svg></button>
+                        }
+                    </div>
                 }
                 @if (!choices.Any() && (!string.IsNullOrWhiteSpace(_query) || !Categories.Any())) { <div class="no-result">@(Options.Any() ? L["没有匹配项，试试名称、API 或分类。"] : L["还没有可选项目，请先创建项目。"])</div> }
                 @if (AllowCustom && !string.IsNullOrWhiteSpace(_query) && !Options.Any(o => o.Value == _query.Trim())) { <button type="button" class="custom" @onclick="() => Choose(_query.Trim())">@L["使用输入值："]@_query.Trim()</button> }
@@ -38,6 +44,12 @@
     private string LocalizedGroup(string? group) => string.Join(" / ",(group ?? "").Split('/',StringSplitOptions.RemoveEmptyEntries).Select(part=>L[part]));
     private async Task Clear(){Close();await ValueChanged.InvokeAsync("");}
     [Parameter] public IEnumerable<PickerOption> Options { get; set; } = [];
+    [Parameter] public EventCallback<string> OnEditOption { get; set; }
+    private async Task EditOption(string value)
+    {
+        Close();
+        await OnEditOption.InvokeAsync(value);
+    }
     [Parameter] public bool Clearable { get; set; }
     [Parameter] public string Value { get; set; } = "";
     [Parameter] public EventCallback<string> ValueChanged { get; set; }

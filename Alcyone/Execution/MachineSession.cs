@@ -337,6 +337,13 @@ public sealed partial class MachineSession : IAsyncDisposable
 
     private void NormalizeActionArguments(StateActionCallModel action, ReflectedActionDescriptor? descriptor = null)
     {
+        if (action.WaitPolicyVersion == 0)
+        {
+            action.WaitForCompletion = false;
+            action.WaitPolicyVersion = 1;
+        }
+        action.AdditionalActions ??= new();
+        foreach (var extra in action.AdditionalActions) NormalizeActionArguments(extra);
         action.ActionMethod ??= string.Empty;
         action.ActionArguments ??= new List<ActionArgumentModel>();
 
@@ -919,7 +926,7 @@ public sealed partial class MachineSession : IAsyncDisposable
             enteredStateId != state.Id)
         {
             foreach(var condition in state.Outputs.SelectMany(o=>o.Conditions)) _conditionScanCache.Remove(condition.Id);
-            await InvokeActionAsync(state.BeforeLeaveAction);
+            await InvokeLifecycleAsync(state.BeforeLeaveAction);
             Runtime.EnteredStates[region.Id] = state.Id;
         }
 
@@ -927,7 +934,7 @@ public sealed partial class MachineSession : IAsyncDisposable
         // 循环脚本
         // 当前卡片存续期间，每个周期执行
         // =====================================================
-        await InvokeActionAsync(state.LoopAction);
+        await InvokeLifecycleAsync(state.LoopAction);
         _executionCancellation.Token.ThrowIfCancellationRequested();
         if (!Runtime.Running) await RefreshRecognitionsAsync(state.Id);
 
@@ -976,7 +983,7 @@ public sealed partial class MachineSession : IAsyncDisposable
                 finally { Runtime.CurrentEdgeIds.Remove(edge.Id); Notify(); }
             }
             _executionCancellation.Token.ThrowIfCancellationRequested();
-            await InvokeActionAsync(state.AfterEnterAction);
+            await InvokeLifecycleAsync(state.AfterEnterAction);
 
             Runtime.CurrentEdgeIds.Add(edge.Id);
 
@@ -992,7 +999,7 @@ public sealed partial class MachineSession : IAsyncDisposable
             // 在真正进入目标卡片之前执行
             // =====================================================
             foreach(var condition in targetState.Outputs.SelectMany(o=>o.Conditions)) _conditionScanCache.Remove(condition.Id);
-            await InvokeActionAsync(targetState.BeforeLeaveAction);
+            await InvokeLifecycleAsync(targetState.BeforeLeaveAction);
             _executionCancellation.Token.ThrowIfCancellationRequested();
 
             // 正式进入目标卡片

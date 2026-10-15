@@ -71,6 +71,9 @@ namespace StateMachine.Execution;
 
     public sealed class StateActionCallModel
     {
+        public bool WaitForCompletion { get; set; }
+        public int WaitPolicyVersion { get; set; }
+        public List<StateActionCallModel> AdditionalActions { get; set; } = new();
         public string ActionMethod { get; set; } = string.Empty;
         public List<ActionArgumentModel> ActionArguments { get; set; } = new();
     }

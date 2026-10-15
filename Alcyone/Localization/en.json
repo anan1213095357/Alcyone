@@ -987,5 +987,13 @@
   "使用咨询": "Usage consultation",
   "微信扫码支付": "Pay with WeChat",
   "软件免费，付费下载均为诈骗；使用咨询为付费服务。": "This software is free. Paid downloads are scams. Usage consultation is a paid service.",
-  "微信收款码": "WeChat payment QR code"
+  "微信收款码": "WeChat payment QR code",
+  "等待所有函数完成": "Wait for all functions",
+  "不等待": "Do not wait",
+  "添加函数": "Add function",
+  "移除函数": "Remove function",
+  "执行方式": "Execution mode",
+  "等待全部": "Wait for all",
+  "编辑此条件脚本": "Edit this condition script",
+  "未找到对应的脚本文件。": "The corresponding script file was not found."
 }

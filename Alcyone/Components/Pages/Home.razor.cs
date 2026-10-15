@@ -442,8 +442,11 @@ public partial class Home
         return _actionMethods.TryGetValue(key, out var descriptor) ? descriptor : null;
     }
 
-    private static IEnumerable<(string Key, string Title, StateActionCallModel Action)> GetLifecycleActions(StateModel state)
+    private IEnumerable<(string Key, string Title, StateActionCallModel Action)> GetLifecycleActions(StateModel state)
     {
+        NormalizeActionArguments(state.BeforeLeaveAction);
+        NormalizeActionArguments(state.LoopAction);
+        NormalizeActionArguments(state.AfterEnterAction);
         yield return ("enter", "进入状态", state.BeforeLeaveAction);
         yield return ("loop", "循环", state.LoopAction);
         yield return ("leave", "离开状态", state.AfterEnterAction);
@@ -451,13 +454,29 @@ public partial class Home
 
     private StateActionCallModel GetStateAction(StateModel state, string lifecycle)
     {
-        return lifecycle switch
+        var parts = lifecycle.Split(':');
+        var root = parts[0] switch
         {
             "enter" => state.BeforeLeaveAction,
             "loop" => state.LoopAction,
             "leave" => state.AfterEnterAction,
             _ => throw new InvalidOperationException($"未知状态生命周期：{lifecycle}")
         };
+        return parts.Length == 1 ? root : root.AdditionalActions[int.Parse(parts[1])];
+    }
+
+    private static IEnumerable<(string Key, StateActionCallModel Action)> LifecycleCalls(string key, StateActionCallModel root)
+    {
+        yield return (key, root);
+        for (var i = 0; i < root.AdditionalActions.Count; i++)
+            yield return ($"{key}:{i}", root.AdditionalActions[i]);
+    }
+
+    private void AddLifecycleAction(StateActionCallModel root) => root.AdditionalActions.Add(new());
+    private void RemoveLifecycleAction(StateActionCallModel root, StateActionCallModel call)
+    {
+        if (ReferenceEquals(root, call)) { root.ActionMethod = string.Empty; root.ActionArguments.Clear(); }
+        else root.AdditionalActions.Remove(call);
     }
 
     private StateActionCallModel? GetStateAction(string stateId, string lifecycle)
@@ -471,6 +490,13 @@ public partial class Home
 
     private void NormalizeActionArguments(StateActionCallModel action, ReflectedActionDescriptor? descriptor = null)
     {
+        if (action.WaitPolicyVersion == 0)
+        {
+            action.WaitForCompletion = false;
+            action.WaitPolicyVersion = 1;
+        }
+        action.AdditionalActions ??= new();
+        foreach (var extra in action.AdditionalActions) NormalizeActionArguments(extra);
         action.ActionMethod ??= string.Empty;
         action.ActionArguments ??= new List<ActionArgumentModel>();
 

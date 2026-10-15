@@ -9,7 +9,9 @@ public partial class ScriptWorkbench
 {
     [Parameter, EditorRequired] public StateScriptHost Host { get; set; } = default!;
     [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<string> OnCompiledFile { get; set; }
     [Parameter] public EventCallback<ScriptAiContext> OnAi { get; set; }
+    [Parameter] public string? InitialMethodKey { get; set; }
     [Parameter] public bool StartWithConditionTemplate { get; set; }
     [Parameter] public bool StartWithActionTemplate { get; set; }
     private ElementReference _editorElement, _cursorElement;
@@ -68,7 +70,11 @@ public partial class ScriptWorkbench
         _newScriptOpen = false;
         _errors.Clear();
         await _editor.InvokeVoidAsync("diagnostics", _errors);
-        if (first is not null) await OpenFileAsync(first);
+        if (first is not null)
+        {
+            await OpenFileAsync(first);
+            await OnCompiledFile.InvokeAsync(first);
+        }
         Report("AI 代码已应用，编译通过。");
         StateHasChanged();
     }
@@ -194,7 +200,8 @@ public partial class ScriptWorkbench
                 LocalizedDocs, Text.Language);
             _editorLanguage = Text.Language;
             _ready = true;
-            if (_files.Length > 0) await OpenFileAsync(_files[0]);
+            if (!string.IsNullOrWhiteSpace(InitialMethodKey)) await OpenMethodAsync(InitialMethodKey);
+            else if (_files.Length > 0) await OpenFileAsync(_files[0]);
             if (StartWithConditionTemplate || StartWithActionTemplate) RequestNewScript();
         }
         catch (Exception ex) { Report("编辑器加载失败：" + ex.Message); }
@@ -208,6 +215,31 @@ public partial class ScriptWorkbench
         var full = Path.GetFullPath(Path.Combine(root, relative));
         if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("无效脚本路径。");
         return full;
+    }
+
+    public async Task OpenMethodAsync(string key)
+    {
+        if (!_ready || _editor is null || _busy) return;
+        var separator = key.LastIndexOf('.');
+        if (separator < 0) return;
+        var method = key[(separator + 1)..];
+        var type = key[..separator].Split('.', '+').Last();
+        foreach (var file in _files)
+        {
+            var source = await File.ReadAllTextAsync(FilePath(file));
+            var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source);
+            var root = await tree.GetRootAsync();
+            var declaration = root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax>()
+                .Where(c => c.Identifier.ValueText == type)
+                .SelectMany(c => c.Members.OfType<Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax>())
+                .FirstOrDefault(m => m.Identifier.ValueText == method);
+            if (declaration is null) continue;
+            await OpenFileAsync(file);
+            var location = tree.GetLineSpan(declaration.Identifier.Span).StartLinePosition;
+            await _editor.InvokeVoidAsync("reveal", location.Line + 1, location.Character + 1);
+            return;
+        }
+        Report(Text["未找到对应的脚本文件。"]);
     }
 
     private async Task OpenFileAsync(string file)
@@ -256,7 +288,11 @@ public partial class ScriptWorkbench
                 _dirty.Remove(draft.Path);
             }
             var result = await Task.Run(Host.Reload);
-            if (result.Success) Report($"编译成功 · {result.ScriptCount} 个脚本 / {result.ActionClassCount} 个动作类 · 已热重载");
+            if (result.Success)
+            {
+                Report($"编译成功 · {result.ScriptCount} 个脚本 / {result.ActionClassCount} 个动作类 · 已热重载");
+                if (_active is not null) await OnCompiledFile.InvokeAsync(_active);
+            }
             else
             {
                 _errors = result.Errors.Select(ParseError).ToList();

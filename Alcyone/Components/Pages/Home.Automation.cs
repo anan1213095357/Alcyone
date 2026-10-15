@@ -72,6 +72,10 @@ public partial class Home
         }
         if (target == "script:new")
         {
+            _scriptInitialMethod = null;
+            _pendingScriptCondition = condition;
+            _pendingConditionTarget = ConditionTarget(condition);
+            _conditionKeysBeforeEdit = ScriptConditionOptions.Select(x => x.Value).ToHashSet(StringComparer.Ordinal);
             _startWithConditionTemplate = true;
             _startWithActionTemplate = false;
             _scriptEditorOpen = _scriptHost is not null;

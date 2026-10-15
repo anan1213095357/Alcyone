@@ -15,8 +15,8 @@ public sealed partial class MachineSession
             try
             {
                 if (Runtime.CurrentStates.TryGetValue(target.RegionId, out var oldId) && Machine.States.FirstOrDefault(s => s.Id == oldId) is { } old)
-                    await InvokeActionAsync(old.AfterEnterAction);
-                await InvokeActionAsync(target.BeforeLeaveAction);
+                    await InvokeLifecycleAsync(old.AfterEnterAction);
+                await InvokeLifecycleAsync(target.BeforeLeaveAction);
                 Runtime.CurrentStates[target.RegionId] = target.Id;
                 Runtime.EnteredStates[target.RegionId] = target.Id;
                 _recognitionRevision++; _recognitionResults.Clear();

@@ -215,7 +215,7 @@
             <div style="display:contents">
             @if (!IsWallpaperView)
             {
-                <nav class="canvas-workbench-bar" aria-label="@L["画布开发工具"]"><div class="workbench-context"><i></i><span>@L["状态画布"]</span></div>
+                <nav class="canvas-workbench-bar" aria-label="@L["画布开发工具"]">
         <div class="workspace-edit-tools">
             <button class="btn" @onclick="OpenScriptEditorAsync">@L["脚本编译器"]</button>
             <button class="btn add-state-control" @onclick="AddStateAsync"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M10 6v8 M6 10h8"/></svg><span>@L["添加状态"]</span></button>
@@ -454,10 +454,11 @@
                             </select>
                         </div>
                         <div class="field">
-                            <label style="display:flex;gap:7px;align-items:center;color:#adb8c9;font-size:10px">
-                                <input type="checkbox" checked="@state.IsStart" @onchange="e => ChangeStateStart(state.Id, e.Value is bool b && b)" />
-                                @L["当前状态域的初始状态"]
-                            </label>
+                            <button type="button" class="state-start-choice @(state.IsStart ? "active" : "")" aria-pressed="@(state.IsStart ? "true" : "false")" @onclick="() => ChangeStateStart(state.Id, !state.IsStart)">
+                                <span class="state-start-symbol" aria-hidden="true">@(state.IsStart ? "★" : "☆")</span>
+                                <span>@L["当前状态域的初始状态"]</span>
+                                <span class="state-start-check" aria-hidden="true">@(state.IsStart ? "✓" : "＋")</span>
+                            </button>
                         </div>
 
                         </div></details>
@@ -483,7 +484,15 @@
 
                             @foreach (var lifecycle in GetLifecycleActions(state))
                             {
-                                var actionCall = lifecycle.Action;
+                                <details class="action-box property-subfold lifecycle-event" @key="(state.Id + lifecycle.Key)">
+                                    <summary class="property-subsummary">@L[lifecycle.Title]</summary>
+                                    <div class="lifecycle-wait-mode" role="group" aria-label="@L["执行方式"]">
+                                        <button type="button" class="@(!lifecycle.Action.WaitForCompletion ? "selected" : "")" aria-pressed="@(!lifecycle.Action.WaitForCompletion ? "true" : "false")" @onclick="() => lifecycle.Action.WaitForCompletion = false"><span class="wait-choice-dot" aria-hidden="true"></span>@L["不等待"]</button>
+                                        <button type="button" title="@L["等待所有函数完成"]" class="@(lifecycle.Action.WaitForCompletion ? "selected" : "")" aria-pressed="@(lifecycle.Action.WaitForCompletion ? "true" : "false")" @onclick="() => lifecycle.Action.WaitForCompletion = true"><span class="wait-choice-dot" aria-hidden="true"></span>@L["等待全部"]</button>
+                                    </div>
+                                @foreach (var call in LifecycleCalls(lifecycle.Key, lifecycle.Action))
+                                {
+                                var actionCall = call.Action;
                                 var actionDescriptor = GetActionDescriptor(actionCall.ActionMethod);
 
                                 if (actionDescriptor is not null)
@@ -491,10 +500,11 @@
                                     NormalizeActionArguments(actionCall, actionDescriptor);
                                 }
 
-                                <details class="action-box property-subfold" @key="(state.Id + lifecycle.Key)">
-                                    <summary class="property-subsummary">@L[lifecycle.Title]</summary>
-
-                                    <SearchPicker Options="LifecycleOptions" Value="@actionCall.ActionMethod" ValueChanged="value => ChangeStateActionMethod(state.Id, lifecycle.Key, value)" Placeholder="选择生命周期 API" />
+                                <div class="lifecycle-call" @key="actionCall">
+                                    <div class="lifecycle-call-heading">
+                                        <div class="lifecycle-api"><SearchPicker Options="LifecycleOptions" Value="@actionCall.ActionMethod" ValueChanged="value => ChangeStateActionMethod(state.Id, call.Key, value)" Placeholder="选择生命周期 API" /></div>
+                                        <button type="button" class="lifecycle-remove" title="@L["移除函数"]" @onclick="() => RemoveLifecycleAction(lifecycle.Action, actionCall)">×</button>
+                                    </div>
 
                                     @if (actionDescriptor is not null)
                                     {
@@ -523,7 +533,7 @@
                                                                     value="@argument.Source"
                                                                     @onchange='e => ChangeStateActionArgumentSource(
                                                                                     state.Id,
-                                                                                    lifecycle.Key,
+                                                                                    call.Key,
                                                                                     parameter.Name,
                                                                                     e.Value?.ToString() ?? "literal")'>
 
@@ -538,11 +548,11 @@
                                                             @if (argument.Source == "variable" &&
                                                                  CanBindGlobalVariable(actionCall, parameter))
                                                             {
-                                                                <SearchPicker Options="@VariableOptions(compatibleVariables)" Value="@argument.VariableName" ValueChanged="value => ChangeStateActionArgumentVariable(state.Id, lifecycle.Key, parameter.Name, value)" Placeholder="选择全局变量" />
+                                                                <SearchPicker Options="@VariableOptions(compatibleVariables)" Value="@argument.VariableName" ValueChanged="value => ChangeStateActionArgumentVariable(state.Id, call.Key, parameter.Name, value)" Placeholder="选择全局变量" />
                                                             }
                                                             else if (editorKind == "string")
                                                             {
-                                                                <SearchPicker Options="@ParameterOptions(parameter)" Value="@argument.LiteralValue" ValueChanged="value => ChangeStateActionArgumentLiteral(state.Id, lifecycle.Key, parameter.Name, value)" AllowCustom="@(!IsReferenceParameter(parameter))" Placeholder="@L[parameter.DisplayName]" />
+                                                                <SearchPicker Options="@ParameterOptions(parameter)" Value="@argument.LiteralValue" ValueChanged="value => ChangeStateActionArgumentLiteral(state.Id, call.Key, parameter.Name, value)" AllowCustom="@(!IsReferenceParameter(parameter))" Placeholder="@L[parameter.DisplayName]" />
                                                             }
                                                             else if (editorKind == "boolean")
                                                             {
@@ -550,7 +560,7 @@
                                                                         value="@argument.LiteralValue"
                                                                         @onchange='e => ChangeStateActionArgumentLiteral(
                                                                                             state.Id,
-                                                                                            lifecycle.Key,
+                                                                                            call.Key,
                                                                                             parameter.Name,
                                                                                             e.Value?.ToString() ?? "false")'>
 
@@ -564,7 +574,7 @@
                                                                         value="@argument.LiteralValue"
                                                                         @onchange="e => ChangeStateActionArgumentLiteral(
                                                                                             state.Id,
-                                                                                            lifecycle.Key,
+                                                                                            call.Key,
                                                                                             parameter.Name,
                                                                                             e.Value?.ToString() ?? string.Empty)">
 
@@ -582,7 +592,7 @@
                                                                        value="@argument.LiteralValue"
                                                                        @onchange='e => ChangeStateActionArgumentLiteral(
                                                                                           state.Id,
-                                                                                          lifecycle.Key,
+                                                                                          call.Key,
                                                                                           parameter.Name,
                                                                                           e.Value?.ToString() ?? "0")' />
     }
@@ -593,7 +603,7 @@
                                                                        value="@argument.LiteralValue"
                                                                        @onchange="e => ChangeStateActionArgumentLiteral(
                                                                                           state.Id,
-                                                                                          lifecycle.Key,
+                                                                                          call.Key,
                                                                                           parameter.Name,
                                                                                           e.Value?.ToString() ?? string.Empty)" />
     }
@@ -604,7 +614,7 @@
                                                                        value="@argument.LiteralValue"
                                                                        @onchange="e => ChangeStateActionArgumentLiteral(
                                                                                           state.Id,
-                                                                                          lifecycle.Key,
+                                                                                          call.Key,
                                                                                           parameter.Name,
                                                                                           e.Value?.ToString() ?? string.Empty)" />
     }
@@ -616,7 +626,7 @@
                                                                        value="@argument.LiteralValue"
                                                                        @onchange="e => ChangeStateActionArgumentLiteral(
                                                                                           state.Id,
-                                                                                          lifecycle.Key,
+                                                                                          call.Key,
                                                                                           parameter.Name,
                                                                                           e.Value?.ToString() ?? string.Empty)" />
     }
@@ -626,7 +636,7 @@
                                                                           rows="3"
                                                                           @onchange="e => ChangeStateActionArgumentLiteral(
                                                                                                 state.Id,
-                                                                                                lifecycle.Key,
+                                                                                                call.Key,
                                                                                                 parameter.Name,
                                                                                                 e.Value?.ToString() ?? string.Empty)">@argument.LiteralValue</textarea>
     }
@@ -636,7 +646,7 @@
                                                                        value="@argument.LiteralValue"
                                                                        @onchange="e => ChangeStateActionArgumentLiteral(
                                                                                           state.Id,
-                                                                                          lifecycle.Key,
+                                                                                          call.Key,
                                                                                           parameter.Name,
                                                                                           e.Value?.ToString() ?? string.Empty)" />
     }
@@ -648,6 +658,9 @@
                                             }
                                         </div>
                                     }
+                                </div>
+                                }
+                                    <button type="button" class="lifecycle-add" @onclick="() => AddLifecycleAction(lifecycle.Action)"><span aria-hidden="true">＋</span>@L["添加函数"]</button>
                                 </details>
                             }
                         </div></details>
@@ -692,7 +705,7 @@
                                                 <details class="condition-editor condition-fold condition-kind-@condition.Kind" open data-check="@condition.SystemCheck" style="@ConditionAccent(conditionIndex)" @key="condition.Id">
                                                     <summary class="condition-heading"><span class="condition-index">@L.Format("条件 {0}", conditionIndex + 1)</span><button type="button" class="condition-remove" title="@L["删除条件"]" aria-label="@L["删除条件"]" @onclick:stopPropagation="true" @onclick="() => RemoveCondition(state.Id, output.Id, condition.Id)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m5 5 6 6m0-6-6 6" /></svg></button></summary><div class="condition-fold-body">
                                                     <div class="recognition-condition-row">
-                                                        <SearchPicker Clearable="true" Options="ConditionOptions" Value="@ConditionTarget(condition)" ValueChanged="value => ChangeConditionTarget(condition, value)" Placeholder="选择判断 API" />
+                                                        <SearchPicker Clearable="true" Options="ConditionOptions" Value="@ConditionTarget(condition)" ValueChanged="value => ChangeConditionTarget(condition, value)" Placeholder="选择判断 API" OnEditOption="OpenConditionScriptOptionAsync" />
                                                     </div>
                                                     @if (!string.IsNullOrWhiteSpace(condition.Kind))
                                                     {
@@ -2043,7 +2056,7 @@
 
 @if (_scriptEditorOpen && _scriptHost is not null)
 {
-    <ScriptWorkbench @ref="_scriptWorkbench" Host="_scriptHost" StartWithConditionTemplate="_startWithConditionTemplate" StartWithActionTemplate="_startWithActionTemplate" OnClose="() => _scriptEditorOpen = false" OnAi="OpenScriptAi" />
+    <ScriptWorkbench @ref="_scriptWorkbench" Host="_scriptHost" InitialMethodKey="@_scriptInitialMethod" StartWithConditionTemplate="_startWithConditionTemplate" StartWithActionTemplate="_startWithActionTemplate" OnClose="CloseScriptEditor" OnCompiledFile="BindCreatedCondition" OnAi="OpenScriptAi" />
 }
 
 
