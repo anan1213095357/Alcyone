@@ -2056,7 +2056,7 @@
 
 @if (_scriptEditorOpen && _scriptHost is not null)
 {
-    <ScriptWorkbench @ref="_scriptWorkbench" Host="_scriptHost" InitialMethodKey="@_scriptInitialMethod" StartWithConditionTemplate="_startWithConditionTemplate" StartWithActionTemplate="_startWithActionTemplate" OnClose="CloseScriptEditor" OnCompiledFile="BindCreatedCondition" OnAi="OpenScriptAi" />
+    <ScriptWorkbench @ref="_scriptWorkbench" Host="_scriptHost" Globals="@Runtime.Variables" InitialMethodKey="@_scriptInitialMethod" StartWithConditionTemplate="_startWithConditionTemplate" StartWithActionTemplate="_startWithActionTemplate" OnClose="CloseScriptEditor" OnCompiledFile="BindCreatedCondition" OnAi="OpenScriptAi" />
 }
 
 

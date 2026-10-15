@@ -32,7 +32,7 @@ public partial class ScriptWorkbench
     private string _newScriptTemplate = "action";
     private string _aiScriptKind = "auto";
 
-    protected override void OnInitialized() => Host.DependencyProgress += OnDependencyProgress;
+    protected override void OnInitialized() { Host.DependencyProgress += OnDependencyProgress; LoadBreakpoints(); }
     private void OnDependencyProgress(string status)
     {
         if(!_disposed)_=InvokeAsync(()=>{Report(status);StateHasChanged();});
@@ -200,6 +200,7 @@ public partial class ScriptWorkbench
                 LocalizedDocs, Text.Language);
             _editorLanguage = Text.Language;
             _ready = true;
+            foreach (var entry in _breakpoints) await _editor.InvokeVoidAsync("breakpoints", entry.Key, entry.Value.ToArray());
             if (!string.IsNullOrWhiteSpace(InitialMethodKey)) await OpenMethodAsync(InitialMethodKey);
             else if (_files.Length > 0) await OpenFileAsync(_files[0]);
             if (StartWithConditionTemplate || StartWithActionTemplate) RequestNewScript();
@@ -269,6 +270,7 @@ public partial class ScriptWorkbench
 
     private async Task CompileAsync()
     {
+        if (_traceEnabled) { Report(Text["请先关闭调试，再编辑和编译脚本。"]); return; }
         if (_editor is null || _busy) return;
         _busy = true;
         _errors.Clear();
@@ -374,6 +376,28 @@ public partial class ScriptWorkbench
     }
 
     private void RequestReload() { if (_active is not null) _confirm = "reload"; }
+    private string? _closingTab;
+    private async Task RequestCloseTabAsync(string file)
+    {
+        if (_busy || _editor is null) return;
+        if ((await _editor.InvokeAsync<ScriptDraft[]>("dirtyFiles")).Any(d => d.Path == file))
+        { _closingTab = file; _confirm = "tab"; return; }
+        await CloseTabAsync(file);
+    }
+    private async Task CloseTabAsync(string file)
+    {
+        if (_editor is null) return;
+        var index = _tabs.IndexOf(file);
+        if (index < 0) return;
+        await _editor.InvokeVoidAsync("remove", file);
+        _tabs.Remove(file); _dirty.Remove(file);
+        if (_active == file)
+        {
+            _active = null;
+            if (_tabs.Count > 0) await OpenFileAsync(_tabs[Math.Min(index, _tabs.Count - 1)]);
+        }
+        _closingTab = null;
+    }
     private async Task RequestCloseAsync()
     {
         if (_editor is not null && (await _editor.InvokeAsync<ScriptDraft[]>("dirtyFiles")).Length > 0) _confirm = "close";
@@ -382,6 +406,8 @@ public partial class ScriptWorkbench
     private async Task DiscardAsync()
     {
         if (_confirm == "close") { await OnClose.InvokeAsync(); return; }
+        if (_confirm == "tab" && _closingTab is not null)
+        { _confirm = null; await CloseTabAsync(_closingTab); return; }
         _confirm = null;
         if (_active is null || _editor is null) return;
         try
@@ -393,14 +419,20 @@ public partial class ScriptWorkbench
     }
     private async Task SaveAndCloseAsync()
     {
+        var tab = _confirm == "tab" ? _closingTab : null;
         _confirm = null;
         await CompileAsync();
-        if (_errors.Count == 0 && _dirty.Count == 0) await OnClose.InvokeAsync();
+        if (_errors.Count == 0 && _dirty.Count == 0)
+        {
+            if (tab is not null) await CloseTabAsync(tab);
+            else await OnClose.InvokeAsync();
+        }
     }
     public override async ValueTask DisposeAsync()
     {
         Host.DependencyProgress -= OnDependencyProgress;
         _disposed = true;
+        StopTrace();
         try
         {
             if (_editor is not null) { await _editor.InvokeVoidAsync("dispose"); await _editor.DisposeAsync(); }

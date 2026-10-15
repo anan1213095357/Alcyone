@@ -170,6 +170,7 @@ public sealed record ScriptReloadResult(
 
 public sealed class StateScriptHost : IDisposable
 {
+    public bool SupportsScriptDebugging { get; private set; }
     private const string ScriptHeader = """
         global using System;
         global using System.Collections.Generic;
@@ -249,6 +250,7 @@ public sealed class StateScriptHost : IDisposable
             if (sources.Count == 0)
             {
                 Swap(Array.Empty<object>(), null);
+                SupportsScriptDebugging = false;
                 var emptyResult = ScriptReloadResult.Ok(0, 0);
                 Reloaded?.Invoke(emptyResult);
                 return emptyResult;
@@ -263,6 +265,18 @@ public sealed class StateScriptHost : IDisposable
                 Reloaded?.Invoke(failed);return failed;
             }
 
+            var debuggingAvailable = false;
+            // Instrument valid scripts only; unsupported syntax keeps the original executable.
+            if (!compilation.GetDiagnostics().Any(d => d.Severity == DiagnosticSeverity.Error))
+            {
+                try
+                {
+                    var traced = ScriptTraceInstrumentation.Apply(compilation);
+                    if (!traced.GetDiagnostics().Any(d => d.Severity == DiagnosticSeverity.Error)) { debuggingAvailable = !ReferenceEquals(compilation, traced); compilation = traced; }
+                    else DependencyProgress?.Invoke("部分脚本语法暂不支持执行追踪，已保留原始编译。");
+                }
+                catch (Exception ex) { DependencyProgress?.Invoke("执行追踪未启用：" + ex.Message); }
+            }
             using var pe = new MemoryStream();
             using var pdb = new MemoryStream();
             var emit = compilation.Emit(pe, pdb,
@@ -307,6 +321,7 @@ public sealed class StateScriptHost : IDisposable
 
                 _nuget.Remember();
                 Swap(targets.Cast<object>().ToArray(), newLoadContext);
+                SupportsScriptDebugging = debuggingAvailable;
                 newLoadContext = null;
 
                 var ok = ScriptReloadResult.Ok(sources.Count, targets.Length);
@@ -421,6 +436,7 @@ public sealed class StateScriptHost : IDisposable
 
     public void Dispose()
     {
+        ScriptTrace.CloseDebug(ScriptDirectory);
         lock (_reloadLock)
         {
             if (_disposed) return;
