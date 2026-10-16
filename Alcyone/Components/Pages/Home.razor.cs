@@ -103,12 +103,14 @@ public partial class Home
 
     private StateModel? SelectedState => string.IsNullOrWhiteSpace(SelectedStateId) ? null : GetState(SelectedStateId!);
 
+    private void OnDesktopPreferencesChanged() { if (!_disposed) _ = InvokeAsync(StateHasChanged); }
     protected override void OnInitialized()
     {
         if (IsWallpaperView) AttachWallpaperSession();
         else CreateDemo();
         _desktopLayoutPending = _desktopMode;
         Desktop.Changed += OnDesktopChanged;
+        DesktopPreferences.Changed += OnDesktopPreferencesChanged;
     }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -1643,7 +1645,7 @@ public partial class Home
     private void NormalizeMachine()
     {
         Machine.Screens ??= new();
-        NormalizeInterfaces(Machine.Screens);
+        NormalizeInterfaces(Machine.Screens, includeBuiltIns: true);
         if (_interfaceId is not null && !Machine.Screens.Any(s => s.Id == _interfaceId)) { _interfaceId=null; _interfaceMode=false; }
         Machine.Regions ??= new List<RegionModel>();
         Machine.Variables ??= new List<VariableModel>();
@@ -1863,7 +1865,9 @@ public partial class Home
         await base.DisposeAsync();
         _disposed = true;
         _desktopCliCancellation?.Cancel();
+        _terminalAiCancellation?.Cancel();
         Desktop.Changed -= OnDesktopChanged;
+        DesktopPreferences.Changed -= OnDesktopPreferencesChanged;
         if (_session is not null)
         {
             _session.Changed -= OnRuntimeChanged;

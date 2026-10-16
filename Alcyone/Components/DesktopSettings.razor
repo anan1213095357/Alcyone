@@ -9,6 +9,7 @@
             <h2>@L["桌面设置"]</h2>
             <label><input type="checkbox" checked="@Preferences.AutoStart" disabled="@(!Desktop.Available)" @onchange="SetAutoStart" />@L["登录 Windows 后自动启动"]</label>
             <label><input type="checkbox" checked="@Preferences.RestoreDesktop" @onchange="SetRestore" />@L["启动时恢复上次启用的桌面"]</label>
+            <label><input type="checkbox" checked="@Preferences.DesktopAiEnabled" @onchange="SetDesktopAi" />@L["显示桌面 AI 对话框"]</label>
             <label><input type="checkbox" checked="@Preferences.FilePackingAnimation" @onchange="SetFilePacking" />@L["删除桌面文件时播放星舰打包动画"]</label>
             <button class="btn" disabled="@(!Desktop.IsDesktop)" @onclick="() => { _open=false; Desktop.PreviewFilePacking(); }">@L["预览星舰打包动画"]</button>
             <p>@L["桌面卡片和星球可拖动，选中卡片可折叠，双击星球可展开。位置与折叠状态自动保存。"]</p>
@@ -18,6 +19,7 @@
     </div>
 }
 @code {
+    private void SetDesktopAi(ChangeEventArgs args) { try { Preferences.SetDesktopAi(args.Value is true); _error=null; } catch(Exception ex) { _error=ex.Message; } }
     private void SetFilePacking(ChangeEventArgs args) { try { Preferences.SetFilePacking(args.Value is true); _error=null; } catch(Exception ex) { _error=ex.Message; } }
     private bool _open;
     private string? _error;

@@ -3,8 +3,10 @@ using Microsoft.JSInterop;
 namespace StateMachine.Components.Pages;
 public partial class Home
 {
-    private static void NormalizeInterfaces(List<InterfaceScreenModel> screens)
+    private static void NormalizeInterfaces(List<InterfaceScreenModel> screens, bool includeBuiltIns = false)
     {
+        if (includeBuiltIns && !screens.Any(s => s.IsTerminal))
+            screens.Add(new InterfaceScreenModel { Id = "alcyone-builtin-terminal", Name = "AI Terminal", IsTerminal = true, Width = 620, Height = 420, X = 80, Y = 160 });
         var ids=new HashSet<string>(StringComparer.Ordinal);
         foreach (var screen in screens)
         {
@@ -61,6 +63,21 @@ public partial class Home
     {
         var screen=Machine.Screens.FirstOrDefault(s=>s.Id==id); if(screen is null) return;
         screen.IsPlaced=false; await SaveConfigAsync();
+    }
+    private async Task SaveTerminalLayoutAsync(string id, DesktopTerminal.Layout layout)
+    {
+        var screen = Machine.Screens.FirstOrDefault(s => s.Id == id);
+        if (screen is null) return;
+        if (IsWallpaperView && _session is not null)
+        {
+            await _session.UpdateInterfacePlacementAsync(GetConfigFilePath(_configKey), id, layout.X, layout.Y, layout.Width, layout.Height);
+            ApplyRuntimeSnapshot();
+        }
+        else
+        {
+            screen.X = layout.X; screen.Y = layout.Y; screen.Width = layout.Width; screen.Height = layout.Height;
+            await SaveConfigAsync();
+        }
     }
     private async Task SetInterfaceValueAsync(InterfaceValueChange change)
     {

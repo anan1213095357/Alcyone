@@ -308,6 +308,16 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
                 CommitPackedFile(surface.WindowHandle,message[packingCommit.Length..]);
                 return;
             }
+            const string closeById = "alcyone:desktop:text-close-id:";
+            if (!_disposed && message.StartsWith(closeById, StringComparison.Ordinal))
+            { TextInput.CloseById(surface.WindowHandle, message[closeById.Length..]); return; }
+            const string replaceInput = "alcyone:desktop:text-replace:";
+            if (!_disposed && message.StartsWith(replaceInput, StringComparison.Ordinal))
+            {
+                try { TextInput.Replace(surface.WindowHandle, message[replaceInput.Length..]); }
+                catch (Exception ex) { logger.LogError(ex, "Desktop text replacement failed"); }
+                return;
+            }
             const string resizeInput = "alcyone:desktop:text-resize:";
             if (!_disposed && message.StartsWith(resizeInput, StringComparison.Ordinal))
             {

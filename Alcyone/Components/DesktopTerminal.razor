@@ -1,0 +1,62 @@
+@inherits LocalizedComponent
+@implements IAsyncDisposable
+@inject DesktopWallpaperService DesktopService
+@inject IJSRuntime JS
+<section class="desktop-terminal terminal-placed @(_collapsed ? "collapsed" : "")" data-desktop-terminal data-native-enabled="@(Desktop ? "true" : "false")" data-world-placed="true" data-busy="@(_busy ? "true" : "false")" @ref="_element" style="@LayoutStyle --terminal-blur:@(_settings.Blur)px;--terminal-size:@(_settings.FontSize)px;--terminal-font:@_settings.Font;--terminal-alpha:@(_settings.Opacity / 100.0);--terminal-accent:@_settings.Color">
+    <header data-terminal-drag><img class="terminal-logo" src="images/planet-logo-transparent.png" alt="Alcyone" draggable="false" /><strong>TERMINAL</strong><small><i class="terminal-status-light @(_busy ? "busy" : "")"></i>@(_busy || AiBusy ? L["执行中"] : L["就绪"])</small>
+        <div class="terminal-actions">
+            <button type="button" title="@L["清空"]" aria-label="@L["清空"]" @onclick="Clear"><svg viewBox="0 0 20 20"><path d="m4 12 7-8 5 4-7 8H6l-2-4zM8 8l5 4M12 16h5" /></svg></button>
+            <button type="button" class="@(_configure ? "active" : "")" title="@L["设置"]" aria-label="@L["设置"]" aria-pressed="@(_configure ? "true" : "false")" @onclick="() => _configure = !_configure"><svg viewBox="0 0 20 20"><path d="M4 5h12M4 10h12M4 15h12M7 3v4M13 8v4M8 13v4" /></svg></button>
+            <span class="terminal-action-divider"></span>
+            <button type="button" title="@L[_collapsed ? "展开" : "折叠"]" aria-label="@L[_collapsed ? "展开" : "折叠"]" @onclick="ToggleCollapsed"><svg viewBox="0 0 20 20"><path d="M5 10h10" />@if (_collapsed) { <path d="M10 5v10" /> }</svg></button>
+            <button type="button" class="terminal-close" title="@L["从画布移除"]" aria-label="@L["从画布移除"]" @onclick="Remove"><svg viewBox="0 0 20 20"><path d="m6 6 8 8m0-8-8 8" /></svg></button>
+        </div>
+    </header>
+    @if (!_collapsed)
+    {
+        @if (_configure)
+        {
+            <div class="terminal-settings">
+                <label class="terminal-range-setting"><span>@L["字号"]</span><input type="range" data-terminal-range="size" min="10" max="24" @bind="_settings.FontSize" @bind:after="Save" /><output data-range-value>@_settings.FontSize px</output></label>
+                <label class="terminal-range-setting"><span>@L["毛玻璃模糊"]</span><input type="range" data-terminal-range="blur" min="0" max="50" @bind="_settings.Blur" @bind:after="Save" /><output data-range-value>@_settings.Blur px</output></label>
+                <label class="terminal-range-setting"><span>@L["透明度"]</span><input type="range" data-terminal-range="alpha" min="0" max="100" @bind="Transparency" @bind:after="Save" /><output data-range-value>@Transparency %</output></label>
+                <label>@L["字体"] <select @bind="_settings.Font" @bind:after="Save"><option>Cascadia Code</option><option>Consolas</option><option>Microsoft YaHei</option></select></label>
+                <section class="terminal-rule-editor">
+                    <div class="terminal-rule-title"><strong>@L["关键字高亮"]</strong><button type="button" disabled="@(_settings.Rules!.Count >= 32)" @onclick="AddRule">＋ @L["添加规则"]</button></div>
+                    <p>@L["每条规则独立设置颜色与加粗；多个关键字用逗号分隔。"]</p>
+                    <div class="terminal-rule-list">
+                    @foreach (var rule in _settings.Rules!)
+                    {
+                        <div class="terminal-rule-row @(!rule.Enabled ? "muted" : "")" @key="rule.Id">
+                            <input type="checkbox" title="@L["启用规则"]" aria-label="@L["启用规则"]" @bind="rule.Enabled" @bind:after="Save" />
+                            <input class="terminal-rule-words" value="@rule.Words" data-native-input="@RuleInputId(rule)" maxlength="256" placeholder="@L["例如 error,失败"]" aria-label="@L["关键字"]" @oninput="e => ChangeRule(rule, e.Value?.ToString() ?? string.Empty)" />
+                            <label class="terminal-rule-color" title="@L["高亮颜色"]"><input type="color" aria-label="@L["高亮颜色"]" @bind="rule.Color" @bind:after="Save" /></label>
+                            <button type="button" class="terminal-rule-weight @(rule.Bold ? "active" : "")" title="@L["关键字加粗"]" aria-label="@L["关键字加粗"]" aria-pressed="@(rule.Bold ? "true" : "false")" @onclick="() => { rule.Bold = !rule.Bold; Save(); }">B</button>
+                            <button type="button" class="terminal-rule-remove" title="@L["删除规则"]" aria-label="@L["删除规则"]" @onclick="() => { _settings.Rules.Remove(rule); Save(); }">×</button>
+                        </div>
+                    }
+                    </div>
+                    <div class="terminal-rule-preview"><small>@L["效果预览"]</small><pre>@Highlight(string.Join(" · ", _settings.Rules.Where(r => r.Enabled && !string.IsNullOrWhiteSpace(r.Words)).Select(r => r.Words.Split(',', '，')[0]).Take(8)))</pre></div>
+                </section>
+            </div>
+        }
+        <div class="terminal-output" @ref="_outputElement">
+            @foreach (var item in _history)
+            {
+                @if (item.Kind == "assistant") { <div class="terminal-assistant"><AiMarkdown Text="@item.Text" /></div> }
+                else if (item.Kind == "inspection") { <details class="terminal-reasoning terminal-inspection"><summary>@item.Text.Split('\n', 2)[0]</summary><pre>@Highlight(item.Text[(item.Text.IndexOf('\n') + 1)..])</pre></details> }
+                else if (item.Kind == "reasoning") { <details class="terminal-reasoning"><summary>@L["思考过程"]</summary><pre>@item.Text</pre></details> }
+                else { <pre class="@item.Kind">@Highlight(item.Text)</pre> }
+            }
+            @if (_busy && _aiWorking)
+            {
+                <AiStreamView Progress="Progress" Busy="true" JsonReply="true" />
+                @if (_inspecting) { <pre>@Highlight(_live)</pre> }
+            }
+            else { <pre>@Highlight(_live)</pre> }
+        </div>
+        <div class="terminal-result-actions"><button type="button" disabled="@(!Desktop || _busy || AiBusy || string.IsNullOrEmpty(_lastExecutedCommand))" @onclick="AnalyzeAsync">✧ @L["一键分析"]</button></div>
+        <form class="terminal-command" @onsubmit="ExecuteAsync" @onsubmit:preventDefault="true"><label class="terminal-command-path" title="@_session.Directory">PS @_session.Directory<span>&gt;</span></label><textarea rows="1" data-auto-grow value="@_command" data-native-input="@_commandId" @oninput="e => UpdateCommand(e.Value?.ToString() ?? string.Empty)" placeholder="@L["输入命令，或描述需求…"]" autocomplete="off" disabled="@(_busy || AiBusy)"></textarea><button type="button" class="terminal-interrupt" disabled="@(!_busy)" title="@L["停止"]" @onclick="StopCommand">■</button><button disabled="@(_busy || AiBusy || string.IsNullOrWhiteSpace(_command))" title="@L["发送指令"]">↵</button></form>
+        <span class="terminal-resize" data-terminal-resize></span>
+    }
+</section>

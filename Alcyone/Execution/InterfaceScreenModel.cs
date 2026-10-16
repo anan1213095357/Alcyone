@@ -5,6 +5,7 @@ public sealed class InterfaceScreenModel
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "Interface";
     public bool IsPlaced { get; set; }
+    public bool IsTerminal { get; set; }
     public double X { get; set; } = 160;
     public double Y { get; set; } = 120;
     public double Width { get; set; } = 960;

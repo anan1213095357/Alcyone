@@ -8,14 +8,14 @@ namespace StateMachine;
 // A normal top-level EDIT owns keyboard/IME input; wallpaper WebViews remain shell children.
 public sealed class DesktopTextInput : IDisposable
 {
-    public sealed record Update(string Id, string Text, bool Submit, bool Active, bool Composing = false);
-    private sealed record Request(string Id, string Text, double Left, double Top, double Width, double Height, double Ratio, double FontSize = 14, string FontFamily = "Segoe UI", string TextColor = "", string BackgroundColor = "", string ValueKind = "string", bool TransparentSurface = false, int FontWeight = 400);
+    public sealed record Update(string Id, string Text, bool Submit, bool Active, bool Composing = false, int HistoryDelta = 0);
+    private sealed record Request(string Id, string Text, double Left, double Top, double Width, double Height, double Ratio, double FontSize = 14, string FontFamily = "Segoe UI", string TextColor = "", string BackgroundColor = "", string ValueKind = "string", bool TransparentSurface = false, int FontWeight = 400, double TextInset = 0, bool HistoryKeys = false);
     public event Action<Update>? Changed;
     private readonly string _class = "Alcyone.Input." + Guid.NewGuid().ToString("N");
     private readonly WindowProc _windowProc, _editProc;
     private nint _host, _edit, _originalProc, _font, _brush, _surface;
     private string _id = "";
-    private bool _snapshotBackground;
+    private bool _snapshotBackground, _historyKeys;
     private uint _textColor=0x00fff3ed, _backgroundColor=0x00291b13;
     private string _valueKind="string";
     private bool _composing, _active, _registered;
@@ -33,7 +33,7 @@ public sealed class DesktopTextInput : IDisposable
         var width = (int)Math.Ceiling(request.Width * request.Ratio);
         var height = (int)Math.Ceiling(request.Height * request.Ratio);
         SetWindowPos(_host, 0, bounds.Left + (int)(request.Left * request.Ratio), bounds.Top + (int)(request.Top * request.Ratio), width, height, 0x0010);
-        _valueKind=request.ValueKind;
+        _valueKind=request.ValueKind; _historyKeys=request.HistoryKeys;
         _textColor=ParseColor(request.TextColor,0x00fff3ed);
         _backgroundColor=ParseColor(request.BackgroundColor,0x00291b13);
         var style=GetWindowLongPtrW(_host,-20).ToInt64();
@@ -55,11 +55,12 @@ public sealed class DesktopTextInput : IDisposable
         {
             var dc=GetDC(_edit); var oldFont=SelectObject(dc,_font);
             GetTextExtentPoint32W(dc,"Mg",2,out var textSize); SelectObject(dc,oldFont); ReleaseDC(_edit,dc);
-            var rectangle=new InputRect { Left=0,Top=Math.Max(0,(height-textSize.Height)/2),Right=width,Bottom=height };
+            var inset=(int)Math.Ceiling((double.IsFinite(request.TextInset) ? Math.Clamp(request.TextInset,0,24) : 0)*request.Ratio);
+            var rectangle=new InputRect { Left=inset,Top=Math.Max(0,(height-textSize.Height)/2),Right=Math.Max(inset+1,width-inset),Bottom=height };
             var buffer=Marshal.AllocHGlobal(Marshal.SizeOf<InputRect>());
             try { Marshal.StructureToPtr(rectangle,buffer,false); SendMessageW(_edit,0x00b3,0,buffer); }
             finally { Marshal.FreeHGlobal(buffer); }
-            SendMessageW(_edit,0x00d3,3,0);
+            SendMessageW(_edit,0x00d3,3,(nint)(inset | (inset << 16)));
         }
         SetWindowTextW(_edit, request.Text);
         _active = true;
@@ -81,15 +82,25 @@ public sealed class DesktopTextInput : IDisposable
         SetWindowPos(_host, 0, bounds.Left + (int)(request.Left * request.Ratio), bounds.Top + (int)(request.Top * request.Ratio), width, height, 0x0014);
         SetWindowPos(_edit, 0, 0, 0, width, height, 0x0014);
     }
+    public void CloseById(nint surface, string id) { if (_id == id) Close(surface); }
     public void Close(nint surface = 0)
     {
         if (!_active || surface != 0 && surface != _surface) return;
         _active = false; ShowWindow(_host, 0); Publish();
     }
-    private void Publish(bool submit = false)
+    private void Publish(bool submit = false, int historyDelta = 0)
     {
         var text = new StringBuilder(GetWindowTextLengthW(_edit) + 1); GetWindowTextW(_edit, text, text.Capacity);
-        Changed?.Invoke(new(_id, text.ToString(), submit, _active, _composing));
+        Changed?.Invoke(new(_id, text.ToString(), submit, _active, _composing, historyDelta));
+    }
+    private sealed record Replacement(string Id, string Text);
+    public void Replace(nint surface, string json)
+    {
+        var replacement = JsonSerializer.Deserialize<Replacement>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (!_active || _composing || surface != _surface || replacement is null || replacement.Id != _id || replacement.Text is null || replacement.Text.Length > 32000) return;
+        SetWindowTextW(_edit, replacement.Text);
+        SendMessageW(_edit, 0x00b1, (nuint)replacement.Text.Length, replacement.Text.Length);
+        InvalidateRect(_edit, 0, true);
     }
     private static nint CaptureBackground(int x,int y,int width,int height)
     {
@@ -151,6 +162,8 @@ public sealed class DesktopTextInput : IDisposable
         }
         if (message == 0x010d) _composing = true;
         if (message == 0x010e) { _composing = false; _imeCommitAt = Environment.TickCount64; Publish(); }
+        if (message == 0x0100 && _historyKeys && !_composing && (wParam == 38 || wParam == 40) && (GetKeyState(16) & 0x8000) == 0 && (GetKeyState(17) & 0x8000) == 0)
+        { Publish(historyDelta: wParam == 38 ? -1 : 1); return 0; }
         if (message == 0x0100 && wParam == 13 && Environment.TickCount64 - _imeCommitAt < 80) return 0;
         if (message == 0x0100 && !_composing && wParam == 65 && (GetKeyState(17) & 0x8000) != 0)
         { SendMessageW(_edit, 0x00b1, 0, -1); return 0; }

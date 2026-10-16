@@ -8,7 +8,7 @@ public sealed record DesktopCliResult(int ExitCode, string Output);
 public static class DesktopCli
 {
     private static readonly CancellationTokenSource Shutdown = new();
-    internal static void CancelAll() => Shutdown.Cancel();
+    internal static void CancelAll() { Shutdown.Cancel(); DesktopTerminalSession.StopAll(); }
     public static async Task<DesktopCliResult> RunAsync(string script, string directory, Func<string, Task> output, CancellationToken cancellation)
     {
         if (string.IsNullOrWhiteSpace(script) || script.Length > 32000) throw new InvalidOperationException("CLI 命令为空或过长。");

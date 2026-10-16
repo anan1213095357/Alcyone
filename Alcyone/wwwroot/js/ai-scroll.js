@@ -23,6 +23,8 @@
     window.addEventListener('resize', () => document.querySelectorAll('textarea[data-auto-grow]').forEach(queueResize));
     const inputBounds = new WeakMap();
     window.alcyoneAiInput = {
+        closeNative(id) { window.external?.sendMessage?.("alcyone:desktop:text-close-id:" + id); this.release(id); },
+        release(id) { document.querySelectorAll("[data-native-input]").forEach(input => { if (input.dataset.nativeInput === id) input.classList.remove("native-editing"); }); },
         resizeAll() { document.querySelectorAll("textarea[data-auto-grow]").forEach(queueResize); },
         resize(input) {
             if (!input) return;
@@ -53,6 +55,8 @@
     };
     function scrollAt(x, y, delta) {
         let node = document.elementFromPoint(x, y);
+        const terminal = node?.closest('.desktop-terminal');
+        if (terminal) { terminal.dispatchEvent(new CustomEvent('alcyone-terminal-wheel', {detail:{x,y,delta}})); return true; }
         if (!node?.closest('.desktop-ai-console')) return false;
         for (; node && !node.matches('.desktop-ai-console'); node = node.parentElement) {
             const style = getComputedStyle(node);

@@ -8,14 +8,15 @@ public sealed record AiStreamProgress(string Content, string Reasoning, string S
 
 public static class AiStreaming
 {
-    public static async Task<string> ReadAsync(HttpClient client, HttpRequestMessage request, Func<AiStreamProgress, Task> progress)
+    public static async Task<string> ReadAsync(HttpClient client, HttpRequestMessage request, Func<AiStreamProgress, Task> progress, CancellationToken cancellation = default)
     {
-        try { return await ReadCoreAsync(client, request, progress); }
-        catch (OperationCanceledException) { throw new InvalidOperationException("AI 请求超时（5 分钟），请检查网络或重试。"); }
+        try { return await ReadCoreAsync(client, request, progress, cancellation); }
+        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested) { throw new InvalidOperationException("AI 请求超时（5 分钟），请检查网络或重试。"); }
     }
-    private static async Task<string> ReadCoreAsync(HttpClient client, HttpRequestMessage request, Func<AiStreamProgress, Task> progress)
+    private static async Task<string> ReadCoreAsync(HttpClient client, HttpRequestMessage request, Func<AiStreamProgress, Task> progress, CancellationToken cancellation)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        timeout.CancelAfter(TimeSpan.FromMinutes(5));
         var clock = Stopwatch.StartNew();
         var content = new StringBuilder();
         var reasoning = new StringBuilder();

@@ -131,7 +131,7 @@
                 <div class="interface-library-hint">@L["拖到画布显示，点击铅笔设计"]</div>
                 @foreach (var interfaceScreen in Machine.Screens)
                 {
-                    <div class="interface-page-row" draggable="true" data-interface-source="@interfaceScreen.Id"><span class="interface-list-icon">▣</span><span class="interface-page-name">@interfaceScreen.Name</span><span class="interface-placement-dot @(interfaceScreen.IsPlaced ? "placed" : "")" title="@L[interfaceScreen.IsPlaced ? "已放置" : "未放置"]"></span><button class="interface-edit" title="@L["设计界面"]" @onclick="() => SelectInterface(interfaceScreen.Id)">✎</button><button class="remove-btn" title="@L["删除界面"]" @onclick="() => DeleteInterfaceAsync(interfaceScreen.Id)">×</button></div>
+                    <div class="interface-page-row" draggable="true" data-interface-source="@interfaceScreen.Id"><span class="interface-list-icon">@(interfaceScreen.IsTerminal ? ">_" : "▣")</span><span class="interface-page-name">@(interfaceScreen.IsTerminal ? L["AI 终端"] : interfaceScreen.Name) @if (interfaceScreen.IsTerminal) { <small class="terminal-built-in">@L["内置终端"]</small> }</span><span class="interface-placement-dot @(interfaceScreen.IsPlaced ? "placed" : "")" title="@L[interfaceScreen.IsPlaced ? "已放置" : "未放置"]"></span>@if (!interfaceScreen.IsTerminal) { <button class="interface-edit" title="@L["设计界面"]" @onclick="() => SelectInterface(interfaceScreen.Id)">✎</button> }<button class="remove-btn" disabled="@(interfaceScreen.IsTerminal && !interfaceScreen.IsPlaced)" title="@L[interfaceScreen.IsTerminal ? "从画布移除" : "删除界面"]" @onclick="() => interfaceScreen.IsTerminal ? RemovePlacedInterfaceAsync(interfaceScreen.Id) : DeleteInterfaceAsync(interfaceScreen.Id)">×</button></div>
                 }
             </details>
             <details class="section left-fold">
@@ -223,7 +223,7 @@
         </div>
                 </nav>
             }
-            @if (IsWallpaperView) { <DesktopAiConsole Submit="SendDesktopAiAsync" Reply="@_desktopAiReply" Progress="_desktopAiProgress" CliPreview="@DesktopCliPreview" CliOutput="@_desktopCliOutput" CliStatus="@_desktopCliStatus" CliBusy="_desktopCliBusy" ExecuteCli="ExecuteDesktopCliAsync" CancelCli="CancelDesktopCli" StateNames="@Machine.States.Select(s => s.Name)" VariableNames="@Machine.Variables.Select(v => v.Name)" /> }
+            @if (IsWallpaperView && DesktopPreferences.DesktopAiEnabled) { <DesktopAiConsole Submit="SendDesktopAiAsync" Reply="@_desktopAiReply" Progress="_desktopAiProgress" CliPreview="@DesktopCliPreview" CliOutput="@_desktopCliOutput" CliStatus="@_desktopCliStatus" CliBusy="_desktopCliBusy" ExecuteCli="ExecuteDesktopCliAsync" CancelCli="CancelDesktopCli" StateNames="@Machine.States.Select(s => s.Name)" VariableNames="@Machine.Variables.Select(v => v.Name)" /> }
             <div class="starfield-anchor" aria-hidden="true"><canvas id="workspaceBackdrop"></canvas><canvas class="nebula-layer nebula-violet"></canvas><canvas class="nebula-layer nebula-aurora"></canvas><canvas class="milky-way-layer"></canvas><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><canvas id="workspaceStarfield"></canvas></div>
             <div id="worldScale">
                 <div id="world">
@@ -231,7 +231,14 @@
                     <div id="interfaceLayer">
                         @foreach (var placedInterface in Machine.Screens.Where(s => s.IsPlaced))
                         {
+                            @if (placedInterface.IsTerminal)
+                            {
+                                <DesktopTerminal @key="placedInterface.Id" Screen="placedInterface" Desktop="IsWallpaperView" LayoutChanged="layout => SaveTerminalLayoutAsync(placedInterface.Id, layout)" Remove="() => RemovePlacedInterfaceAsync(placedInterface.Id)" SubmitAi="SendTerminalAiAsync" AnalyzeAi="AnalyzeTerminalOutputAsync" CancelAi="CancelTerminalAi" AiBusy="@(_desktopAiBusy || _desktopCliBusy)" Progress="_desktopAiProgress" />
+                            }
+                            else
+                            {
                             <InterfaceSurface @key="placedInterface.Id" Screen="placedInterface" ConfigKey="@_configKey" Desktop="IsWallpaperView" Variables="Machine.Variables" Values="Runtime.Variables" ValueChanged="SetInterfaceValueAsync" Edit="() => SelectInterface(placedInterface.Id)" Remove="() => RemovePlacedInterfaceAsync(placedInterface.Id)" Clicked="control => InvokePlacedInterfaceAsync(placedInterface.Id, control)" />
+                            }
                         }
                     </div>
                     <svg id="edgeSvg">
@@ -1687,7 +1694,7 @@
         function onCanvasContextMenu(event) { event.preventDefault(); }
 
         function onWheel(event) {
-            if (!workspace || event.target.closest('.canvas-selection-toolbar, .alcyone-fold-popover, .desktop-ai-console, .interface-designer')) return;
+            if (!workspace || event.target.closest('.canvas-selection-toolbar, .alcyone-fold-popover, .desktop-ai-console, .desktop-terminal, .interface-designer')) return;
             const interfaceSurface = event.target.closest('.interface-surface');
             if (interfaceSurface ? desktopView : event.target.closest('input, textarea, select')) return;
             event.preventDefault();

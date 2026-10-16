@@ -21,11 +21,13 @@ public sealed partial class MachineSession
         }
         SetRuntimeVariable(variable.Name,value); Notify();
     });
-    public Task UpdateInterfacePlacementAsync(string path,string id,double x,double y) => _dispatcher.InvokeAsync(() =>
+    public Task UpdateInterfacePlacementAsync(string path,string id,double x,double y,double? width=null,double? height=null) => _dispatcher.InvokeAsync(() =>
     {
         if(!double.IsFinite(x)||!double.IsFinite(y)) return;
         var updated=Clone(Machine);
         var screen=updated.Screens.FirstOrDefault(s=>s.Id==id); if(screen is null) return;
+        if (width is { } w && double.IsFinite(w)) screen.Width=Math.Clamp(w,280,4000);
+        if (height is { } h && double.IsFinite(h)) screen.Height=Math.Clamp(h,180,2500);
         screen.IsPlaced=true; screen.X=Math.Clamp(x,0,Math.Max(0,4000-screen.Width)); screen.Y=Math.Clamp(y,0,Math.Max(0,2500-screen.Height));
         var temporary=path+"."+Guid.NewGuid().ToString("N")+".tmp";
         try { File.WriteAllText(temporary,System.Text.Json.JsonSerializer.Serialize(updated,_jsonOptions)); File.Move(temporary,path,true); }
