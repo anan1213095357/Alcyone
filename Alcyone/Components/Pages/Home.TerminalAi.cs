@@ -68,6 +68,7 @@ public partial class Home
                     _desktopAiProgress = progress with { Reasoning = reasoning + currentReasoning };
                     StateHasChanged();
                 }), cancellation.Token);
+                cancellation.Token.ThrowIfCancellationRequested();
                 reasoning += currentReasoning + (currentReasoning.Length > 0 ? "\n\n" : "");
                 if (reasoning.Length > 60000) reasoning = reasoning[^60000..];
                 var answer = ParseDesktopAiAnswer(content, terminalRequest: true);
@@ -96,7 +97,7 @@ public partial class Home
                         if (!seen.Add(command)) output = "相同查询已执行过，请使用已有结果或更换查询方式。";
                         else
                         {
-                            _desktopAiProgress = new("", reasoning, "正在查询 · " + call.Name);
+                            _desktopAiProgress = new("", reasoning, L[DesktopTerminalTools.Title(call.Name)]);
                             await InvokeAsync(StateHasChanged);
                             output = await inspect(command, call.Name, cancellation.Token);
                             if (output.Length > 12000) output = output[..9000] + "\n[输出过长，已省略中段；请缩小查询条件]\n" + output[^3000..];

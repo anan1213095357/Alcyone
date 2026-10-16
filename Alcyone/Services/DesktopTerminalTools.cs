@@ -5,6 +5,11 @@ namespace StateMachine;
 // Inspection tools use fixed PowerShell templates. Model text is always quoted as data.
 public static class DesktopTerminalTools
 {
+    public static string Title(string name) => name switch
+    {
+        "installed_apps" => "查询已安装软件", "shortcuts" => "查询快捷方式", "search_executables" => "查找程序文件",
+        "inspect_file" => "核实文件信息", "list_directory" => "查看目录", "processes" => "查询进程", _ => "查询"
+    };
     private static string Quote(string text) => "'" + text.Replace("'", "''") + "'";
     public static string Build(string name, string[]? terms, string[]? paths, string? path)
     {
