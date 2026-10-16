@@ -9,7 +9,7 @@ namespace StateMachine;
 public sealed class DesktopTextInput : IDisposable
 {
     public sealed record Update(string Id, string Text, bool Submit, bool Active, bool Composing = false, int HistoryDelta = 0);
-    private sealed record Request(string Id, string Text, double Left, double Top, double Width, double Height, double Ratio, double FontSize = 14, string FontFamily = "Segoe UI", string TextColor = "", string BackgroundColor = "", string ValueKind = "string", bool TransparentSurface = false, int FontWeight = 400, double TextInset = 0, bool HistoryKeys = false);
+    private sealed record Request(string Id, string Text, double Left, double Top, double Width, double Height, double Ratio, double FontSize = 14, string FontFamily = "Segoe UI", string TextColor = "", string BackgroundColor = "", string ValueKind = "string", bool TransparentSurface = false, int FontWeight = 400, double TextInset = 0, bool HistoryKeys = false, bool FullBackground = false, bool StableBackground = false);
     public event Action<Update>? Changed;
     private readonly string _class = "Alcyone.Input." + Guid.NewGuid().ToString("N");
     private readonly WindowProc _windowProc, _editProc;
@@ -40,8 +40,13 @@ public sealed class DesktopTextInput : IDisposable
         // Keep the normal EDIT window's activation and mouse hit testing.
         SetWindowLongPtrW(_host,-20,(nint)(style&~0x80000));
         ShowWindow(_host,0);
+        // Do not capture a compositor frame that still contains the previous
+        // native edit window (including its text or an outdated wallpaper image).
+        if (request.TransparentSurface && !request.StableBackground) DwmFlush();
         if(_brush!=0) DeleteObject(_brush);
-        _brush=request.TransparentSurface ? CaptureBackground(bounds.Left+(int)(request.Left*request.Ratio),bounds.Top+(int)(request.Top*request.Ratio),width,height) : 0;
+        // Terminal inputs use an opaque brush while focused. Captured wallpaper
+        // is a frozen image, not transparency, and cannot track moving planets.
+        _brush=request.TransparentSurface && !request.StableBackground ? CaptureBackground(bounds.Left+(int)(request.Left*request.Ratio),bounds.Top+(int)(request.Top*request.Ratio),width,height,request.FullBackground) : 0;
         _snapshotBackground=_brush!=0 && request.TransparentSurface;
         if(_brush==0) _brush=CreateSolidBrush(_backgroundColor);
         var fontSize=double.IsFinite(request.FontSize) ? Math.Clamp(request.FontSize,1,144) : 14;
@@ -102,7 +107,7 @@ public sealed class DesktopTextInput : IDisposable
         SendMessageW(_edit, 0x00b1, (nuint)replacement.Text.Length, replacement.Text.Length);
         InvalidateRect(_edit, 0, true);
     }
-    private static nint CaptureBackground(int x,int y,int width,int height)
+    private static nint CaptureBackground(int x,int y,int width,int height,bool fullBackground)
     {
         var screen=GetDC(0); if(screen==0) return 0;
         var memory=CreateCompatibleDC(screen); var bitmap=CreateCompatibleBitmap(screen,width,height);
@@ -110,8 +115,14 @@ public sealed class DesktopTextInput : IDisposable
         {
             if(memory==0 || bitmap==0) return 0;
             var previous=SelectObject(memory,bitmap);
-            // Sample a text-free lower strip, so the background brush never contains old glyphs.
-            var copied=StretchBlt(memory,0,0,width,height,screen,x,y+Math.Max(0,height-2),width,1,0x00cc0020);
+            // Terminals hide their browser text before opening this native input.
+            // Copy the full region: stretching a one-pixel strip turns planets
+            // and other wallpaper details into vertical bands in the input row.
+            var sourceY = fullBackground ? y : y + Math.Max(0,height-2);
+            var sourceHeight = fullBackground ? height : 1;
+            var copied=fullBackground
+                ? BitBlt(memory,0,0,width,height,screen,x,y,0x00cc0020)
+                : StretchBlt(memory,0,0,width,height,screen,x,sourceY,width,sourceHeight,0x00cc0020);
             SelectObject(memory,previous);
             return copied ? CreatePatternBrush(bitmap) : 0;
         }
@@ -153,6 +164,18 @@ public sealed class DesktopTextInput : IDisposable
     }
     private nint EditMessage(nint hwnd, uint message, nuint wParam, nint lParam)
     {
+        if (_brush != 0 && message == 0x0014 && GetClientRect(hwnd, out var backgroundRect))
+        {
+            // Transparent text drawing still needs the old glyphs erased.
+            FillRect((nint)wParam, ref backgroundRect, _brush);
+            return 1;
+        }
+        if (_brush != 0 && message == 0x000f)
+        {
+            // EDIT otherwise repaints only changed glyphs, leaving old text
+            // visible through the transparent background during rapid typing.
+            InvalidateRect(hwnd, 0, true);
+        }
         if(message==0x0020) { SetCursor(LoadCursorW(0,(nint)32513)); return 1; }
         if(message==0x0102 && wParam>=32 && wParam<127)
         {
@@ -182,6 +205,9 @@ public sealed class DesktopTextInput : IDisposable
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint from,uint to,bool attach);
     [StructLayout(LayoutKind.Sequential)] private struct InputRect { public int Left,Top,Right,Bottom; }
+    [DllImport("dwmapi.dll")] private static extern int DwmFlush();
+    [DllImport("user32.dll")] private static extern bool GetClientRect(nint window, out InputRect rectangle);
+    [DllImport("user32.dll")] private static extern int FillRect(nint dc, ref InputRect rectangle, nint brush);
     [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(nint window,uint color,byte alpha,uint flags);
     [DllImport("user32.dll")] private static extern short GetKeyState(int key);
     [DllImport("user32.dll")] private static extern bool InvalidateRect(nint window,nint rectangle,bool erase);

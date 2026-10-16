@@ -284,8 +284,9 @@
         }
         if (!confirmation || !api || !popupAnchor) return;
         const host = api.workspace, bounds = host.getBoundingClientRect(), world = api.world.getBoundingClientRect();
-        const x = world.left + popupAnchor.x * api.zoom() - bounds.left;
-        const y = world.top + popupAnchor.y * api.zoom() - bounds.top;
+        const uiScale = bounds.width / Math.max(1, host.offsetWidth);
+        const x = (world.left + popupAnchor.x * api.zoom() - bounds.left) / uiScale;
+        const y = (world.top + popupAnchor.y * api.zoom() - bounds.top) / uiScale;
         const width = confirmation.offsetWidth, height = confirmation.offsetHeight, margin = 10;
         let left = x + 12, top = y + 12;
         if (left + width > host.clientWidth - margin) left = x - width - 12;

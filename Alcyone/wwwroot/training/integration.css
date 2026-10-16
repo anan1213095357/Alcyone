@@ -1,6 +1,6 @@
 .integrated-workbench { height:100vh;display:flex;flex-direction:column; }
 .integration-bar { min-height:48px;display:flex;align-items:center;gap:16px;padding:8px 16px;background:#101a2b;border-bottom:1px solid #30415e; }
-.integration-bar span { flex:1;font-size:12px;color:var(--muted); }
+.integration-bar span { flex:1;font-size:var(--font-body, .8125rem);color:var(--muted); }
 .integration-bar strong { flex-shrink:0;white-space:nowrap; }
 .integration-bar .action,.integration-save .action { width:auto;flex-shrink:0;padding:7px 14px; }
 .integration-bar .action { margin-left:auto; }
@@ -31,18 +31,18 @@
 .integrated-workbench .side-stack > .panel-card:first-child,
 .integrated-workbench .text-side-panels > .panel-card:first-child { border-top:0; padding-top:12px; }
 .integrated-workbench .side-stack .card-heading { gap:8px; margin-bottom:14px; }
-.integrated-workbench .side-stack .badge { min-width:0; height:auto; padding:2px 0; border:0; border-radius:0; background:transparent; color:#718bad; font-size:11px; font-weight:600; }
+.integrated-workbench .side-stack .badge { min-width:0; height:auto; padding:2px 0; border:0; border-radius:0; background:transparent; color:#718bad; font-size:var(--font-label, .75rem); font-weight:600; }
 .integrated-workbench .side-stack .card-title,
-.integrated-workbench .side-stack .section-title { color:#dae5f5; font-size:13px; font-weight:650; }
+.integrated-workbench .side-stack .section-title { color:#dae5f5; font-size:var(--font-body, .8125rem); font-weight:650; }
 .integrated-workbench .side-stack .card-sub,
-.integrated-workbench .side-stack .section-sub { margin-top:5px; color:#8596ae; font-size:11px; line-height:1.75; }
+.integrated-workbench .side-stack .section-sub { margin-top:5px; color:#8596ae; font-size:var(--font-label, .75rem); line-height:1.75; }
 .integrated-workbench .side-stack .metric-grid { gap:14px; margin-bottom:12px; }
 .integrated-workbench .side-stack .metric-box,
 .integrated-workbench .side-stack .field-box,
 .integrated-workbench .side-stack .call-param { min-height:0; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
 .integrated-workbench .side-stack .field-box > span,
 .integrated-workbench .side-stack .metric-box > span,
-.integrated-workbench .side-stack .call-param > span { color:#a1b0c5; font-size:11px; }
+.integrated-workbench .side-stack .call-param > span { color:#a1b0c5; font-size:var(--font-label, .75rem); }
 .integrated-workbench .side-stack .field-box > div,
 .integrated-workbench .side-stack .call-param > div { align-items:center; }
 .integrated-workbench .side-stack .field-box input { width:100%; min-width:0; font-weight:500; }
@@ -50,11 +50,11 @@
 .integrated-workbench .side-stack .call-param b { flex-shrink:0; font-weight:500; }
 .integrated-workbench .side-stack .call-param-grid { gap:12px; margin:14px 0; }
 .integrated-workbench .side-stack .info-line { padding:8px 0; border:0; border-radius:0; background:transparent; color:#9aacC5; }
-.integrated-workbench .side-stack .micro-status { color:#8596ae; font-size:11px; line-height:1.7; }
+.integrated-workbench .side-stack .micro-status { color:#8596ae; font-size:var(--font-label, .75rem); line-height:1.7; }
 .integrated-workbench .side-stack .result-box { border:0; border-left:3px solid #425777; border-radius:0; padding:10px 12px; background:#141e2c; box-shadow:none; }
 .integrated-workbench .side-stack .result-box.match { border-left-color:#46c99b; }
 .integrated-workbench .side-stack .result-box.miss { border-left-color:#e59972; }
-.integrated-workbench .side-stack .text-inline-field { margin:12px 0; color:#a1b0c5; font-size:11px; }
+.integrated-workbench .side-stack .text-inline-field { margin:12px 0; color:#a1b0c5; font-size:var(--font-label, .75rem); }
 .integrated-workbench .side-stack .text-seed { border:0; border-radius:0; padding:7px 2px; border-bottom:1px solid #243247; }
 .integrated-workbench .side-stack .text-seed.selected { background:#192a40; box-shadow:inset 2px 0 #6c9fff; }
 .integrated-workbench .side-stack .text-glyph-row { border-top-color:#293549; padding:12px 0; }

@@ -14,6 +14,9 @@ public partial class Home
     private bool _aboutOpen;
     private bool _appSettingsOpen;
     private bool? _lastAnimationPause;
+    private DesktopDisplay? PreviewDisplay => Desktop.Displays.FirstOrDefault(display => display.Primary) ?? Desktop.Displays.FirstOrDefault();
+    private int DesktopPreviewWidth => PreviewDisplay is { } display ? (int)Math.Round(display.Width * 96d / Math.Max(96u, display.Dpi)) : 0;
+    private int DesktopPreviewHeight => PreviewDisplay is { } display ? (int)Math.Round(display.Height * 96d / Math.Max(96u, display.Dpi)) : 0;
 
     private async Task SyncAnimationPauseAsync()
     {

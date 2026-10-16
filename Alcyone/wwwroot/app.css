@@ -8,6 +8,12 @@ html.alcyone-animations-paused *::before,
 html.alcyone-animations-paused *::after { animation-play-state: paused !important; }
 
 :root {
+    --ui-text-scale: 1;
+    --font-caption: .6875rem;
+    --font-label: .75rem;
+    --font-body: .8125rem;
+    --font-heading: .9375rem;
+    --font-title: 1.125rem;
     --bg: #070a10;
     --panel: #0d121c;
     --panel2: #111824;
@@ -60,6 +66,7 @@ body {
     background: var(--bg);
     color: var(--text);
     font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    font-size: var(--font-body);
 }
 
 button,

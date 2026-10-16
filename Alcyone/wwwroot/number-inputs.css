@@ -10,7 +10,7 @@ input[type="number"] {
     background:linear-gradient(180deg,#172235,#101927) !important;
     color:#e7effc !important;
     font-variant-numeric:tabular-nums;
-    font-size:12px;
+    font-size:var(--font-body, .8125rem);
     line-height:1.4;
     box-shadow:inset 0 1px 0 #ffffff06;
     transition:border-color .15s,box-shadow .15s;

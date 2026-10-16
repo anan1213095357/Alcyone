@@ -87,7 +87,7 @@ public partial class DesktopTerminal
         public double Y { get; set; } = 100;
         public double Width { get; set; } = 510;
         public double Height { get; set; } = 420;
-        public int FontSize { get; set; } = 12;
+        public int FontSize { get; set; } = 13;
         public int Opacity { get; set; } = 82;
         public string Font { get; set; } = "Cascadia Code";
         public List<HighlightRule>? Rules { get; set; }
@@ -145,6 +145,7 @@ public partial class DesktopTerminal
         if (_disposed || update.Id != _commandId && rule is null) return;
         _ = InvokeAsync(async () =>
         {
+            if (update.Active && _view is not null) await _view.InvokeVoidAsync("activated", update.Id);
             if (update.Id == _commandId)
             {
                 if (update.HistoryDelta != 0)

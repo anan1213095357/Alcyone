@@ -15,7 +15,7 @@
 @implements IAsyncDisposable
 @rendermode InteractiveServer
 
-<div id="app" class="@(_desktopMode ? "desktop-mode" : null)">
+<div id="app" class="@(_desktopMode ? "desktop-mode" : null)" data-board-scale="@DesktopPreferences.BoardScale" data-desktop-width="@DesktopPreviewWidth" data-desktop-height="@DesktopPreviewHeight">
             @if (!IsWallpaperView && _interfaceMode && CurrentInterface is { } screen)
             {
                 <InterfaceDesigner @key="screen.Id" Screen="screen" Actions="InterfaceActions" Variables="Machine.Variables" Values="Runtime.Variables" ValueChanged="SetInterfaceValueAsync" Changed="SaveConfigAsync" AiRequested="OpenInterfaceAi" ScriptRequested="OpenInterfaceScript" Clicked="InvokeInterfaceControlAsync" Closed="() => _interfaceMode=false" />
@@ -57,6 +57,8 @@
                 <section class="app-settings-menu" aria-label="@L["应用设置"]">
                     <div class="app-menu-heading">@L["设置"]</div>
                     <div class="app-language-row"><span>@L["界面语言"]</span><LanguagePicker /></div>
+                    <TextScaleSettings />
+                    <TextScaleSettings Desktop="true" />
                     <AiConnectionDialog />
                     <DesktopSettings />
                     <button class="starship-settings-entry" @onclick="() => { _appSettingsOpen = false; _starshipSettingsOpen = true; }"><span>@L["星舰外观"]</span><small>@L["选择航线上的飞行形象"]</small><span>›</span></button>
@@ -419,7 +421,7 @@
                             var input = to?.Inputs.FirstOrDefault(x => x.Id == edge.ToPortId);
                             <div class="group">
                                 <div class="group-title">@L["状态连线"]</div>
-                                <div style="margin-top:9px;color:#9faabe;font-size:10px;line-height:1.8">
+                                <div style="margin-top:9px;color:#9faabe;font-size:var(--font-caption, .6875rem);line-height:1.8">
                                     @(from?.Name ?? "")<br />
                                     @(output?.Name ?? "")<br />
                                     ↓<br />
@@ -431,7 +433,7 @@
                                 <div class="group-title">@L["切换前等待"]</div>
                                 <label>@L["等待时间（毫秒）"]</label>
                                 <input type="number" min="0" max="86400000" step="100" value="@edge.DelayMilliseconds" @onchange="e => ChangeEdgeDelayAsync(edge, e)" />
-                                <div style="margin-top:8px;color:#9faabe;font-size:11px;line-height:1.7">@L["条件满足后，等待结束再切换。0 表示不额外等待。"]</div>
+                                <div style="margin-top:8px;color:#9faabe;font-size:var(--font-label, .75rem);line-height:1.7">@L["条件满足后，等待结束再切换。0 表示不额外等待。"]</div>
                             </div>
                             <button class="danger" @onclick="DeleteSelectedEdge">@L["删除连线"]</button>
                         }
@@ -837,11 +839,11 @@
                                                         }
                                                         else
                                                         {
-                                                            <div style="display:flex;align-items:center;padding-left:7px;color:#67758d;font-size:9px">@L["与另一个全局变量比较"]</div>
+                                                            <div style="display:flex;align-items:center;padding-left:7px;color:#67758d;font-size:var(--font-caption, .6875rem)">@L["与另一个全局变量比较"]</div>
                                                         }
                                                     </div>
                                                     <div class="condition-row-c">
-                                                        <div style="display:flex;align-items:center;color:#718097;font-size:9px">@L["比较值"]</div>
+                                                        <div style="display:flex;align-items:center;color:#718097;font-size:var(--font-caption, .6875rem)">@L["比较值"]</div>
                                                         @if (condition.RightMode == "variable")
                                                         {
                                                             <SearchPicker Options="@VariableOptions(ComparisonVariables(condition))" Value="@NodeString(condition.RightValue)" ValueChanged="value => ChangeConditionRightValue(state.Id, output.Id, condition.Id, value)" Placeholder="选择比较变量" />
@@ -1209,24 +1211,59 @@
         let suppressClickUntil = 0;
         let initialized = false;
         let desktopView = false, desktopResize = null;
-
-        const editorMinZoom = () => Math.max(.01, Math.min(
-            (workspace?.offsetWidth || 1) / WORLD_WIDTH,
-            (workspace?.offsetHeight || 1) / WORLD_HEIGHT));
-        const clampZoom = value => Math.min(MAX_ZOOM, Math.max(desktopView ? .01 : editorMinZoom(), value));
+        // This camera belongs only to this editor window; never persist it.
+        let editorViewZoom = 1, appliedBoardScale = null;
+        const sharedBoardScale = () => (Number(document.getElementById('app')?.dataset.boardScale) || 25) / 100;
+        const uiScale = () => Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) ||
+            (document.body.getBoundingClientRect().width / Math.max(1, document.body.offsetWidth)) || 1;
+        const viewScale = () => world ? world.getBoundingClientRect().width / Math.max(1, world.offsetWidth) : canvasZoom * uiScale();
+        const desktopFrame = () => {
+            const app = document.getElementById('app');
+            // Preview the actual desktop viewport, including its aspect ratio.
+            // The fixed logical world alone is not the desktop's visible frame.
+            const width = desktopView ? workspace.clientWidth * uiScale() :
+                Number(app?.dataset.desktopWidth) || screen.width;
+            const height = desktopView ? workspace.clientHeight * uiScale() :
+                Number(app?.dataset.desktopHeight) || screen.height;
+            return { width: width / sharedBoardScale(), height: height / sharedBoardScale() };
+        };
+        const editorMinZoom = () => {
+            if (!workspace) return .01;
+            const frame = desktopFrame();
+            // Measure the viewport without scrollbar gutters. Otherwise zooming
+            // out can keep both scrollbars alive by fitting to their smaller area.
+            const style = getComputedStyle(workspace);
+            const width = workspace.offsetWidth - (parseFloat(style.borderLeftWidth) || 0) - (parseFloat(style.borderRightWidth) || 0);
+            const height = workspace.offsetHeight - (parseFloat(style.borderTopWidth) || 0) - (parseFloat(style.borderBottomWidth) || 0);
+            return Math.max(.0001, Math.min(width / frame.width, height / frame.height));
+        };
+        const clampZoom = value => desktopView ? sharedBoardScale() / uiScale() :
+            Math.max(editorMinZoom(), Math.min(Math.max(MAX_ZOOM / uiScale(), editorMinZoom()), value));
 
         function fitDesktop() {
             if (!workspace || !scaleBox) return;
             if (!desktopView) {
-                setZoom(canvasZoom, true);
-                return;
+                // Keep the editor's preview at the desktop's aspect ratio.
+                // Any extra window height belongs to the logs below it.
+                const frame = desktopFrame();
+                const previewHeight = workspace.offsetWidth * frame.height / frame.width;
+                const app = document.getElementById('app');
+                if (app && previewHeight > 0) app.style.setProperty('--editor-preview-height', `${previewHeight}px`);
             }
-            workspace.style.setProperty('--desktop-taskbar-inset', `${Math.max(0, screen.height - screen.availHeight)}px`);
-            const zoom = Math.min(workspace.clientWidth / WORLD_WIDTH, workspace.clientHeight / WORLD_HEIGHT);
-            setZoom(zoom, false);
-            scaleBox.style.left = `${Math.max(0, (workspace.clientWidth - WORLD_WIDTH * canvasZoom) / 2)}px`;
-            scaleBox.style.top = `${Math.max(0, (workspace.clientHeight - WORLD_HEIGHT * canvasZoom) / 2)}px`;
-            workspace.scrollLeft = workspace.scrollTop = 0;
+            const boardScale = sharedBoardScale();
+            if (appliedBoardScale !== boardScale) {
+                // A setting change returns to the whole-desktop preview.
+                editorViewZoom = 1;
+                workspace.scrollLeft = workspace.scrollTop = 0;
+                appliedBoardScale = boardScale;
+            }
+            setZoom(desktopView ? boardScale / uiScale() : editorMinZoom() * editorViewZoom, false);
+            scaleBox.style.marginLeft = scaleBox.style.marginTop = "0";
+            scaleBox.style.left = scaleBox.style.top = "0";
+            if (desktopView) {
+                workspace.style.setProperty('--desktop-taskbar-inset', `${Math.max(0, screen.height - screen.availHeight)}px`);
+                workspace.scrollLeft = workspace.scrollTop = 0;
+            }
         }
 
         function setDesktopView(enabled) {
@@ -1246,8 +1283,8 @@
             const rect = element.getBoundingClientRect();
             const worldRect = world.getBoundingClientRect();
             return {
-                x: (rect.left - worldRect.left + rect.width / 2) / canvasZoom,
-                y: (rect.top - worldRect.top + rect.height / 2) / canvasZoom
+                x: (rect.left - worldRect.left + rect.width / 2) / viewScale(),
+                y: (rect.top - worldRect.top + rect.height / 2) / viewScale()
             };
         }
 
@@ -1449,7 +1486,7 @@
                         <title>${document.documentElement.lang === "en" ? "Click to set the transition delay" : "点击设置切换前等待"}</title>
                         <path d="${sleeve}" fill="none" stroke="${stroke}" stroke-width="27" stroke-linecap="round" />
                         <path id="${pathId}" d="${sleeve}" fill="none" stroke="#182438" stroke-width="23" stroke-linecap="round" />
-                        <text fill="#e4efff" font-size="11" font-weight="600" dy="4" text-anchor="middle" style="pointer-events:all"><textPath href="#${pathId}" startOffset="50%">${label}</textPath></text>
+                        <text fill="#e4efff" font-weight="600" dy="4" text-anchor="middle" style="font-size:var(--font-label);pointer-events:all"><textPath href="#${pathId}" startOffset="50%">${label}</textPath></text>
                     </g>`;
                 }
                 edgeMarkup.set(edge.id,{signature,html:html.slice(htmlStart),ships:ships.slice(shipsStart)});
@@ -1496,16 +1533,16 @@
             const start = getPortPosition(pending.stateId, pending.portId);
             if (!start) return;
             const rect = world.getBoundingClientRect();
-            const x = (clientX - rect.left) / canvasZoom;
-            const y = (clientY - rect.top) / canvasZoom;
+            const x = (clientX - rect.left) / viewScale();
+            const y = (clientY - rect.top) / viewScale();
             tempEdge.setAttribute("d", bezierPath(start.x, start.y, x, y));
         }
 
         function constrainCanvasScroll() {
             if (desktopView || !workspace) return;
-            if (canvasZoom <= editorMinZoom() + .0001) { workspace.scrollLeft = workspace.scrollTop = 0; return; }
-            const maxX = Math.max(0, WORLD_WIDTH * canvasZoom - workspace.clientWidth);
-            const maxY = Math.max(0, WORLD_HEIGHT * canvasZoom - workspace.clientHeight);
+            const frame = desktopFrame();
+            const maxX = Math.max(0, frame.width * canvasZoom - workspace.clientWidth);
+            const maxY = Math.max(0, frame.height * canvasZoom - workspace.clientHeight);
             workspace.scrollLeft = Math.max(0, Math.min(maxX, workspace.scrollLeft));
             workspace.scrollTop = Math.max(0, Math.min(maxY, workspace.scrollTop));
         }
@@ -1522,16 +1559,18 @@
             }
             canvasZoom = clampZoom(Number(value));
             if (!desktopView) {
-                const fitted = canvasZoom <= editorMinZoom() + .0001;
-                workspace.style.overflow = fitted ? "hidden" : "auto";
-                scaleBox.style.marginLeft = fitted ? `${Math.max(0,(workspace.clientWidth-WORLD_WIDTH*canvasZoom)/2)}px` : "0";
-                scaleBox.style.marginTop = fitted ? `${Math.max(0,(workspace.clientHeight-WORLD_HEIGHT*canvasZoom)/2)}px` : "0";
+                const overview = canvasZoom <= editorMinZoom() + .000001;
+                workspace.style.overflow = overview ? "hidden" : "auto";
+                workspace.classList.toggle('is-overview', overview);
+                if (overview) workspace.scrollLeft = workspace.scrollTop = 0;
+                scaleBox.style.marginLeft = scaleBox.style.marginTop = "0";
             }
             world.style.transform = `scale(${canvasZoom})`;
-            scaleBox.style.width = `${WORLD_WIDTH * canvasZoom}px`;
-            scaleBox.style.height = `${WORLD_HEIGHT * canvasZoom}px`;
+            const frame = desktopFrame();
+            scaleBox.style.width = `${frame.width * canvasZoom}px`;
+            scaleBox.style.height = `${frame.height * canvasZoom}px`;
             const label = document.getElementById("zoomLabel");
-            if (label) label.textContent = `${Math.round(canvasZoom * 100)}%`;
+            if (label) label.textContent = `${Math.round(canvasZoom / editorMinZoom() * 100)}%`;
             if (keepCenter) {
                 workspace.scrollLeft = centerWorldX * canvasZoom - workspace.clientWidth / 2;
                 workspace.scrollTop = centerWorldY * canvasZoom - workspace.clientHeight / 2;
@@ -1540,43 +1579,61 @@
             scheduleDrawEdges();
         }
 
-        function fitCanvas() {
-            if (!workspace) return;
-            const cards = [...document.querySelectorAll(".state-card:not([hidden]), .alcyone-orb")];
-            if (cards.length === 0) {
-                setZoom(0.85, false);
-                workspace.scrollLeft = 0;
-                workspace.scrollTop = 0;
-                return;
-            }
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            for (const card of cards) {
-                const x = parseFloat(card.style.left) || 0;
-                const y = parseFloat(card.style.top) || 0;
-                const width = card.offsetWidth || 540;
-                const height = card.offsetHeight || 220;
-                minX = Math.min(minX, x);
-                minY = Math.min(minY, y);
-                maxX = Math.max(maxX, x + width);
-                maxY = Math.max(maxY, y + height);
-            }
-            const padding = 120;
-            const width = maxX - minX + padding * 2;
-            const height = maxY - minY + padding * 2;
-            const zoom = clampZoom(Math.min(workspace.clientWidth / width, workspace.clientHeight / height, 1));
-            setZoom(zoom, false);
-            workspace.scrollLeft = Math.max(0, (minX - padding) * zoom);
-            workspace.scrollTop = Math.max(0, (minY - padding) * zoom);
+        function setEditorZoom(value, keepCenter = false) {
+            if (desktopView) return;
+            setZoom(value, keepCenter);
+            editorViewZoom = canvasZoom / editorMinZoom();
         }
 
+        function fitCanvas() {
+            if (desktopView || !workspace) return;
+            setEditorZoom(editorMinZoom(), false);
+            workspace.scrollLeft = workspace.scrollTop = 0;
+        }
         function dragBounds() {
             const viewport=workspace.getBoundingClientRect(),rect=world.getBoundingClientRect();
-            return {left:Math.max(0,(viewport.left-rect.left)/canvasZoom),top:Math.max(0,(viewport.top-rect.top)/canvasZoom),
-                right:Math.min(WORLD_WIDTH,(viewport.left+workspace.clientWidth-rect.left)/canvasZoom),
-                bottom:Math.min(WORLD_HEIGHT,(viewport.top+workspace.clientHeight-rect.top)/canvasZoom)};
+            const scale = viewScale();
+            return {left:Math.max(0,(viewport.left-rect.left)/scale),top:Math.max(0,(viewport.top-rect.top)/scale),
+                right:Math.min(WORLD_WIDTH,desktopFrame().width,(viewport.right-rect.left)/scale),
+                bottom:Math.min(WORLD_HEIGHT,desktopFrame().height,(viewport.bottom-rect.top)/scale)};
         }
         function isBackground(target) {
             return target === workspace || target?.id === "world" || target?.id === "stateLayer" || target?.id === "edgeSvg";
+        }
+
+        function beginCanvasPan(event) {
+            window.getSelection()?.removeAllRanges();
+            pan = {
+                mouseX: event.clientX,
+                mouseY: event.clientY,
+                scrollLeft: workspace.scrollLeft,
+                scrollTop: workspace.scrollTop,
+                moved: false
+            };
+            workspace.style.cursor = "grabbing";
+            event.preventDefault();
+        }
+
+        function onTerminalCanvasPan(event) {
+            if (desktopView || event.button !== 2 || !event.target.closest?.('.desktop-terminal')) return;
+            // Capture before the terminal's own handlers stop propagation.
+            // This is an editor camera gesture, not a terminal move or resize.
+            event.stopPropagation();
+            dotnet?.invokeMethodAsync("SetCanvasInteraction", true);
+            beginCanvasPan(event);
+        }
+
+        function onTerminalCanvasContextMenu(event) {
+            if (!desktopView && event.target.closest?.('.desktop-terminal')) event.preventDefault();
+        }
+
+        function onTerminalCanvasWheel(event) {
+            if (desktopView || !event.target.closest?.('.desktop-terminal')) return;
+            // In the editor, wheel gestures over a placed terminal belong to
+            // the canvas camera. Capture before terminal output consumes them.
+            event.preventDefault();
+            event.stopPropagation();
+            zoomCanvasAtPointer(event);
         }
 
         function onPointerDown(event) {
@@ -1610,16 +1667,7 @@
             }
 
             if (event.button === 1 || event.button === 2) {
-                window.getSelection()?.removeAllRanges();
-                pan = {
-                    mouseX: event.clientX,
-                    mouseY: event.clientY,
-                    scrollLeft: workspace.scrollLeft,
-                    scrollTop: workspace.scrollTop,
-                    moved: false
-                };
-                workspace.style.cursor = "grabbing";
-                event.preventDefault();
+                beginCanvasPan(event);
             }
         }
 
@@ -1636,15 +1684,16 @@
         function applyPointerMove(event) {
             if (window.alcyoneGroups?.pointerMove(event)) return;
             if (pan && workspace) {
-                const dx = event.clientX - pan.mouseX;
-                const dy = event.clientY - pan.mouseY;
+                const dx = (event.clientX - pan.mouseX) / uiScale();
+                const dy = (event.clientY - pan.mouseY) / uiScale();
                 if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true;
-                workspace.scrollLeft = Math.max(0, Math.min(WORLD_WIDTH * canvasZoom - workspace.clientWidth, pan.scrollLeft - dx));
-                workspace.scrollTop = Math.max(0, Math.min(WORLD_HEIGHT * canvasZoom - workspace.clientHeight, pan.scrollTop - dy));
+                const frame = desktopFrame();
+                workspace.scrollLeft = Math.max(0, Math.min(frame.width * canvasZoom - workspace.clientWidth, pan.scrollLeft - dx));
+                workspace.scrollTop = Math.max(0, Math.min(frame.height * canvasZoom - workspace.clientHeight, pan.scrollTop - dy));
             }
             if (drag) {
-                const dx = (event.clientX - drag.mouseX) / canvasZoom;
-                const dy = (event.clientY - drag.mouseY) / canvasZoom;
+                const dx = (event.clientX - drag.mouseX) / viewScale();
+                const dy = (event.clientY - drag.mouseY) / viewScale();
                 drag.x = Math.max(drag.bounds.left,Math.min(drag.bounds.right-drag.width,drag.startX+dx));
                 drag.y = Math.max(drag.bounds.top,Math.min(drag.bounds.bottom-drag.height,drag.startY+dy));
                 if (Math.abs(dx) + Math.abs(dy) > 1) drag.moved = true;
@@ -1700,23 +1749,27 @@
 
         function onWheel(event) {
             if (!workspace || event.target.closest('.canvas-selection-toolbar, .alcyone-fold-popover, .desktop-ai-console, .desktop-terminal, .interface-designer')) return;
+            // Desktop presentation always shows the whole shared board.
+            if (desktopView) return;
             const interfaceSurface = event.target.closest('.interface-surface');
             if (interfaceSurface ? desktopView : event.target.closest('input, textarea, select')) return;
+            zoomCanvasAtPointer(event);
+        }
+
+        function zoomCanvasAtPointer(event) {
+            if (!workspace || !world || desktopView || !event.deltaY) return;
             event.preventDefault();
             const rect = workspace.getBoundingClientRect();
-            const mouseX = event.clientX - rect.left;
-            const mouseY = event.clientY - rect.top;
+            const mouseX = (event.clientX - rect.left) / uiScale();
+            const mouseY = (event.clientY - rect.top) / uiScale();
             const worldRect = world.getBoundingClientRect();
-            const worldX = (event.clientX - worldRect.left) / canvasZoom;
-            const worldY = (event.clientY - worldRect.top) / canvasZoom;
+            const worldX = (event.clientX - worldRect.left) / viewScale();
+            const worldY = (event.clientY - worldRect.top) / viewScale();
             const factor = event.deltaY < 0 ? 1.1 : 0.9;
             const newZoom = clampZoom(canvasZoom * factor);
             if (Math.abs(newZoom - canvasZoom) < .000001) return;
-            setZoom(newZoom, false);
-            if (desktopView) {
-                scaleBox.style.left = `${mouseX - worldX * newZoom}px`;
-                scaleBox.style.top = `${mouseY - worldY * newZoom}px`;
-            } else if (newZoom > editorMinZoom() + .0001) {
+            setEditorZoom(newZoom, false);
+            if (newZoom > editorMinZoom() + .0001) {
                 workspace.scrollLeft = worldX * newZoom - mouseX;
                 workspace.scrollTop = worldY * newZoom - mouseY;
             }
@@ -1953,10 +2006,13 @@
                 tempEdge = document.getElementById("tempEdge");
                 if (initialized) return;
                 initialized = true;
-                window.alcyoneGroups?.init({ workspace, world, dotnet, drawEdges: scheduleDrawEdges, desktopView, zoom: () => canvasZoom, dragBounds });
+                window.alcyoneGroups?.init({ workspace, world, dotnet, drawEdges: scheduleDrawEdges, desktopView, zoom: viewScale, dragBounds });
                 startStarfield();
                 desktopResize = new ResizeObserver(fitDesktop);
                 if (workspace) desktopResize.observe(workspace);
+                workspace?.addEventListener("pointerdown", onTerminalCanvasPan, true);
+                workspace?.addEventListener("contextmenu", onTerminalCanvasContextMenu, true);
+                workspace?.addEventListener("wheel", onTerminalCanvasWheel, { capture: true, passive: false });
                 workspace?.addEventListener("pointerdown", onPointerDown);
                 workspace?.addEventListener("contextmenu", onCanvasContextMenu);
                 workspace?.addEventListener("click", onClick);
@@ -1975,6 +2031,9 @@
                 window.alcyoneGroups?.dispose();
                 window.alcyoneRouteParticles?.dispose();
                 stopStarfield?.(); stopStarfield = null;
+                workspace?.removeEventListener("pointerdown", onTerminalCanvasPan, true);
+                workspace?.removeEventListener("contextmenu", onTerminalCanvasContextMenu, true);
+                workspace?.removeEventListener("wheel", onTerminalCanvasWheel, true);
                 workspace?.removeEventListener("pointerdown", onPointerDown);
                 workspace?.removeEventListener("contextmenu", onCanvasContextMenu);
                 workspace?.removeEventListener("click", onClick);
@@ -2018,8 +2077,9 @@
                 updatePendingVisual();
                 scheduleDrawEdges();
             },
-            setZoom(value, keepCenter) { setZoom(value, !!keepCenter); },
-            adjustZoom(delta, keepCenter) { setZoom(canvasZoom + Number(delta), !!keepCenter); },
+            syncBoardSize: fitDesktop,
+            setZoom(value, keepCenter) { setEditorZoom(Number(value) * editorMinZoom(), !!keepCenter); },
+            adjustZoom(delta, keepCenter) { setEditorZoom((editorViewZoom + Number(delta)) * editorMinZoom(), !!keepCenter); },
             fitCanvas,
             setDesktopView,
             getAddStatePosition() {

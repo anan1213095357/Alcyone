@@ -1,0 +1,28 @@
+@inherits LocalizedComponent
+@inject DesktopPreferences Preferences
+
+<section class="text-scale-settings" aria-label="@L[Title]">
+    <label for="@InputId">@L[Title] <output for="@InputId">@Scale%</output></label>
+    <div class="text-scale-control">
+        <input id="@InputId" type="range" min="@(Desktop ? 10 : 80)" max="@(Desktop ? 100 : 160)" step="5" value="@Scale" @oninput="ChangeScale" />
+        <button type="button" @onclick="Reset">@L["恢复默认"]</button>
+    </div>
+    <p>@L[Desktop ? "仅此设置同步编辑器与桌面的画板显示比例；编辑器滚轮缩放、平移不影响桌面。" : "仅调整编辑器，控件、间距和文字一起缩放。"]</p>
+    @if (Desktop) { <p>@L["编辑器缩到最小时完整预览桌面，保持屏幕比例与星球相对位置；放大仅影响编辑视图。"]</p> }
+    @if (_error is not null) { <p role="alert">@_error</p> }
+</section>
+
+@code {
+    [Parameter] public bool Desktop { get; set; }
+    private string Title => Desktop ? "画板显示比例" : "软件界面缩放";
+    private string InputId => Desktop ? "shared-board-scale" : "editor-ui-scale";
+    private int Scale => Desktop ? Preferences.BoardScale : Preferences.EditorScale;
+    private string? _error;
+    private bool _disposed;
+    protected override void OnInitialized() => Preferences.Changed += OnChanged;
+    private void OnChanged() { if (!_disposed) _ = InvokeAsync(() => { if (!_disposed) StateHasChanged(); }); }
+    public override async ValueTask DisposeAsync() { _disposed = true; Preferences.Changed -= OnChanged; await base.DisposeAsync(); }
+    private void ChangeScale(ChangeEventArgs args) { if (int.TryParse(args.Value?.ToString(), out var value)) Save(value); }
+    private void Reset() => Save(Desktop ? 25 : 100);
+    private void Save(int value) { try { if (Desktop) Preferences.SetBoardScale(value); else Preferences.SetEditorScale(value); _error = null; } catch (Exception ex) { _error = ex.Message; } }
+}

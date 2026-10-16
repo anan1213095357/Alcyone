@@ -64,8 +64,9 @@ export function create(host, status, reference, docs, locale = 'zh-CN') {
             return { suggestions: items };
         }
     });
+    const textRatio = () => parseFloat(getComputedStyle(document.documentElement).fontSize) / 16;
     const editor = monaco.editor.create(host, {
-        model: null, theme: 'alcyone-studio', automaticLayout: true, fontSize: 14, lineHeight: 23,
+        model: null, theme: 'alcyone-studio', automaticLayout: true, fontSize: 13 * textRatio(), lineHeight: 22 * textRatio(),
         fontFamily: "Cascadia Code, Consolas, monospace", padding: { top: 18, bottom: 18 },
         minimap: { enabled: true, maxColumn: 90 }, scrollBeyondLastLine: false,
         roundedSelection: false, renderLineHighlight: 'all', smoothScrolling: true,
@@ -74,6 +75,16 @@ export function create(host, status, reference, docs, locale = 'zh-CN') {
         quickSuggestions: { other: true, comments: false, strings: false }, suggestOnTriggerCharacters: true,
         ariaLabel: 'C# 脚本编辑器', fixedOverflowWidgets: true, stickyScroll: { enabled: false }
     });
+    // A rem-sized probe also responds to changes from another desktop window.
+    const textProbe = document.createElement('span');
+    textProbe.style.cssText = 'position:absolute;width:1rem;height:0;overflow:hidden;pointer-events:none;visibility:hidden';
+    host.appendChild(textProbe);
+    const textObserver = new ResizeObserver(() => {
+        const ratio = textRatio();
+        editor.updateOptions({ fontSize: 13 * ratio, lineHeight: 22 * ratio });
+    });
+    textObserver.observe(textProbe);
+    editor.onDidDispose(() => { textObserver.disconnect(); textProbe.remove(); });
     const models = new Map(); let active; let disposed = false;
     const invoke = (method, ...args) => { if (!disposed) reference.invokeMethodAsync(method, ...args).catch(() => {}); };
     const dependencyButton = document.createElement('button');

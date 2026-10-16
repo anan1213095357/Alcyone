@@ -61,7 +61,7 @@ button, input, textarea {
 }
 
 .brand-title {
-    font-size: 14px;
+    font-size: var(--font-body, .8125rem);
     font-weight: 720;
     letter-spacing: .1px;
 }
@@ -97,7 +97,7 @@ button, input, textarea {
 }
 
 .section-title {
-    font-size: 15px;
+    font-size: var(--font-heading, .9375rem);
     line-height: 1.35;
     font-weight: 720;
 }
@@ -105,13 +105,13 @@ button, input, textarea {
 .section-sub {
     margin-top: 7px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--font-body, .8125rem);
     line-height: 1.55;
 }
 
 .capture-meta {
     color: #7790b2;
-    font-size: 11px;
+    font-size: var(--font-label, .75rem);
     font-weight: 650;
     letter-spacing: .35px;
 }
@@ -197,7 +197,7 @@ button, input, textarea {
     background: rgba(5,10,18,.94);
     border: 1px solid #3b5273;
     color: #f3f7ff;
-    font-size: 12px;
+    font-size: var(--font-body, .8125rem);
     font-weight: 700;
     line-height: 1;
     letter-spacing: .2px;
@@ -260,7 +260,7 @@ button, input, textarea {
     padding: 8px 2px 2px;
     color: #dce8fb;
     font-family: Consolas, monospace;
-    font-size: 11px;
+    font-size: var(--font-label, .75rem);
     line-height: 1.45;
 }
 
@@ -272,7 +272,7 @@ button, input, textarea {
 }
 
 .empty-icon {
-    font-size: 42px;
+    font-size: 2.625rem;
     color: #4f6381;
 }
 
@@ -284,7 +284,7 @@ button, input, textarea {
 
 .empty-sub {
     margin-top: 8px;
-    font-size: 12px;
+    font-size: var(--font-body, .8125rem);
 }
 
 .side-stack {
@@ -322,13 +322,13 @@ button, input, textarea {
     border-radius: 6px;
     background: #1a2a44;
     color: #8eb7ff;
-    font-size: 10px;
+    font-size: var(--font-caption, .6875rem);
     font-weight: 800;
     letter-spacing: .8px;
 }
 
 .card-title {
-    font-size: 14px;
+    font-size: var(--font-body, .8125rem);
     line-height: 1.35;
     font-weight: 730;
 }
@@ -336,7 +336,7 @@ button, input, textarea {
 .card-sub {
     margin-top: 7px;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--font-body, .8125rem);
     line-height: 1.65;
 }
 
@@ -347,7 +347,7 @@ button, input, textarea {
     border-radius: 8px;
     color: #dbe8fb;
     background: #172233;
-    font-size: 12px;
+    font-size: var(--font-body, .8125rem);
     font-weight: 680;
     letter-spacing: .15px;
     cursor: pointer;
@@ -397,7 +397,7 @@ button, input, textarea {
     border-radius: 7px;
     background: #0b111b;
     color: #8497b3;
-    font-size: 11px;
+    font-size: var(--font-label, .75rem);
     line-height: 1.5;
 }
 
@@ -426,7 +426,7 @@ button, input, textarea {
     .metric-box > span, .field-box > span {
         display: block;
         color: #788ba6;
-        font-size: 10.5px;
+        font-size: var(--font-body, .8125rem);
         line-height: 1.4;
     }
 
@@ -438,13 +438,13 @@ button, input, textarea {
     }
 
     .metric-box strong {
-        font-size: 17px;
+        font-size: var(--font-title, 1.125rem);
         font-weight: 760;
     }
 
     .metric-box b, .field-box b {
         color: #7588a4;
-        font-size: 10px;
+        font-size: var(--font-caption, .6875rem);
         font-weight: 600;
     }
 
@@ -454,7 +454,7 @@ button, input, textarea {
         padding: 0;
         background: transparent;
         color: #eef4ff;
-        font-size: 17px;
+        font-size: var(--font-title, 1.125rem);
         font-weight: 750;
         appearance: textfield;
     }
@@ -482,7 +482,7 @@ button, input, textarea {
     margin-top: 9px;
     min-height: 17px;
     color: #778ba8;
-    font-size: 11px;
+    font-size: var(--font-label, .75rem);
     line-height: 1.5;
 }
 
@@ -492,7 +492,7 @@ button, input, textarea {
     align-items: center;
     gap: 9px;
     color: #9baac0;
-    font-size: 11.5px;
+    font-size: var(--font-body, .8125rem);
     cursor: pointer;
 }
 
@@ -539,7 +539,7 @@ button, input, textarea {
 }
 
 .result-state {
-    font-size: 9.5px;
+    font-size: var(--font-caption, .6875rem);
     font-weight: 850;
     letter-spacing: 1px;
     color: #6f819b;
@@ -547,7 +547,7 @@ button, input, textarea {
 
 .result-main {
     margin-top: 7px;
-    font-size: 13px;
+    font-size: var(--font-body, .8125rem);
     font-weight: 700;
     line-height: 1.4;
 }
@@ -583,7 +583,7 @@ button, input, textarea {
     padding: 11px 12px;
     background: #080d15;
     color: #adc4e8;
-    font: 11px/1.65 Consolas, "SFMono-Regular", monospace;
+    font: var(--font-label, .75rem)/1.65 Consolas, "SFMono-Regular", monospace;
     scrollbar-width: none;
 }
 
@@ -619,7 +619,7 @@ button, input, textarea {
         display: block;
         margin-bottom: 5px;
         color: #778ba8;
-        font-size: 9.5px;
+        font-size: var(--font-caption, .6875rem);
     }
 
     .call-param > div {
@@ -635,7 +635,7 @@ button, input, textarea {
         padding: 0;
         background: transparent;
         color: #edf4ff;
-        font-size: 12px;
+        font-size: var(--font-body, .8125rem);
         font-weight: 700;
         appearance: textfield;
     }
@@ -646,7 +646,7 @@ button, input, textarea {
 
     .call-param b {
         color: #6f819b;
-        font-size: 9px;
+        font-size: var(--font-caption, .6875rem);
         font-weight: 600;
     }
 
@@ -669,7 +669,7 @@ button, input, textarea {
     border-top: 1px solid #1d293a;
     background: #0a0f17;
     color: #7e90a9;
-    font-size: 11px;
+    font-size: var(--font-label, .75rem);
 }
 
 .status-dot {
@@ -692,6 +692,6 @@ button, input, textarea {
 }
 
 .region-editor { display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:6px;margin-top:10px; }
-.region-editor input { flex:1;min-width:0;height:34px;padding:0 9px;border:1px solid var(--border,#303e54);border-radius:6px;background:#0c131e;color:#dce5f2;font:12px Consolas,monospace;outline:none; }
+.region-editor input { flex:1;min-width:0;height:34px;padding:0 9px;border:1px solid var(--border,#303e54);border-radius:6px;background:#0c131e;color:#dce5f2;font:var(--font-body, .8125rem) Consolas,monospace;outline:none; }
 .region-editor input:focus { border-color:#4c8dff; }
 .region-editor .action { width:auto;min-width:44px;padding:0 9px;height:34px; }

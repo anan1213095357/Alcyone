@@ -21,12 +21,12 @@
     .star-route-plume { animation:none; }
 }
 .state-card.box-selected { outline:2px solid #9fcaff; outline-offset:5px; box-shadow:0 0 0 8px #6aaaff15,0 15px 50px #0008 !important; }
-.canvas-gesture-hint { font-size:11px; color:#91a8c7; white-space:nowrap; padding:0 6px; }
+.canvas-gesture-hint { font-size:var(--font-label, .75rem); color:#91a8c7; white-space:nowrap; padding:0 6px; }
 .canvas-selection-toolbar { position:absolute; z-index:150; transform:translateX(-50%); display:flex; align-items:center; gap:15px; padding:8px 10px 8px 18px; max-width:calc(100% - 24px); border:1px solid #88b9ff50; border-radius:15px; background:linear-gradient(125deg,#182c46ed,#0b1525f5); box-shadow:0 12px 35px #0009,inset 0 1px 0 #d8e9ff13; backdrop-filter:blur(16px); color:#dcecff; font-family:system-ui,sans-serif; }
 .canvas-selection-toolbar[hidden] { display:none; }
-.selection-count { white-space:nowrap; font-size:12px; font-weight:600; color:#abc9ed; padding-right:14px; border-right:1px solid #86acf02a; }
+.selection-count { white-space:nowrap; font-size:var(--font-body, .8125rem); font-weight:600; color:#abc9ed; padding-right:14px; border-right:1px solid #86acf02a; }
 .selection-actions { display:flex; align-items:center; gap:5px; }
-.selection-actions button { display:flex; align-items:center; gap:7px; padding:9px 12px; border:1px solid transparent; border-radius:9px; background:transparent; color:#dceaff; font:500 12px/1.2 system-ui,sans-serif; white-space:nowrap; cursor:pointer; transition:background .16s,border-color .16s,transform .16s; }
+.selection-actions button { display:flex; align-items:center; gap:7px; padding:9px 12px; border:1px solid transparent; border-radius:9px; background:transparent; color:#dceaff; font:500 var(--font-body, .8125rem)/1.2 system-ui,sans-serif; white-space:nowrap; cursor:pointer; transition:background .16s,border-color .16s,transform .16s; }
 .selection-actions button svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
 .selection-actions button:hover:not(:disabled) { background:#75adff22; border-color:#8ebeff44; transform:translateY(-1px); }
 .selection-actions button[data-action="fold"] { background:#448beb25; color:#b9d9ff; }
@@ -37,20 +37,20 @@
 .alcyone-orb.drop-target .orb-surface { outline:2px solid #8affd4; box-shadow:0 0 0 8px #68efbc12,0 0 45px #79ffbd50; }
 .alcyone-orb.drop-target .planet-disc { transform:scale(1.13); filter:drop-shadow(0 0 13px #87ffcfaa); }
 .alcyone-orb.drop-target .orb-hint { opacity:1; color:#a4ffdb; }
-@media(max-width:1000px) { .canvas-selection-toolbar { gap:6px; padding:7px; } .selection-count { font-size:10px; padding-right:7px; } .selection-actions button { padding:8px; gap:4px; } }
+@media(max-width:1000px) { .canvas-selection-toolbar { gap:6px; padding:7px; } .selection-count { font-size:var(--font-caption, .6875rem); padding-right:7px; } .selection-actions button { padding:8px; gap:4px; } }
 .alcyone-fold-popover { position:absolute; z-index:200; box-sizing:border-box; width:280px; max-width:calc(100% - 20px); max-height:calc(100% - 20px); overflow:auto; margin:0; padding:17px; border:1px solid #83b6ff55; border-radius:13px; color:#e1ecff; background:linear-gradient(145deg,#17283ff5,#0a1221fa); box-shadow:0 12px 38px #0009,0 0 25px #6d9bff12; font-family:system-ui,sans-serif; }
-.alcyone-fold-popover h2 { font-size:14px; font-weight:600; margin:0 0 9px; }
-.alcyone-fold-popover p { font-size:12px; line-height:1.7; color:#a6b9d4; margin:0 0 15px; }
-.planet-name-input { box-sizing:border-box; display:block; width:100%; padding:9px 11px; margin:12px 0 15px; border-radius:7px; border:1px solid #739bd45c; background:#040b17; color:#e3edff; font-size:13px; outline-offset:2px; }
+.alcyone-fold-popover h2 { font-size:var(--font-body, .8125rem); font-weight:600; margin:0 0 9px; }
+.alcyone-fold-popover p { font-size:var(--font-body, .8125rem); line-height:1.7; color:#a6b9d4; margin:0 0 15px; }
+.planet-name-input { box-sizing:border-box; display:block; width:100%; padding:9px 11px; margin:12px 0 15px; border-radius:7px; border:1px solid #739bd45c; background:#040b17; color:#e3edff; font-size:var(--font-body, .8125rem); outline-offset:2px; }
 .planet-settings { width:330px; }
 .planet-appearance-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; margin:0 0 16px; }
-.planet-appearance-grid button { display:flex; flex-direction:column; align-items:center; padding:3px 1px 7px; border:1px solid #93b8ef20; border-radius:8px; background:#02091666; color:#9db4d2; cursor:pointer; font:10px/1.3 system-ui,sans-serif; }
+.planet-appearance-grid button { display:flex; flex-direction:column; align-items:center; padding:3px 1px 7px; border:1px solid #93b8ef20; border-radius:8px; background:#02091666; color:#9db4d2; cursor:pointer; font:var(--font-caption, .6875rem)/1.3 system-ui,sans-serif; }
 .planet-appearance-grid canvas { width:56px; height:56px; max-width:100%; }
 .planet-appearance-grid button:hover { border-color:#91bfff88; background:#27456655; }
 .planet-appearance-grid button[aria-pressed="true"] { border-color:#95c6ff; color:#e0f0ff; background:#2e54834a; box-shadow:inset 0 0 14px #71adff15; }
 .planet-appearance-grid button:focus-visible { outline:2px solid #b8d9ff; outline-offset:2px; }
 .fold-dialog-actions { display:flex; justify-content:flex-end; gap:10px; }
-.fold-dialog-actions button { border:1px solid #91b9f033; background:#ffffff06; color:#c9d9f0; border-radius:7px; padding:7px 13px; font-size:12px; cursor:pointer; }
+.fold-dialog-actions button { border:1px solid #91b9f033; background:#ffffff06; color:#c9d9f0; border-radius:7px; padding:7px 13px; font-size:var(--font-body, .8125rem); cursor:pointer; }
 .fold-dialog-actions .confirm-fold { background:#3776d2; border-color:#7cb1ff; color:white; }
 .fold-dialog-actions button:focus-visible { outline:2px solid #a5ceff; outline-offset:3px; }
 .alcyone-selection-box { position:absolute; z-index:100; pointer-events:none; border:1px solid #9bc9ff; background:linear-gradient(135deg,#77adff24,#c4b5fd12); box-shadow:0 0 22px #73aaff18,inset 0 0 20px #7bafff0d; border-radius:8px; }
@@ -61,11 +61,11 @@
 .orb-surface:active { cursor:grabbing; }
 .planet-disc { display:block; position:absolute; width:180px; height:180px; top:-4px; left:0; filter:drop-shadow(-2px -1px 3px #79bdff66); transition:filter .3s,transform .3s; pointer-events:none; }
 .orb-halo { position:absolute; width:174px; height:174px; top:-1px; left:3px; border-radius:50%; background:radial-gradient(circle,transparent 48%,#388fff12 57%,#659eff0b 61%,transparent 72%); animation:alcyone-breathe 5s ease-in-out infinite; pointer-events:none; }
-.orb-name { position:absolute; left:0; top:162px; width:180px; padding:3px 10px; border:1px solid transparent; border-radius:6px; background:transparent; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:600 13px/1.4 system-ui,sans-serif; letter-spacing:1px; color:#dae9ff; text-shadow:0 0 16px #86b6ff50; cursor:text; }
+.orb-name { position:absolute; left:0; top:162px; width:180px; padding:3px 10px; border:1px solid transparent; border-radius:6px; background:transparent; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:600 var(--font-body, .8125rem)/1.4 system-ui,sans-serif; letter-spacing:1px; color:#dae9ff; text-shadow:0 0 16px #86b6ff50; cursor:text; }
 .orb-name:hover { background:#233d5c60; border-color:#789ac633; }
 .orb-surface:focus-visible,.orb-name:focus-visible { outline:1px solid #a8d4ff; outline-offset:3px; }
-.orb-count { position:absolute; top:193px; left:0; right:0; font:10px/1.4 system-ui,sans-serif; letter-spacing:1.5px; color:#8ea8ca; }
-.orb-hint { position:absolute; top:215px; left:-20px; right:-20px; font:10px/1.4 system-ui,sans-serif; color:#b5cbec; opacity:0; transform:translateY(-4px); transition:opacity .25s,transform .25s; pointer-events:none; }
+.orb-count { position:absolute; top:193px; left:0; right:0; font:var(--font-caption, .6875rem)/1.4 system-ui,sans-serif; letter-spacing:1.5px; color:#8ea8ca; }
+.orb-hint { position:absolute; top:215px; left:-20px; right:-20px; font:var(--font-caption, .6875rem)/1.4 system-ui,sans-serif; color:#b5cbec; opacity:0; transform:translateY(-4px); transition:opacity .25s,transform .25s; pointer-events:none; }
 .alcyone-orb:hover .planet-disc { transform:scale(1.035); filter:drop-shadow(-2px -1px 5px #79bdff88); }
 .alcyone-orb:hover .orb-hint,.alcyone-orb:focus-within .orb-hint { opacity:1; transform:translateY(0); }
 .alcyone-orb.is-running .planet-disc { filter:drop-shadow(0 0 7px #79efc780); }

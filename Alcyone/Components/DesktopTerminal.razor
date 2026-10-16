@@ -2,7 +2,7 @@
 @implements IAsyncDisposable
 @inject DesktopWallpaperService DesktopService
 @inject IJSRuntime JS
-<section class="desktop-terminal terminal-placed @(_collapsed ? "collapsed" : "")" data-desktop-terminal data-native-enabled="@(Desktop ? "true" : "false")" data-world-placed="true" data-busy="@(_busy ? "true" : "false")" @ref="_element" style="@LayoutStyle --terminal-blur:@(_settings.Blur)px;--terminal-size:@(_settings.FontSize)px;--terminal-font:@_settings.Font;--terminal-alpha:@(_settings.Opacity / 100.0);--terminal-accent:@_settings.Color">
+<section class="desktop-terminal terminal-placed @(_collapsed ? "collapsed" : "")" data-desktop-terminal data-native-enabled="@(Desktop ? "true" : "false")" data-world-placed="true" data-busy="@(_busy ? "true" : "false")" @ref="_element" style="@LayoutStyle --terminal-blur:@(_settings.Blur)px;--terminal-size:@((_settings.FontSize / 16m).ToString(System.Globalization.CultureInfo.InvariantCulture))rem;--terminal-font:@_settings.Font;--terminal-alpha:@(_settings.Opacity / 100.0);--terminal-accent:@_settings.Color">
     <header data-terminal-drag><img class="terminal-logo" src="images/planet-logo-transparent.png" alt="Alcyone" draggable="false" /><strong>TERMINAL</strong><small><i class="terminal-status-light @(_busy ? "busy" : "")"></i>@(_busy || AiBusy ? L["执行中"] : L["就绪"])</small>
         <div class="terminal-actions">
             <button type="button" title="@L["清空"]" aria-label="@L["清空"]" @onclick="Clear"><svg viewBox="0 0 20 20"><path d="m4 12 7-8 5 4-7 8H6l-2-4zM8 8l5 4M12 16h5" /></svg></button>
@@ -56,7 +56,12 @@
             else { <pre>@Highlight(_live)</pre> }
         </div>
         <div class="terminal-result-actions"><button type="button" disabled="@(!Desktop || _busy || AiBusy || string.IsNullOrEmpty(_lastExecutedCommand))" @onclick="AnalyzeAsync">✧ @L["一键分析"]</button></div>
-        <form class="terminal-command" @onsubmit="ExecuteAsync" @onsubmit:preventDefault="true"><label class="terminal-command-path" title="@_session.Directory">PS @_session.Directory<span>&gt;</span></label><textarea rows="1" data-auto-grow value="@_command" data-native-input="@_commandId" @oninput="e => UpdateCommand(e.Value?.ToString() ?? string.Empty)" placeholder="@L["输入命令，或描述需求…"]" autocomplete="off" disabled="@(_busy || AiBusy)"></textarea><button type="button" class="terminal-interrupt" disabled="@(!_busy)" title="@L["停止"]" @onclick="StopCommand">■</button><button disabled="@(_busy || AiBusy || string.IsNullOrWhiteSpace(_command))" title="@L["发送指令"]">↵</button></form>
+        <form class="terminal-command" @onsubmit="ExecuteAsync" @onsubmit:preventDefault="true">
+            <label class="terminal-command-path" title="@_session.Directory"><span class="terminal-path-text">PS @_session.Directory</span><span>&gt;</span></label>
+            <textarea rows="1" data-auto-grow value="@_command" data-native-input="@_commandId" @oninput="e => UpdateCommand(e.Value?.ToString() ?? string.Empty)" placeholder="@L["输入命令，或描述需求…"]" aria-label="@L["输入命令，或描述需求…"]" autocomplete="off" disabled="@(_busy || AiBusy)"></textarea>
+            <button type="button" class="terminal-interrupt" disabled="@(!_busy)" title="@L["停止"]" aria-label="@L["停止"]" @onclick="StopCommand">■</button>
+            <button type="submit" disabled="@(_busy || AiBusy || string.IsNullOrWhiteSpace(_command))" title="@L["发送指令"]" aria-label="@L["发送指令"]">↵</button>
+        </form>
         <span class="terminal-resize" data-terminal-resize></span>
     }
 </section>

@@ -128,6 +128,7 @@ public partial class Home
             {
                 await JS.InvokeVoidAsync("industrialStateMachineUi.init", _dotNetRef, true);
                 _jsReady = true;
+                await JS.InvokeVoidAsync("industrialStateMachineUi.syncBoardSize");
                 _desktopLayoutPending = true;
                 StateHasChanged();
                 return;
@@ -148,8 +149,8 @@ public partial class Home
             if (Machine.Settings.AutoStart && !Runtime.Running) await RunMachineAsync();
             _autoSaveReady = true;
             await SaveConfigAsync();
-            await JS.InvokeVoidAsync("industrialStateMachineUi.setZoom", 0.85, false);
-            await JS.InvokeVoidAsync("industrialStateMachineUi.setInitialScroll", 40, 50);
+            await JS.InvokeVoidAsync("industrialStateMachineUi.syncBoardSize");
+            await JS.InvokeVoidAsync("industrialStateMachineUi.setInitialScroll", 0, 0);
             if (restoreDesktop && _session is not null && _configKey == DesktopPreferences.ConfigKey)
             {
                 // Explorer's desktop host may still be starting during Windows sign-in.
@@ -167,6 +168,7 @@ public partial class Home
         {
             try
             {
+            await JS.InvokeVoidAsync("industrialStateMachineUi.syncBoardSize");
             await SyncJsAsync();
             if (_desktopLayoutPending)
             {

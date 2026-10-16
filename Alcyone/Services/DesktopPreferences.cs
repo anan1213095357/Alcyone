@@ -14,6 +14,9 @@ public sealed class DesktopPreferences
     public bool RestoreDesktop { get; private set; } = true;
     public bool DesktopEnabled { get; private set; }
     public string WallpaperTheme { get; private set; } = "default";
+    public int EditorScale { get; private set; } = 100;
+    public int DesktopScale { get; private set; } = 100;
+    public int BoardScale { get; private set; } = 25;
     public string ConfigKey { get; private set; } = "default";
     public bool AutoStart
     {
@@ -28,6 +31,9 @@ public sealed class DesktopPreferences
             var saved = JsonSerializer.Deserialize<Settings>(File.ReadAllText(_path));
             if (saved is null) return;
             WallpaperTheme = saved.WallpaperTheme ?? "default";
+            EditorScale = Math.Clamp(saved.EditorScale ?? saved.TextScale ?? 100, 80, 160);
+            DesktopScale = Math.Clamp(saved.DesktopScale ?? saved.TextScale ?? 100, 80, 160);
+            BoardScale = Math.Clamp(saved.BoardScale ?? 25, 10, 100);
             DesktopAiEnabled = saved.DesktopAiEnabled; FilePackingAnimation = saved.FilePackingAnimation; RestoreDesktop = saved.RestoreDesktop; DesktopEnabled = saved.DesktopEnabled; ConfigKey = saved.ConfigKey;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
@@ -48,15 +54,21 @@ public sealed class DesktopPreferences
     public void SetDesktopAi(bool enabled) { lock (_gate) Save(new(RestoreDesktop, DesktopEnabled, ConfigKey, FilePackingAnimation, enabled)); }
     private void Save(Settings settings)
     {
-        settings = settings with { WallpaperTheme = settings.WallpaperTheme ?? WallpaperTheme };
+        settings = settings with { WallpaperTheme = settings.WallpaperTheme ?? WallpaperTheme, EditorScale = settings.EditorScale ?? EditorScale, DesktopScale = settings.DesktopScale ?? DesktopScale, BoardScale = settings.BoardScale ?? BoardScale };
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
         var temporary = _path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(settings)); File.Move(temporary, _path, true);
         DesktopAiEnabled = settings.DesktopAiEnabled;
         WallpaperTheme = settings.WallpaperTheme!;
+        EditorScale = settings.EditorScale!.Value;
+        DesktopScale = settings.DesktopScale!.Value;
+        BoardScale = settings.BoardScale!.Value;
         FilePackingAnimation = settings.FilePackingAnimation; RestoreDesktop = settings.RestoreDesktop; DesktopEnabled = settings.DesktopEnabled; ConfigKey = settings.ConfigKey;
         Changed?.Invoke();
     }
     public void SetWallpaperTheme(string id) { lock (_gate) Save(new(RestoreDesktop, DesktopEnabled, ConfigKey, FilePackingAnimation, DesktopAiEnabled, id)); }
-    private sealed record Settings(bool RestoreDesktop, bool DesktopEnabled, string ConfigKey, bool FilePackingAnimation = true, bool DesktopAiEnabled = true, string? WallpaperTheme = null);
+    public void SetEditorScale(int percent) { lock (_gate) Save(new(RestoreDesktop, DesktopEnabled, ConfigKey, FilePackingAnimation, DesktopAiEnabled, WallpaperTheme, EditorScale: Math.Clamp(percent, 80, 160))); }
+    public void SetDesktopScale(int percent) { lock (_gate) Save(new(RestoreDesktop, DesktopEnabled, ConfigKey, FilePackingAnimation, DesktopAiEnabled, WallpaperTheme, DesktopScale: Math.Clamp(percent, 80, 160))); }
+    public void SetBoardScale(int percent) { lock (_gate) Save(new(RestoreDesktop, DesktopEnabled, ConfigKey, FilePackingAnimation, DesktopAiEnabled, WallpaperTheme, BoardScale: Math.Clamp(percent, 10, 100))); }
+    private sealed record Settings(bool RestoreDesktop, bool DesktopEnabled, string ConfigKey, bool FilePackingAnimation = true, bool DesktopAiEnabled = true, string? WallpaperTheme = null, int? TextScale = null, int? EditorScale = null, int? DesktopScale = null, int? BoardScale = null);
 }

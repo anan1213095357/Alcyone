@@ -1,0 +1,20 @@
+@inject DesktopPreferences Preferences
+@implements IDisposable
+
+<style>@RootStyle</style>
+
+@code {
+    private static string Ratio(int percent) => (percent / 100m).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    private string RootStyle => ":root{font-size:16px;--editor-ui-scale:" + Ratio(Preferences.EditorScale) + ";--desktop-ui-scale:" + Ratio(Preferences.DesktopScale) + ";--ui-scale:var(--editor-ui-scale);}"
+        + "html:has(#app.desktop-mode){--ui-scale:1;}"
+        + "body{zoom:var(--ui-scale);width:calc(100vw / var(--ui-scale));height:calc(100vh / var(--ui-scale));}"
+        + "#app,#app.desktop-mode{width:100%;height:calc(100vh / var(--ui-scale));}"
+        + ".desktop-ai-console{left:50%;width:min(560px,calc(100vw / var(--ui-scale) - 48px));}"
+        + ".desktop-ai-console.ai-embedded{left:auto;width:100%;}"
+        + ".topbar>.application-controls .app-settings-menu{max-height:calc(100vh / var(--ui-scale) - 80px);}"
+        + ".desktop-settings-dialog{max-height:calc(90vh / var(--ui-scale));}";
+    private bool _disposed;
+    protected override void OnInitialized() => Preferences.Changed += OnChanged;
+    private void OnChanged() { if (!_disposed) _ = InvokeAsync(() => { if (!_disposed) StateHasChanged(); }); }
+    public void Dispose() { _disposed = true; Preferences.Changed -= OnChanged; }
+}
