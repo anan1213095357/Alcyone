@@ -14,7 +14,7 @@ public sealed partial class MachineSession
         var states = updated.States.ToDictionary(s => s.Id);
         foreach (var p in positions)
             if (states.TryGetValue(p.Id, out var state) && double.IsFinite(p.X) && double.IsFinite(p.Y))
-            { state.X = Math.Clamp(p.X, 0, 3800); state.Y = Math.Clamp(p.Y, 0, 2300); }
+            { state.X = Math.Max(0, p.X); state.Y = Math.Max(0, p.Y); }
         if (groups is not null)
         {
             var used = new HashSet<string>(); var ids = new HashSet<string>();
@@ -25,7 +25,7 @@ public sealed partial class MachineSession
                 if (group.StateIds.Count == 0) continue;
                 group.Name = string.IsNullOrWhiteSpace(group.Name) ? "Alcyone" : group.Name.Trim()[..Math.Min(48, group.Name.Trim().Length)];
                 if (!new[] { "ocean", "rust", "ice", "violet", "sand", "jade", "rock", "lava", "blue", "rose", "forest", "silver", "amber", "pearl", "toxic", "storm", "crimson", "midnight" }.Contains(group.Appearance)) group.Appearance = "ocean";
-                group.X = Math.Clamp(group.X, 0, 3820); group.Y = Math.Clamp(group.Y, 0, 2280);
+                group.X = Math.Max(0, group.X); group.Y = Math.Max(0, group.Y);
                 var previous = Machine.StateGroups.FirstOrDefault(g => g.Id == group.Id);
                 if (previous is not { IsCollapsed: true } || !group.IsCollapsed) continue;
                 var dx = group.X - previous.X;

@@ -214,8 +214,8 @@
             || { id: `group_${crypto.randomUUID()}`, name: 'Alcyone', appearance: 'ocean', isCollapsed: false, stateIds: [], x: 0, y: 0 };
         const absorbing = groups.includes(group) && collapsed(group);
         if (!absorbing) {
-            group.x = Math.max(0, Math.min(3800, (left + right) / 2 - 90));
-            group.y = Math.max(0, Math.min(2300, (top + bottom) / 2 - 90));
+            group.x = Math.max(0, Math.min(Math.max(0, api.world.offsetWidth - 180), (left + right) / 2 - 90));
+            group.y = Math.max(0, Math.min(Math.max(0, api.world.offsetHeight - 180), (top + bottom) / 2 - 90));
         }
         for (const other of groups) if (other !== group && !collapsed(other)) other.stateIds = other.stateIds.filter(id => !selected.has(id));
         groups = groups.filter(g => g === group || g.stateIds.length);

@@ -1190,8 +1190,6 @@
 
 <script>
     (() => {
-        const WORLD_WIDTH = 4000;
-        const WORLD_HEIGHT = 2500;
         const MIN_ZOOM = 0.25;
         const MAX_ZOOM = 1.8;
 
@@ -1567,6 +1565,9 @@
             }
             world.style.transform = `scale(${canvasZoom})`;
             const frame = desktopFrame();
+            // Logical space grows as the shared board scale shrinks.
+            world.style.width = `${frame.width}px`;
+            world.style.height = `${frame.height}px`;
             scaleBox.style.width = `${frame.width * canvasZoom}px`;
             scaleBox.style.height = `${frame.height * canvasZoom}px`;
             const label = document.getElementById("zoomLabel");
@@ -1594,8 +1595,8 @@
             const viewport=workspace.getBoundingClientRect(),rect=world.getBoundingClientRect();
             const scale = viewScale();
             return {left:Math.max(0,(viewport.left-rect.left)/scale),top:Math.max(0,(viewport.top-rect.top)/scale),
-                right:Math.min(WORLD_WIDTH,desktopFrame().width,(viewport.right-rect.left)/scale),
-                bottom:Math.min(WORLD_HEIGHT,desktopFrame().height,(viewport.bottom-rect.top)/scale)};
+                right:Math.min(desktopFrame().width,(viewport.right-rect.left)/scale),
+                bottom:Math.min(desktopFrame().height,(viewport.bottom-rect.top)/scale)};
         }
         function isBackground(target) {
             return target === workspace || target?.id === "world" || target?.id === "stateLayer" || target?.id === "edgeSvg";
