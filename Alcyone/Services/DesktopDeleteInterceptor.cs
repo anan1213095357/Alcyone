@@ -10,13 +10,14 @@ internal sealed class DesktopDeleteInterceptor : IDisposable
     private readonly Hook _mouseProc,_keyProc;
     private readonly Func<List<DesktopFilePacking.Selection>> _selection;
     private readonly Action<List<DesktopFilePacking.Selection>> _request;
+    private readonly Action _refreshSnapshots;
     private nint _mouse,_key;
-    private List<DesktopFilePacking.Selection>? _context,_drag;
+    private List<DesktopFilePacking.Selection>? _drag;
     private NativePoint _down;
     private bool _desktopDown,_dropArmed;
-    public DesktopDeleteInterceptor(Func<List<DesktopFilePacking.Selection>> selection,Action<List<DesktopFilePacking.Selection>> request)
+    public DesktopDeleteInterceptor(Func<List<DesktopFilePacking.Selection>> selection,Action<List<DesktopFilePacking.Selection>> request,Action refreshSnapshots)
     {
-        _selection=selection;_request=request;_mouseProc=Mouse;_keyProc=Keyboard;
+        _selection=selection;_request=request;_refreshSnapshots=refreshSnapshots;_mouseProc=Mouse;_keyProc=Keyboard;
         _mouse=SetWindowsHookExW(14,_mouseProc,GetModuleHandleW(null),0);_key=SetWindowsHookExW(13,_keyProc,GetModuleHandleW(null),0);
         if(_mouse==0 || _key==0){Dispose();throw new System.ComponentModel.Win32Exception();}
     }
@@ -42,13 +43,11 @@ internal sealed class DesktopDeleteInterceptor : IDisposable
         {
             if(code<0)return CallNextHookEx(_mouse,code,message,data);
             var point=Marshal.PtrToStructure<MouseData>(data).Point;var window=WindowFromPoint(point);
-            if(message==0x0204) _context=null;
-            if(message==0x0205 && DesktopWindow(window)) _context=_selection();
+            // Leave Explorer's context menu alone. The observer retains the original pixels.
+            if(message is 0x0204 or 0x0205 && DesktopWindow(window))_refreshSnapshots();
             if(message==0x0201)
             {
-                if(_context is {Count:>0} && IsDeleteMenu(point))
-                {var selected=_context;_context=null;Escape();_request(selected);return 1;}
-                _context=null;_down=point;_desktopDown=DesktopWindow(window)&&DesktopIconHitTest.IsIcon(window,point);_drag=null;_dropArmed=false;
+                _down=point;_desktopDown=DesktopWindow(window)&&DesktopIconHitTest.IsIcon(window,point);_drag=null;_dropArmed=false;
             }
             if(message==0x0200 && _desktopDown && Math.Abs(point.X-_down.X)+Math.Abs(point.Y-_down.Y)>10)
             {
@@ -74,14 +73,6 @@ internal sealed class DesktopDeleteInterceptor : IDisposable
         }
         catch{return "";}
         finally{if(accessible is not null && Marshal.IsComObject(accessible))Marshal.ReleaseComObject(accessible);}
-    }
-    private static bool IsDeleteMenu(NativePoint point)
-    {
-        var root=GetAncestor(WindowFromPoint(point),2);var name=new StringBuilder(64);GetClassNameW(root,name,name.Capacity);
-        if(name.ToString() is "Progman" or "WorkerW")return false;
-        GetWindowThreadProcessId(root,out var menuProcess);GetWindowThreadProcessId(DesktopIconAvoidance.FindIconList(),out var desktopProcess);
-        if(menuProcess!=desktopProcess)return false;
-        var label=AccessibleName(point).Replace("&","").Trim();return label=="Delete"||label.StartsWith("删除")||label.StartsWith("Delete (");
     }
     private static bool IsRecycleBin(NativePoint point)=>DesktopWindow(WindowFromPoint(point)) && AccessibleName(point).Trim() is "回收站" or "Recycle Bin";
     private static void Escape(){keybd_event(0x1b,0,0,0);keybd_event(0x1b,0,2,0);}

@@ -14,5 +14,6 @@
 
 .packing-hugging-photo{transform:scaleX(-1)}.packing-original-rocket{left:22px}.packing-original-rocket>img{transform:scaleX(-1)}.packing-ship-flame{left:40px}.packing-person-facing{position:absolute;inset:0;transform:scaleX(-1);transform-origin:50% 50%}.packing-cargo{left:82px}.is-climbing .rig-arm-front{animation-duration:.7s}.is-climbing .rig-leg-front{animation-duration:.7s}.is-climbing .rig-arm-back,.is-climbing .rig-leg-back{animation-duration:.7s;animation-delay:.35s}
 
+.packing-original-snapshot{position:absolute;display:block;max-width:none;max-height:none;border:0;padding:0;margin:0;pointer-events:none;image-rendering:auto}
 .packing-return-pose{position:absolute;inset:0;z-index:2;opacity:0;clip-path:polygon(48% 7%,83% 9%,98% 39%,92% 59%,65% 85%,28% 83%,24% 67%,42% 49%,38% 30%)}.packing-return-pose>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:scaleX(-1)}
 .is-climbing .rig-arm-front{transform-origin:58% 43%;animation:packing-hull-grip .7s ease-in-out infinite}.is-climbing .rig-arm-back{animation:packing-hull-grip .7s .35s ease-in-out infinite}@keyframes packing-hull-grip{0%,100%{transform:rotate(-8deg) translate(-2px,-1px)}50%{transform:rotate(-13deg) translate(-3px,-3px)}}

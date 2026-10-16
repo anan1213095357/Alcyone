@@ -1,5 +1,15 @@
 (() => {
     const queue=[];let busy=false;
+    function retainOriginal(item){
+        const original=item.original;
+        if(!original || typeof original.image!=='string' || !original.image.startsWith('data:image/png;base64,') ||
+            ![original.left,original.top,original.width,original.height].every(Number.isFinite) || original.width<=0 || original.height<=0)return;
+        const ratio=devicePixelRatio||1,layer=document.createElement('div'),image=document.createElement('img');
+        layer.className='file-packing-effect';image.className='packing-original-snapshot';image.src=original.image;image.alt='';
+        Object.assign(image.style,{left:(original.left/ratio)+'px',top:(original.top/ratio)+'px',width:(original.width/ratio)+'px',height:(original.height/ratio)+'px',
+            transformOrigin:((item.x-original.left)/ratio)+'px '+((item.y-original.top)/ratio)+'px'});
+        layer.append(image);document.body.append(layer);item.replica={layer,image};
+    }
     const commits=new Map();
     function commitPackedFile(id){
         if(!id)return Promise.resolve(true);
@@ -51,7 +61,7 @@
         const rocket=document.createElement('div');rocket.className='packing-ship';rocket.innerHTML=ship+'<i class="packing-ship-flame"></i><div class="packing-cargo">'+sack+'</div>';
         const person=document.createElement('div');person.className='packing-person';person.innerHTML='<div class="packing-person-facing"><div class="packing-person-sack">'+sack+'</div><div class="packing-person-rig">'+['leg-back','leg-front','body','arm-back','arm-front'].map(part=>'<img class="rig-'+part+'" src="'+personImage.src+'" alt=""/>').join('')+'</div></div>';
         const ring=document.createElement('div');ring.className='packing-launch-ring';Object.assign(ring.style,{left:(origin.x-24)+'px',top:(origin.y-24)+'px'});
-        const parcel=document.createElement('div');parcel.className='packing-parcel';const icon=document.createElement('div');icon.className='packing-file';const name=document.createElement('span');name.textContent=item.name;icon.append(name);if(item.id)icon.style.visibility='hidden';parcel.append(icon);
+        const parcel=document.createElement('div');parcel.className='packing-parcel';const icon=document.createElement('div');icon.className='packing-file';const name=document.createElement('span');name.textContent=item.name;icon.append(name);if(item.id || item.replica)icon.style.visibility='hidden';parcel.append(icon);
         const wrap=document.createElement('div');wrap.className='packing-wrap';wrap.innerHTML='<i></i><b></b>';parcel.append(wrap);Object.assign(parcel.style,{left:(x-23)+'px',top:(y-25)+'px'});
         layer.append(ring,rocket,person,parcel);document.body.append(layer);
         const rx=Math.max(2,Math.min(innerWidth-125,x-150)),ry=Math.max(8,Math.min(innerHeight-185,y-170));
@@ -69,7 +79,7 @@
             await animate(person,[{transform:pose(px,py,0)},{transform:pose(px-7,py+9,-9)},{transform:pose(px,py,0)}],{duration:450,easing:'ease-in-out'});
             person.classList.add('is-packing');
             await animate(wrap,[{opacity:0,transform:'scale(.25)'},{opacity:1,transform:'scale(1.08)'},{opacity:1,transform:'scale(1)'}],{duration:650,easing:'ease-out'});
-            await animate(icon,[{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(.5)'}],{duration:160});
+            await animate(item.replica?.image||icon,[{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(.5)'}],{duration:160});
             const facing=person.querySelector('.packing-person-facing');
             if(initialFacing===-1) await animate(facing,[{transform:'scaleX(-1)'},{transform:'scaleX(-.3)',offset:.4},{transform:'scaleX(1)'}],{duration:350,easing:'ease-in-out'});
             const bagX=px+58,bagY=py+39;
@@ -109,7 +119,7 @@
             bare.style.visibility='hidden';hugging.style.visibility='visible';returning.style.visibility='hidden';
             rocket.querySelector('.packing-cargo').style.opacity=committed?'1':'0';rocket.classList.add('flying');
             await fly(rocket,{x:rx,y:ry},{x:launchX,y:launchY},true);
-        }finally{layer.remove();}
+        }finally{layer.remove();item.replica?.layer.remove();}
     }
     async function pump(){if(busy)return;busy=true;try{while(queue.length)await pack(queue.shift());}finally{busy=false;}}
     window.external?.receiveMessage?.(message=>{
@@ -117,6 +127,6 @@
         const resultPrefix='alcyone:desktop:pack-result:';
         if(message.startsWith(resultPrefix)){try{const result=JSON.parse(message.slice(resultPrefix.length));const resolve=commits.get(result.id);commits.delete(result.id);resolve?.(result.success===true);}catch{}return;}
         const prefix='alcyone:desktop:pack-file:';if(!message.startsWith(prefix))return;
-        try{const item=JSON.parse(message.slice(prefix.length));if(!Number.isFinite(item.x)||!Number.isFinite(item.y))return;queue.push(item);pump().catch(()=>{});}catch{}
+        try{const item=JSON.parse(message.slice(prefix.length));if(!Number.isFinite(item.x)||!Number.isFinite(item.y))return;retainOriginal(item);queue.push(item);pump().catch(()=>{});}catch{}
     });
 })();

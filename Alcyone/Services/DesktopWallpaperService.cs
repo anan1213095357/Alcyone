@@ -394,8 +394,8 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
     private void EnsurePackingInterceptor()
     {
         if(!preferences.FilePackingAnimation) return;
-        _filePacking ??=new DesktopFilePacking();
-        _deleteInterceptor ??=new DesktopDeleteInterceptor(()=>_filePacking?.SelectedFiles() ?? new(),RequestFilePacking);
+        _filePacking ??=new DesktopFilePacking(()=>PostMessageW(_helper,0x0113,1,0));
+        _deleteInterceptor ??=new DesktopDeleteInterceptor(()=>_filePacking?.SelectedFiles() ?? new(),RequestFilePacking,()=>_filePacking?.RefreshSnapshots());
     }
     private void RequestFilePacking(List<DesktopFilePacking.Selection> files)
     {
@@ -403,6 +403,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
         foreach(var file in files)
         {
             if(!_packingDeletePaths.TryAdd(file.Path,0))continue;
+            _filePacking?.SuppressObservedDelete(file.Path);
             var id=Guid.NewGuid().ToString("N");_packingDeletes[id]=new(file,0);
             _packingPreviews.Enqueue(new(file.Name,file.X,file.Y,id));
         }
@@ -428,6 +429,7 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
             catch(Exception ex){logger.LogError(ex,"Packing animation recycle operation failed");}
             finally
             {
+                if(!success)_filePacking?.ResumeObservation(pending.File.Path);
                 _packingDeletePaths.TryRemove(pending.File.Path,out _);
                 if(!_disposed){_packingResults.Enqueue((surface,id,success));PostMessageW(_helper,0x0113,1,0);}
             }
@@ -606,7 +608,9 @@ public sealed class DesktopWallpaperService(UiText text, ILogger<DesktopWallpape
                     {
                         if(!GetWindowRect(surface.WindowHandle,out var bounds) || item.X<bounds.Left || item.X>=bounds.Right || item.Y<bounds.Top || item.Y>=bounds.Bottom) continue;
                         if(item.Id is not null && _packingDeletes.TryGetValue(item.Id,out var pending)) _packingDeletes[item.Id]=pending with { Surface=surface.WindowHandle };
-                        surface.SendWebMessage("alcyone:desktop:pack-file:"+System.Text.Json.JsonSerializer.Serialize(new { id=item.Id,name=item.Name,x=item.X-bounds.Left,y=item.Y-bounds.Top }));
+                        var original=item.Original;
+                        surface.SendWebMessage("alcyone:desktop:pack-file:"+System.Text.Json.JsonSerializer.Serialize(new { id=item.Id,name=item.Name,x=item.X-bounds.Left,y=item.Y-bounds.Top,
+                            original=original is null ? null : new { image=original.Image,left=original.Left-bounds.Left,top=original.Top-bounds.Top,width=original.Width,height=original.Height } }));
                         break;
                     }
                 }
