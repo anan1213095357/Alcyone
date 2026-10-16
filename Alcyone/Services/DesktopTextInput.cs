@@ -9,7 +9,7 @@ namespace StateMachine;
 public sealed class DesktopTextInput : IDisposable
 {
     public sealed record Update(string Id, string Text, bool Submit, bool Active, bool Composing = false, int HistoryDelta = 0);
-    private sealed record Request(string Id, string Text, double Left, double Top, double Width, double Height, double Ratio, double FontSize = 14, string FontFamily = "Segoe UI", string TextColor = "", string BackgroundColor = "", string ValueKind = "string", bool TransparentSurface = false, int FontWeight = 400, double TextInset = 0, bool HistoryKeys = false, bool FullBackground = false, bool StableBackground = false);
+    private sealed record Request(string Id, string Text, double Left, double Top, double Width, double Height, double Ratio, double FontSize = 14, string FontFamily = "Segoe UI", string TextColor = "", string BackgroundColor = "", string ValueKind = "string", bool TransparentSurface = false, int FontWeight = 400, double TextInset = 0, bool HistoryKeys = false, bool FullBackground = false, bool StableBackground = false, bool LiveTransparency = false);
     public event Action<Update>? Changed;
     private readonly string _class = "Alcyone.Input." + Guid.NewGuid().ToString("N");
     private readonly WindowProc _windowProc, _editProc;
@@ -37,22 +37,30 @@ public sealed class DesktopTextInput : IDisposable
         _textColor=ParseColor(request.TextColor,0x00fff3ed);
         _backgroundColor=ParseColor(request.BackgroundColor,0x00291b13);
         var style=GetWindowLongPtrW(_host,-20).ToInt64();
-        // Keep the normal EDIT window's activation and mouse hit testing.
-        SetWindowLongPtrW(_host,-20,(nint)(style&~0x80000));
         ShowWindow(_host,0);
+        // Color-key only the background, leaving real EDIT text, caret, focus
+        // and IME rendering intact. Do not use WS_EX_TRANSPARENT or global alpha.
+        var liveTransparency = request.LiveTransparency;
+        const uint transparentKey = 0x00291b13;
+        SetWindowLongPtrW(_host,-20,(nint)(liveTransparency ? style|0x80000 : style&~0x80000));
+        if (liveTransparency)
+        {
+            if (SetLayeredWindowAttributes(_host, transparentKey, 255, 1)) _backgroundColor = transparentKey;
+            else { liveTransparency = false; SetWindowLongPtrW(_host,-20,(nint)(style&~0x80000)); }
+        }
         // Do not capture a compositor frame that still contains the previous
         // native edit window (including its text or an outdated wallpaper image).
-        if (request.TransparentSurface && !request.StableBackground) DwmFlush();
+        if (request.TransparentSurface && !request.StableBackground && !request.LiveTransparency) DwmFlush();
         if(_brush!=0) DeleteObject(_brush);
-        // Terminal inputs use an opaque brush while focused. Captured wallpaper
-        // is a frozen image, not transparency, and cannot track moving planets.
-        _brush=request.TransparentSurface && !request.StableBackground ? CaptureBackground(bounds.Left+(int)(request.Left*request.Ratio),bounds.Top+(int)(request.Top*request.Ratio),width,height,request.FullBackground) : 0;
+        // Live transparent inputs never capture the wallpaper: its animation
+        // remains visible through the keyed background as it changes.
+        _brush=request.TransparentSurface && !request.StableBackground && !request.LiveTransparency ? CaptureBackground(bounds.Left+(int)(request.Left*request.Ratio),bounds.Top+(int)(request.Top*request.Ratio),width,height,request.FullBackground) : 0;
         _snapshotBackground=_brush!=0 && request.TransparentSurface;
         if(_brush==0) _brush=CreateSolidBrush(_backgroundColor);
         var fontSize=double.IsFinite(request.FontSize) ? Math.Clamp(request.FontSize,1,144) : 14;
         var family=request.FontFamily.Trim(' ', '\'', '"');
         if(string.IsNullOrWhiteSpace(family)||family.Length>100||family is "system-ui" or "sans-serif" or "inherit") family="Segoe UI";
-        var font = CreateFontW(-(int)Math.Round(fontSize * request.Ratio), 0, 0, 0, Math.Clamp(request.FontWeight,100,900), 0, 0, 0, 1, 0, 0, 5, 0, family);
+        var font = CreateFontW(-(int)Math.Round(fontSize * request.Ratio), 0, 0, 0, Math.Clamp(request.FontWeight,100,900), 0, 0, 0, 1, 0, 0, liveTransparency ? 4u : 5u, 0, family);
         SendMessageW(_edit, 0x0030, (nuint)font, 1);
         if (_font != 0) DeleteObject(_font); _font = font;
         SetWindowPos(_edit, 0, 0, 0, width, height, 0x0014);
@@ -157,6 +165,8 @@ public sealed class DesktopTextInput : IDisposable
     }
     private nint WindowMessage(nint hwnd, uint message, nuint wParam, nint lParam)
     {
+        if (message == 0x0014 && _brush != 0 && GetClientRect(hwnd, out var backgroundRect))
+        { FillRect((nint)wParam, ref backgroundRect, _brush); return 1; }
         if (message == 0x0111 && (wParam >> 16 & 0xffff) == 0x0300 && _active) { InvalidateRect(_edit,0,true); Publish(); }
         if (message == 0x0006 && (wParam & 0xffff) == 0) Close();
         if (message == 0x0133) { SetTextColor((nint)wParam, _textColor); SetBkColor((nint)wParam, _backgroundColor); SetBkMode((nint)wParam,_snapshotBackground ? 1 : 2); return _brush; }
