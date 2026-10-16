@@ -1,0 +1,2 @@
+.wallpaper-background { position:absolute; inset:0; overflow:hidden; pointer-events:none; background:radial-gradient(ellipse at center,#403020,#030610 65%); }
+.wallpaper-background ::deep canvas { display:block; width:100%; height:100%; }

@@ -1,0 +1,27 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="wallpaper-background" @ref="_host" aria-hidden="true"></div>
+
+@code {
+    [Parameter, EditorRequired] public string Module { get; set; } = "";
+    private ElementReference _host;
+    private IJSObjectReference? _controller;
+    private IJSObjectReference? _module;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/wallpaper-themes.js");
+        _controller = await _module.InvokeAsync<IJSObjectReference>("mount", _host, Module);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_controller is not null) { await _controller.InvokeVoidAsync("dispose"); await _controller.DisposeAsync(); }
+            if (_module is not null) await _module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+    }
+}

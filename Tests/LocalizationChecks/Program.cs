@@ -22,6 +22,18 @@ Directory.CreateDirectory(directory);
 try
 {
     var path = Path.Combine(directory, "settings.json");
+    var desktopPath = Path.Combine(directory, "desktop.json");
+    var desktopPreferences = new StateMachine.DesktopPreferences(desktopPath);
+    Check(desktopPreferences.WallpaperTheme == "default", "Existing installations retain the default wallpaper");
+    desktopPreferences.SetWallpaperTheme("gravity");
+    desktopPreferences.SetDesktopAi(false);
+    desktopPreferences.SetFilePacking(false);
+    desktopPreferences.SetRestore(false);
+    desktopPreferences.RememberDesktop(true, "example");
+    var restoredDesktop = new StateMachine.DesktopPreferences(desktopPath);
+    Check(restoredDesktop.WallpaperTheme == "gravity" && !restoredDesktop.DesktopAiEnabled && restoredDesktop.ConfigKey == "example", "Wallpaper selection survives other settings and restart");
+    restoredDesktop.SetWallpaperTheme("default");
+    Check(new StateMachine.DesktopPreferences(desktopPath).WallpaperTheme == "default", "Switching back to the default persists");
     var preferences = new LanguagePreferences(path);
     var text = new UiText(preferences);
     Check(preferences.Language == "zh-CN" && text["运行"] == "运行", "Chinese default");

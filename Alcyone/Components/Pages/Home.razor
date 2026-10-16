@@ -11,6 +11,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
 @inject IJSRuntime JS
+@inject WallpaperThemes Themes
 @implements IAsyncDisposable
 @rendermode InteractiveServer
 
@@ -224,7 +225,11 @@
                 </nav>
             }
             @if (IsWallpaperView && DesktopPreferences.DesktopAiEnabled) { <DesktopAiConsole Submit="SendDesktopAiAsync" Reply="@_desktopAiReply" Progress="_desktopAiProgress" CliPreview="@DesktopCliPreview" CliOutput="@_desktopCliOutput" CliStatus="@_desktopCliStatus" CliBusy="_desktopCliBusy" ExecuteCli="ExecuteDesktopCliAsync" CancelCli="CancelDesktopCli" StateNames="@Machine.States.Select(s => s.Name)" VariableNames="@Machine.Variables.Select(v => v.Name)" /> }
-            <div class="starfield-anchor" aria-hidden="true"><canvas id="workspaceBackdrop"></canvas><canvas class="nebula-layer nebula-violet"></canvas><canvas class="nebula-layer nebula-aurora"></canvas><canvas class="milky-way-layer"></canvas><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><canvas id="workspaceStarfield"></canvas></div>
+            @if (Themes.Find(DesktopPreferences.WallpaperTheme).Module is { } themeModule)
+            {
+                <WallpaperBackground @key="themeModule" Module="@themeModule" />
+            }
+            <div class="starfield-anchor" style="@(Themes.Find(DesktopPreferences.WallpaperTheme).Module is null ? null : "display:none")" aria-hidden="true"><canvas id="workspaceBackdrop"></canvas><canvas class="nebula-layer nebula-violet"></canvas><canvas class="nebula-layer nebula-aurora"></canvas><canvas class="milky-way-layer"></canvas><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><div class="distant-galaxy"><div class="galaxy-projection"><canvas></canvas></div></div><canvas id="workspaceStarfield"></canvas></div>
             <div id="worldScale">
                 <div id="world">
                     <div id="alcyoneGroupLayer"></div>
@@ -1918,7 +1923,8 @@
             function tick(time) {
                 if (stopped) return;
                 const dt = last ? Math.min((time - last) / 1000, .05) : 0; last = time;
-                paint(dt); frame = window.alcyoneAnimation.requestFrame(tick);
+                if (canvas.parentElement.style.display !== 'none') paint(dt);
+                frame = window.alcyoneAnimation.requestFrame(tick);
             }
             function resume() {
                 window.alcyoneAnimation.cancelFrame(frame); last = 0;

@@ -1,12 +1,20 @@
 @inherits LocalizedComponent
 @inject DesktopPreferences Preferences
 @inject DesktopWallpaperService Desktop
+@inject WallpaperThemes Themes
 <button class="desktop-settings-entry" @onclick="() => _open = true"><span>@L["桌面与启动"]</span><small>@L["开机自启与桌面恢复"]</small><span>›</span></button>
 @if (_open)
 {
     <div class="desktop-settings-backdrop" data-overlay-dismiss @onclick="() => _open = false">
         <section class="desktop-settings-dialog" role="dialog" aria-modal="true" aria-label="@L["桌面设置"]" @onclick:stopPropagation="true">
             <h2>@L["桌面设置"]</h2>
+            <label class="wallpaper-theme-label">@L["壁纸主题"]
+                <select value="@Themes.Find(Preferences.WallpaperTheme).Id" @onchange="SetWallpaperTheme">
+                    @foreach (var theme in Themes.All) { <option value="@theme.Id">@L[theme.Name]</option> }
+                </select>
+            </label>
+            <p>@L[Themes.Find(Preferences.WallpaperTheme).Description]</p>
+            <p>@L["切换后立即应用，重启后保留选择。"]</p>
             <label><input type="checkbox" checked="@Preferences.AutoStart" disabled="@(!Desktop.Available)" @onchange="SetAutoStart" />@L["登录 Windows 后自动启动"]</label>
             <label><input type="checkbox" checked="@Preferences.RestoreDesktop" @onchange="SetRestore" />@L["启动时恢复上次启用的桌面"]</label>
             <label><input type="checkbox" checked="@Preferences.DesktopAiEnabled" @onchange="SetDesktopAi" />@L["显示桌面 AI 对话框"]</label>
@@ -19,6 +27,7 @@
     </div>
 }
 @code {
+    private void SetWallpaperTheme(ChangeEventArgs args) { try { Preferences.SetWallpaperTheme(Themes.Find(args.Value?.ToString()).Id); _error = null; } catch (Exception ex) { _error = ex.Message; } }
     private void SetDesktopAi(ChangeEventArgs args) { try { Preferences.SetDesktopAi(args.Value is true); _error=null; } catch(Exception ex) { _error=ex.Message; } }
     private void SetFilePacking(ChangeEventArgs args) { try { Preferences.SetFilePacking(args.Value is true); _error=null; } catch(Exception ex) { _error=ex.Message; } }
     private bool _open;

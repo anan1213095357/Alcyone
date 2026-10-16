@@ -13,6 +13,7 @@ public sealed class DesktopPreferences
     public bool FilePackingAnimation { get; private set; } = true;
     public bool RestoreDesktop { get; private set; } = true;
     public bool DesktopEnabled { get; private set; }
+    public string WallpaperTheme { get; private set; } = "default";
     public string ConfigKey { get; private set; } = "default";
     public bool AutoStart
     {
@@ -26,6 +27,7 @@ public sealed class DesktopPreferences
             if (!File.Exists(_path)) return;
             var saved = JsonSerializer.Deserialize<Settings>(File.ReadAllText(_path));
             if (saved is null) return;
+            WallpaperTheme = saved.WallpaperTheme ?? "default";
             DesktopAiEnabled = saved.DesktopAiEnabled; FilePackingAnimation = saved.FilePackingAnimation; RestoreDesktop = saved.RestoreDesktop; DesktopEnabled = saved.DesktopEnabled; ConfigKey = saved.ConfigKey;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { }
@@ -46,12 +48,15 @@ public sealed class DesktopPreferences
     public void SetDesktopAi(bool enabled) { lock (_gate) Save(new(RestoreDesktop, DesktopEnabled, ConfigKey, FilePackingAnimation, enabled)); }
     private void Save(Settings settings)
     {
+        settings = settings with { WallpaperTheme = settings.WallpaperTheme ?? WallpaperTheme };
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
         var temporary = _path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(settings)); File.Move(temporary, _path, true);
         DesktopAiEnabled = settings.DesktopAiEnabled;
+        WallpaperTheme = settings.WallpaperTheme!;
         FilePackingAnimation = settings.FilePackingAnimation; RestoreDesktop = settings.RestoreDesktop; DesktopEnabled = settings.DesktopEnabled; ConfigKey = settings.ConfigKey;
         Changed?.Invoke();
     }
-    private sealed record Settings(bool RestoreDesktop, bool DesktopEnabled, string ConfigKey, bool FilePackingAnimation = true, bool DesktopAiEnabled = true);
+    public void SetWallpaperTheme(string id) { lock (_gate) Save(new(RestoreDesktop, DesktopEnabled, ConfigKey, FilePackingAnimation, DesktopAiEnabled, id)); }
+    private sealed record Settings(bool RestoreDesktop, bool DesktopEnabled, string ConfigKey, bool FilePackingAnimation = true, bool DesktopAiEnabled = true, string? WallpaperTheme = null);
 }
